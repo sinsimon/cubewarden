@@ -2207,17 +2207,14 @@ function renderChanges() {
       h("button", { class: "btn sm", type: "button", onclick: () => fn(id) }, btn)))) : h("div", { class: "kempty", style: "padding:8px 10px" }, "None"));
   body.append(list("Out of the cube", d.removes, "Put back", (id) => { pushUndo("put back " + byId[id].name); S.current.push(id); afterChange("Put back " + byId[id].name); }));
   body.append(list("Into the cube", d.adds, "Take out", (id) => { pushUndo("take out " + byId[id].name); S.current = S.current.filter((x) => x !== id); afterChange("Took out " + byId[id].name); }));
-  const resetBtn = h("button", { class: "btn danger", type: "button", onclick: (e) => {
+  /** A button that asks for a second click before doing something that loses work. */
+  const armed = (label, confirmLabel, cls, title, run) => h("button", { class: "btn " + cls, type: "button", title, onclick: (e) => {
     const b = e.currentTarget;
-    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Click again: lose all edits"; return; }
-    resetToDemo();
-  } }, "Reset to demo");
-  const restart = h("button", { class: "btn ghost", type: "button", onclick: (e) => {
-    const b = e.currentTarget;
-    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Click again to start over"; return; }
-    suppressUnload = true; B.store.clear(); location.reload();
-  } }, "Import another cube");
-  body.append(h("div", { class: "row", style: "border-top:1px solid var(--line);padding-top:12px" }, resetBtn, restart, h("span", { class: "help muted", style: "font-size:12px" }, "Everything autosaves in this browser.")));
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = confirmLabel; return; }
+    run();
+  } }, label);
+  const restart = armed("Start over", "Click again: clear everything", "danger", "Clear this browser's work and go back to the first screen: open the cube again or import another one.", () => { suppressUnload = true; B.store.clear(); location.reload(); });
+  body.append(h("div", { class: "row", style: "border-top:1px solid var(--line);padding-top:12px;flex-wrap:wrap" }, restart, h("span", { class: "help muted", style: "font-size:12px" }, "Everything autosaves in this browser. Download the project file to keep a copy.")));
   return [drawerHead("Changes", "Against the imported list"), body];
 }
 /** CubeCobra tags of the imported cube live on the cards as ccTags (field "tag:" in filters). */
@@ -2247,7 +2244,6 @@ function mechanicsFromTags(cfg, tagsById) {
   return all.length;
 }
 function demoState() { return { version: 1, config: clone(D.seed), original: D.cube.original.slice(), current: D.cube.current.slice(), started: true, ccTags: {} }; }
-function resetToDemo() { suppressUnload = true; B.store.save(demoState()); location.reload(); }
 
 /* ================= data sources / shortcuts / view filter ================= */
 function renderData() {
