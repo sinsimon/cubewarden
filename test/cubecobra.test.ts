@@ -15,10 +15,9 @@ describe("reading a CubeCobra cube", () => {
     expect(cube.name).toBe("Sample cube");
     expect(cube.mainboard).toHaveLength(5);
     expect(cube.maybeboard).toHaveLength(1);
-    const spider = byName(cube.cards, "Skyward Spider");
-    expect(spider).toMatchObject({ colors: "WU", manaCost: "{W/U}{W/U}", hybrid: true });
-    expect(byName(cube.cards, "Air Nomad Legacy")).toMatchObject({ colors: "WU", manaCost: "{W}{U}", hybrid: false, type: "Enchantment" });
-    expect(byName(cube.cards, "Exhibition Tidecaller").tags).toContain("mill");
+    expect(byName(cube.cards, "Sokka, Lateral Strategist")).toMatchObject({ colors: "WU", manaCost: "{1}{W/U}{W/U}", hybrid: true });
+    expect(byName(cube.cards, "No More Lies")).toMatchObject({ colors: "WU", manaCost: "{W}{U}", hybrid: false, type: "Instant" });
+    expect(byName(cube.cards, "Gran-Gran").tags).toContain("triggered-ability");
     expect(cube.config).toBeNull();
   });
   it("counts a card listed twice once, and says how many duplicates it dropped", async () => {
@@ -29,8 +28,8 @@ describe("reading a CubeCobra cube", () => {
   });
   it("keeps the cube's own CubeCobra tags on the cards", async () => {
     const cube = await readCubeCobra(SAMPLE);
-    expect(byName(cube.cards, "North Pole Gates").ccTags).toEqual(["TLA Lands"]);
-    expect(cube.tags).toEqual(["TLA Lands"]);
+    expect(byName(cube.cards, "Abandoned Campground").ccTags).toEqual(["DSK"]);
+    expect(cube.tags).toEqual(expect.arrayContaining(["DSK", "TLA", "MKM", "WOE"]));
   });
   it("prefers the card data we already have, but keeps the cube's tags", async () => {
     const spiderId = SAMPLE.cards.mainboard[1].details.oracle_id;

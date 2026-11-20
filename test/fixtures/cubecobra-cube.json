@@ -11,16 +11,16 @@
  "cards": {
   "mainboard": [
    {
-    "cardID": "bcf7b9da-d35d-4338-b4d9-83e47dc058ee",
+    "cardID": "ee0565f5-ebdb-43f9-bbb4-0485b1968937",
     "board": "mainboard",
-    "status": "Owned",
+    "status": "Not Owned",
     "tags": [
-     "TLA Lands"
+     "DSK"
     ],
     "details": {
-     "oracle_id": "3fcd1432-66d0-40e1-85ef-b57a6fa94b7c",
-     "scryfall_id": "bcf7b9da-d35d-4338-b4d9-83e47dc058ee",
-     "name": "North Pole Gates",
+     "oracle_id": "0eec9984-cd11-4a52-9234-469c6a5fb9aa",
+     "scryfall_id": "ee0565f5-ebdb-43f9-bbb4-0485b1968937",
+     "name": "Abandoned Campground",
      "colors": [],
      "color_identity": [
       "U",
@@ -31,39 +31,38 @@
      "cmc": 0,
      "power": null,
      "toughness": null,
-     "oracle_text": "This land enters tapped.\n{T}: Add {W} or {U}.\n{4}, {T}, Sacrifice this land: Draw a card.",
+     "oracle_text": "This land enters tapped unless a player has 13 or less life.\n{T}: Add {W} or {U}.",
      "keywords": [],
      "oracle_tags": [
-      "pure-draw",
-      "draw",
-      "card-advantage",
-      "utility-land",
-      "cycle-tla-c-tapland",
+      "cycle-dsk-thirteenland",
+      "conditional-tapland",
       "cycle-dual-land",
       "dual-land",
       "cycle-land",
       "cycle",
-      "tapland",
-      "sacrifice-self",
+      "life-total-matters-self",
       "activated-ability"
      ],
-     "set": "tla",
-     "collector_number": "274",
+     "set": "dsk",
+     "collector_number": "255",
      "rarity": "common",
-     "image_normal": "https://assets.cubecobra.com/cardimages/bcf7b9da-d35d-4338-b4d9-83e47dc058ee/normal.webp?v=1783904910",
-     "elo": 1170.558753888062,
-     "cubeCount": 1548,
-     "pickCount": 1032
+     "image_normal": "https://assets.cubecobra.com/cardimages/ee0565f5-ebdb-43f9-bbb4-0485b1968937/normal.webp?v=1783909431",
+     "elo": 1204.5488143859602,
+     "cubeCount": 2382,
+     "pickCount": 1918
     }
    },
    {
-    "cardID": "f5cbb580-cd02-4c60-acb7-b7ed1f1fce59",
+    "cardID": "1326c5db-4615-495f-8e30-376243d91352",
     "board": "mainboard",
     "status": "Not Owned",
+    "tags": [
+     "TLA"
+    ],
     "details": {
-     "oracle_id": "d6ba76fa-441c-4a74-bfea-8ae2a2c9e391",
-     "scryfall_id": "f5cbb580-cd02-4c60-acb7-b7ed1f1fce59",
-     "name": "Skyward Spider",
+     "oracle_id": "427f8ef9-12b3-4fa0-b303-28153566b6dc",
+     "scryfall_id": "1326c5db-4615-495f-8e30-376243d91352",
+     "name": "Sokka, Lateral Strategist",
      "colors": [
       "U",
       "W"
@@ -74,50 +73,56 @@
      ],
      "parsed_cost": [
       "w-u",
-      "w-u"
+      "w-u",
+      "1"
      ],
-     "type": "Creature — Spider Human Hero",
-     "cmc": 2,
+     "type": "Legendary Creature — Human Warrior Ally",
+     "cmc": 3,
      "power": "2",
-     "toughness": "2",
-     "oracle_text": "Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nThis creature has flying as long as it's modified. (Equipment, Auras you control, and counters are modifications.)",
+     "toughness": "4",
+     "oracle_text": "Vigilance\nWhenever Sokka and at least one other creature attack, draw a card.",
      "keywords": [
-      "Ward"
+      "Vigilance"
      ],
      "oracle_tags": [
-      "cycle-spm-c-hybrid",
+      "draw-engine",
+      "repeatable-draw",
+      "repeatable-card-advantage",
+      "card-advantage",
+      "draw",
+      "repeatable-pure-draw",
+      "pure-draw",
+      "cycle-tla-u-hybrid",
+      "cycle-tla-draft-signpost",
+      "draft-signpost",
       "cycle",
-      "ward",
-      "protects-self",
-      "hate-target",
-      "hate",
-      "triggered-ability",
-      "synergy-modified",
-      "counters-matter",
-      "synergy-aura",
-      "synergy-equipment",
-      "gains-flying",
-      "evasion",
-      "rhystic",
-      "tax"
+      "alliteration",
+      "card-names",
+      "attacking-matters",
+      "attacking-matters-self",
+      "attack-trigger",
+      "triggered-ability"
      ],
-     "set": "spm",
-     "collector_number": "146",
-     "rarity": "common",
-     "image_normal": "https://assets.cubecobra.com/cardimages/f5cbb580-cd02-4c60-acb7-b7ed1f1fce59/normal.webp?v=1783905311",
-     "elo": 1215.0609470587856,
-     "cubeCount": 1020,
-     "pickCount": 657
+     "set": "tla",
+     "collector_number": "241",
+     "rarity": "uncommon",
+     "image_normal": "https://assets.cubecobra.com/cardimages/1326c5db-4615-495f-8e30-376243d91352/normal.webp?v=1783904920",
+     "elo": 1296.2523315702563,
+     "cubeCount": 1902,
+     "pickCount": 2078
     }
    },
    {
-    "cardID": "10874416-fa4c-4aa3-b885-4351d011d208",
+    "cardID": "1e0c695d-62f9-4805-9e2f-7032e8464136",
     "board": "mainboard",
     "status": "Not Owned",
+    "tags": [
+     "MKM"
+    ],
     "details": {
-     "oracle_id": "9e830359-ab92-4bfd-82b3-d9c67ac80cf7",
-     "scryfall_id": "10874416-fa4c-4aa3-b885-4351d011d208",
-     "name": "Air Nomad Legacy",
+     "oracle_id": "ead1ee6a-e0da-46d5-89e8-31e8c0270bc2",
+     "scryfall_id": "1e0c695d-62f9-4805-9e2f-7032e8464136",
+     "name": "No More Lies",
      "colors": [
       "U",
       "W"
@@ -130,43 +135,44 @@
       "u",
       "w"
      ],
-     "type": "Enchantment",
+     "type": "Instant",
      "cmc": 2,
      "power": null,
      "toughness": null,
-     "oracle_text": "When this enchantment enters, create a Clue token. (It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nCreatures you control with flying get +1/+1.",
+     "oracle_text": "Counter target spell unless its controller pays {3}. If that spell is countered this way, exile it instead of putting it into its owner's graveyard.",
      "keywords": [],
      "oracle_tags": [
-      "anthem",
-      "synergy-flying",
-      "toughness-boost-to-all",
-      "pure-draw",
-      "draw",
-      "card-advantage",
-      "triggered-ability",
-      "cycle-tla-u-two-color",
-      "cycle-tla-draft-signpost",
-      "draft-signpost",
+      "single-target-instant-sorcery",
+      "cycle-mkm-u-gold-noncreature",
+      "cycle-mkm-draft-signpost",
       "cycle",
-      "power-boost-to-all"
+      "draft-signpost",
+      "counterspell-soft",
+      "counterspell",
+      "blue-effect",
+      "self-replacement-effect",
+      "counterspell-exile"
      ],
-     "set": "tla",
-     "collector_number": "206",
+     "set": "mkm",
+     "collector_number": "221",
      "rarity": "uncommon",
-     "image_normal": "https://assets.cubecobra.com/cardimages/10874416-fa4c-4aa3-b885-4351d011d208/normal.webp?v=1783904932",
-     "elo": 1150.8057648809242,
-     "cubeCount": 1693,
-     "pickCount": 1024
+     "image_normal": "https://assets.cubecobra.com/cardimages/1e0c695d-62f9-4805-9e2f-7032e8464136/normal.webp?v=1783912840",
+     "elo": 1460.1222253570659,
+     "cubeCount": 13470,
+     "pickCount": 71299
     }
    },
    {
-    "cardID": "a58c364e-d0c5-41b9-8c8b-2e5a99468cc7",
+    "cardID": "fa434b41-e5f7-4989-865a-95db67b05cb1",
     "board": "mainboard",
     "status": "Not Owned",
+    "tags": [
+     "TLA"
+    ],
     "details": {
-     "oracle_id": "d32c9439-4c97-412b-83cc-6d9acb48be3c",
-     "scryfall_id": "a58c364e-d0c5-41b9-8c8b-2e5a99468cc7",
-     "name": "Exhibition Tidecaller",
+     "oracle_id": "0259a9ed-0558-4183-b737-871ed5573c32",
+     "scryfall_id": "fa434b41-e5f7-4989-865a-95db67b05cb1",
+     "name": "Gran-Gran",
      "colors": [
       "U"
      ],
@@ -176,140 +182,133 @@
      "parsed_cost": [
       "u"
      ],
-     "type": "Creature — Djinn Wizard",
+     "type": "Legendary Creature — Human Peasant Ally",
      "cmc": 1,
-     "power": "0",
+     "power": "1",
      "toughness": "2",
-     "oracle_text": "Opus — Whenever you cast an instant or sorcery spell, target player mills three cards. If five or more mana was spent to cast that spell, that player mills ten cards instead.",
-     "keywords": [
-      "Mill",
-      "Opus"
-     ],
+     "oracle_text": "Whenever Gran-Gran becomes tapped, draw a card, then discard a card.\nNoncreature spells you cast cost {1} less to cast as long as there are three or more Lesson cards in your graveyard.",
+     "keywords": [],
      "oracle_tags": [
-      "mill-any",
-      "mill-self",
-      "mill",
-      "mill-opponent",
-      "amount-spent-matters",
-      "mana-spent-matters",
-      "repeatable-crime",
-      "synergy-instant",
-      "synergy-sorcery",
-      "cast-trigger-you",
-      "cast-trigger",
+      "uninspired",
       "triggered-ability",
-      "self-replacement-effect"
+      "cards-in-graveyard-matter",
+      "synergy-noncreature",
+      "synergy-lesson",
+      "alliteration",
+      "card-names",
+      "repeatable-loot",
+      "repeatable-draw",
+      "repeatable-card-advantage",
+      "card-advantage",
+      "draw",
+      "loot",
+      "discard-outlet",
+      "blue-effect",
+      "cost-reducer-noncreature",
+      "cost-reducer"
      ],
-     "set": "sos",
-     "collector_number": "48",
-     "rarity": "rare",
-     "image_normal": "https://assets.cubecobra.com/cardimages/a58c364e-d0c5-41b9-8c8b-2e5a99468cc7/normal.webp?v=1783903694",
-     "elo": 1332.4952541979887,
-     "cubeCount": 1856,
-     "pickCount": 959
+     "set": "tla",
+     "collector_number": "54",
+     "rarity": "uncommon",
+     "image_normal": "https://assets.cubecobra.com/cardimages/fa434b41-e5f7-4989-865a-95db67b05cb1/normal.webp?v=1786399175",
+     "elo": 1342.0417475650981,
+     "cubeCount": 2127,
+     "pickCount": 1458
     }
    },
    {
-    "cardID": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
+    "cardID": "09a4578a-7dc6-4da3-93ee-913b10be5740",
     "board": "mainboard",
     "status": "Not Owned",
+    "tags": [
+     "WOE"
+    ],
     "details": {
-     "oracle_id": "11ceb2db-021e-422d-976e-7bfe3b67a8aa",
-     "scryfall_id": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
-     "name": "Foraging Wickermaw",
+     "oracle_id": "10b8d4c7-7553-4d76-b643-d98b80701e13",
+     "scryfall_id": "09a4578a-7dc6-4da3-93ee-913b10be5740",
+     "name": "Gingerbrute",
      "colors": [],
      "color_identity": [],
      "parsed_cost": [
-      "2"
+      "1"
      ],
-     "type": "Artifact Creature — Scarecrow",
-     "cmc": 2,
+     "type": "Artifact Creature — Food Golem",
+     "cmc": 1,
      "power": "1",
-     "toughness": "3",
-     "oracle_text": "When this creature enters, surveil 1. (Look at the top card of your library. You may put it into your graveyard.)\n{1}: Add one mana of any color. This creature becomes that color until end of turn. Activate only once each turn.",
+     "toughness": "1",
+     "oracle_text": "Haste (This creature can attack and {T} as soon as it comes under your control.)\n{1}: This creature can't be blocked this turn except by creatures with haste.\n{2}, {T}, Sacrifice this creature: You gain 3 life.",
      "keywords": [
-      "Surveil"
+      "Haste"
      ],
      "oracle_tags": [
-      "color-change-self",
-      "color-change",
-      "mana-filter",
-      "triggered-ability",
+      "lifegain",
+      "mixed-subtypes",
+      "martyr",
+      "sacrifice-self",
       "activated-ability",
-      "surveil",
-      "peek-library",
-      "peek",
-      "top-deck-manipulation",
-      "library-manipulation",
-      "mill-self",
-      "mill"
+      "portmanteau",
+      "card-names",
+      "unblockable",
+      "evasion"
      ],
-     "set": "ecl",
-     "collector_number": "256",
+     "set": "woe",
+     "collector_number": "246",
      "rarity": "common",
-     "image_normal": "https://assets.cubecobra.com/cardimages/f524bc08-caeb-4362-b960-eb8e0e4159d0/normal.webp?v=1783904398",
-     "elo": 1323.9738866524842,
-     "cubeCount": 1486,
-     "pickCount": 1490
+     "image_normal": "https://assets.cubecobra.com/cardimages/09a4578a-7dc6-4da3-93ee-913b10be5740/normal.webp?v=1783915058",
+     "elo": 1295.3178595026102,
+     "cubeCount": 31037,
+     "pickCount": 52305
     }
    }
   ],
   "maybeboard": [
    {
-    "cardID": "6b8e6435-7de4-41d5-bc7d-8e24c11897d0",
+    "cardID": "da45e9b0-a4f6-413b-9e62-666c511eb5b0",
     "board": "maybeboard",
     "status": "Not Owned",
     "details": {
-     "oracle_id": "8a0e35ac-6c03-4922-b3b4-e419419fe3d7",
-     "scryfall_id": "6b8e6435-7de4-41d5-bc7d-8e24c11897d0",
-     "name": "Bofur, Reliable Guardian",
+     "oracle_id": "24ee57b5-a505-4264-97ca-8b8dfb12298e",
+     "scryfall_id": "da45e9b0-a4f6-413b-9e62-666c511eb5b0",
+     "name": "Mardu Devotee",
      "colors": [
       "W"
      ],
      "color_identity": [
+      "B",
+      "R",
       "W"
      ],
      "parsed_cost": [
-      "w",
-      "1",
-      "split",
       "w"
      ],
-     "type": "Legendary Creature — Dwarf Scout",
+     "type": "Creature — Human Scout",
      "cmc": 1,
      "power": "1",
-     "toughness": "1",
-     "oracle_text": "Lifelink\nTarget artifact or creature you control gains hexproof and indestructible until end of turn. (Then exile this card. You may cast the creature later from exile.)",
+     "toughness": "2",
+     "oracle_text": "When this creature enters, scry 2. (Look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)\n{1}: Add {R}, {W}, or {B}. Activate only once each turn.",
      "keywords": [
-      "Lifelink"
+      "Scry"
      ],
      "oracle_tags": [
-      "single-target-instant-sorcery",
-      "repeatable-lifegain",
-      "lifegain",
-      "castable-from-exile",
-      "unexile",
-      "castable-from-nonhand",
-      "combat-trick",
-      "more-expensive-than-mv",
-      "virtual-french-vanilla",
-      "flavors-of-vanilla",
-      "protects-artifact",
-      "protection",
-      "protects-creature",
-      "exile-self",
-      "alliteration",
-      "card-names",
-      "gives-indestructible",
-      "gives-hexproof"
+      "mana-filter",
+      "triggered-ability",
+      "cycle-tdm-devotee",
+      "cycle",
+      "scry",
+      "peek-library",
+      "peek",
+      "bottom-deck-manipulation",
+      "library-manipulation",
+      "top-deck-manipulation",
+      "activated-ability"
      ],
-     "set": "hob",
-     "collector_number": "6",
-     "rarity": "uncommon",
-     "image_normal": "https://assets.cubecobra.com/cardimages/6b8e6435-7de4-41d5-bc7d-8e24c11897d0/normal.webp?v=1785496981",
-     "elo": 1232.3542263509771,
-     "cubeCount": 1041,
-     "pickCount": 768
+     "set": "tdm",
+     "collector_number": "16",
+     "rarity": "common",
+     "image_normal": "https://assets.cubecobra.com/cardimages/da45e9b0-a4f6-413b-9e62-666c511eb5b0/normal.webp?v=1783907411",
+     "elo": 1284.8037415202061,
+     "cubeCount": 2827,
+     "pickCount": 2465
     }
    }
   ],
