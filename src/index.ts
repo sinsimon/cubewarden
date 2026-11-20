@@ -6,3 +6,11 @@ export { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
 export { FilterError, isCreature, isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 export { formatConstraint, gap, inConstraint, statusOf, type Status } from "./constraint.ts";
 export { archetypePool, colorPool, evaluate, scopeCards, worst, type ArchetypeReport, type EvaluateOptions, type ScopeReport, type SharedSummary, type Report, type Result, type ScopeStatus } from "./evaluate.ts";
+export { describeFilter } from "./describe.ts";
+export { toScryfall, type ScryfallScope } from "./scryfall.ts";
+export {
+  cardFromCubeCobra, cubeCobraListUrl, decodeRules, encodeRules, fetchCubeCobra, isHybridCost, readCubeCobra,
+  type CubeCobraCube, type CubeCobraJson,
+} from "./cubecobra.ts";
+export { changelist, diff, exportCsv, mechanicTags, type Diff } from "./export.ts";
+export { aboutMarkdown, REPO_URL, type AboutOptions } from "./about.ts";

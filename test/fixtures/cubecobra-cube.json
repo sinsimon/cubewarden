@@ -1,0 +1,318 @@
+{
+ "id": "sample-cube",
+ "shortId": "sample",
+ "name": "Sample cube",
+ "primerTabs": [
+  {
+   "title": "Primer",
+   "content": "A small sample cube for tests."
+  }
+ ],
+ "cards": {
+  "mainboard": [
+   {
+    "cardID": "bcf7b9da-d35d-4338-b4d9-83e47dc058ee",
+    "board": "mainboard",
+    "status": "Owned",
+    "tags": [
+     "TLA Lands"
+    ],
+    "details": {
+     "oracle_id": "3fcd1432-66d0-40e1-85ef-b57a6fa94b7c",
+     "scryfall_id": "bcf7b9da-d35d-4338-b4d9-83e47dc058ee",
+     "name": "North Pole Gates",
+     "colors": [],
+     "color_identity": [
+      "U",
+      "W"
+     ],
+     "parsed_cost": [],
+     "type": "Land",
+     "cmc": 0,
+     "power": null,
+     "toughness": null,
+     "oracle_text": "This land enters tapped.\n{T}: Add {W} or {U}.\n{4}, {T}, Sacrifice this land: Draw a card.",
+     "keywords": [],
+     "oracle_tags": [
+      "pure-draw",
+      "draw",
+      "card-advantage",
+      "utility-land",
+      "cycle-tla-c-tapland",
+      "cycle-dual-land",
+      "dual-land",
+      "cycle-land",
+      "cycle",
+      "tapland",
+      "sacrifice-self",
+      "activated-ability"
+     ],
+     "set": "tla",
+     "collector_number": "274",
+     "rarity": "common",
+     "image_normal": "https://assets.cubecobra.com/cardimages/bcf7b9da-d35d-4338-b4d9-83e47dc058ee/normal.webp?v=1783904910",
+     "elo": 1170.558753888062,
+     "cubeCount": 1548,
+     "pickCount": 1032
+    }
+   },
+   {
+    "cardID": "f5cbb580-cd02-4c60-acb7-b7ed1f1fce59",
+    "board": "mainboard",
+    "status": "Not Owned",
+    "details": {
+     "oracle_id": "d6ba76fa-441c-4a74-bfea-8ae2a2c9e391",
+     "scryfall_id": "f5cbb580-cd02-4c60-acb7-b7ed1f1fce59",
+     "name": "Skyward Spider",
+     "colors": [
+      "U",
+      "W"
+     ],
+     "color_identity": [
+      "U",
+      "W"
+     ],
+     "parsed_cost": [
+      "w-u",
+      "w-u"
+     ],
+     "type": "Creature — Spider Human Hero",
+     "cmc": 2,
+     "power": "2",
+     "toughness": "2",
+     "oracle_text": "Ward {2} (Whenever this creature becomes the target of a spell or ability an opponent controls, counter it unless that player pays {2}.)\nThis creature has flying as long as it's modified. (Equipment, Auras you control, and counters are modifications.)",
+     "keywords": [
+      "Ward"
+     ],
+     "oracle_tags": [
+      "cycle-spm-c-hybrid",
+      "cycle",
+      "ward",
+      "protects-self",
+      "hate-target",
+      "hate",
+      "triggered-ability",
+      "synergy-modified",
+      "counters-matter",
+      "synergy-aura",
+      "synergy-equipment",
+      "gains-flying",
+      "evasion",
+      "rhystic",
+      "tax"
+     ],
+     "set": "spm",
+     "collector_number": "146",
+     "rarity": "common",
+     "image_normal": "https://assets.cubecobra.com/cardimages/f5cbb580-cd02-4c60-acb7-b7ed1f1fce59/normal.webp?v=1783905311",
+     "elo": 1215.0609470587856,
+     "cubeCount": 1020,
+     "pickCount": 657
+    }
+   },
+   {
+    "cardID": "10874416-fa4c-4aa3-b885-4351d011d208",
+    "board": "mainboard",
+    "status": "Not Owned",
+    "details": {
+     "oracle_id": "9e830359-ab92-4bfd-82b3-d9c67ac80cf7",
+     "scryfall_id": "10874416-fa4c-4aa3-b885-4351d011d208",
+     "name": "Air Nomad Legacy",
+     "colors": [
+      "U",
+      "W"
+     ],
+     "color_identity": [
+      "U",
+      "W"
+     ],
+     "parsed_cost": [
+      "u",
+      "w"
+     ],
+     "type": "Enchantment",
+     "cmc": 2,
+     "power": null,
+     "toughness": null,
+     "oracle_text": "When this enchantment enters, create a Clue token. (It's an artifact with \"{2}, Sacrifice this token: Draw a card.\")\nCreatures you control with flying get +1/+1.",
+     "keywords": [],
+     "oracle_tags": [
+      "anthem",
+      "synergy-flying",
+      "toughness-boost-to-all",
+      "pure-draw",
+      "draw",
+      "card-advantage",
+      "triggered-ability",
+      "cycle-tla-u-two-color",
+      "cycle-tla-draft-signpost",
+      "draft-signpost",
+      "cycle",
+      "power-boost-to-all"
+     ],
+     "set": "tla",
+     "collector_number": "206",
+     "rarity": "uncommon",
+     "image_normal": "https://assets.cubecobra.com/cardimages/10874416-fa4c-4aa3-b885-4351d011d208/normal.webp?v=1783904932",
+     "elo": 1150.8057648809242,
+     "cubeCount": 1693,
+     "pickCount": 1024
+    }
+   },
+   {
+    "cardID": "a58c364e-d0c5-41b9-8c8b-2e5a99468cc7",
+    "board": "mainboard",
+    "status": "Not Owned",
+    "details": {
+     "oracle_id": "d32c9439-4c97-412b-83cc-6d9acb48be3c",
+     "scryfall_id": "a58c364e-d0c5-41b9-8c8b-2e5a99468cc7",
+     "name": "Exhibition Tidecaller",
+     "colors": [
+      "U"
+     ],
+     "color_identity": [
+      "U"
+     ],
+     "parsed_cost": [
+      "u"
+     ],
+     "type": "Creature — Djinn Wizard",
+     "cmc": 1,
+     "power": "0",
+     "toughness": "2",
+     "oracle_text": "Opus — Whenever you cast an instant or sorcery spell, target player mills three cards. If five or more mana was spent to cast that spell, that player mills ten cards instead.",
+     "keywords": [
+      "Mill",
+      "Opus"
+     ],
+     "oracle_tags": [
+      "mill-any",
+      "mill-self",
+      "mill",
+      "mill-opponent",
+      "amount-spent-matters",
+      "mana-spent-matters",
+      "repeatable-crime",
+      "synergy-instant",
+      "synergy-sorcery",
+      "cast-trigger-you",
+      "cast-trigger",
+      "triggered-ability",
+      "self-replacement-effect"
+     ],
+     "set": "sos",
+     "collector_number": "48",
+     "rarity": "rare",
+     "image_normal": "https://assets.cubecobra.com/cardimages/a58c364e-d0c5-41b9-8c8b-2e5a99468cc7/normal.webp?v=1783903694",
+     "elo": 1332.4952541979887,
+     "cubeCount": 1856,
+     "pickCount": 959
+    }
+   },
+   {
+    "cardID": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
+    "board": "mainboard",
+    "status": "Not Owned",
+    "details": {
+     "oracle_id": "11ceb2db-021e-422d-976e-7bfe3b67a8aa",
+     "scryfall_id": "f524bc08-caeb-4362-b960-eb8e0e4159d0",
+     "name": "Foraging Wickermaw",
+     "colors": [],
+     "color_identity": [],
+     "parsed_cost": [
+      "2"
+     ],
+     "type": "Artifact Creature — Scarecrow",
+     "cmc": 2,
+     "power": "1",
+     "toughness": "3",
+     "oracle_text": "When this creature enters, surveil 1. (Look at the top card of your library. You may put it into your graveyard.)\n{1}: Add one mana of any color. This creature becomes that color until end of turn. Activate only once each turn.",
+     "keywords": [
+      "Surveil"
+     ],
+     "oracle_tags": [
+      "color-change-self",
+      "color-change",
+      "mana-filter",
+      "triggered-ability",
+      "activated-ability",
+      "surveil",
+      "peek-library",
+      "peek",
+      "top-deck-manipulation",
+      "library-manipulation",
+      "mill-self",
+      "mill"
+     ],
+     "set": "ecl",
+     "collector_number": "256",
+     "rarity": "common",
+     "image_normal": "https://assets.cubecobra.com/cardimages/f524bc08-caeb-4362-b960-eb8e0e4159d0/normal.webp?v=1783904398",
+     "elo": 1323.9738866524842,
+     "cubeCount": 1486,
+     "pickCount": 1490
+    }
+   }
+  ],
+  "maybeboard": [
+   {
+    "cardID": "6b8e6435-7de4-41d5-bc7d-8e24c11897d0",
+    "board": "maybeboard",
+    "status": "Not Owned",
+    "details": {
+     "oracle_id": "8a0e35ac-6c03-4922-b3b4-e419419fe3d7",
+     "scryfall_id": "6b8e6435-7de4-41d5-bc7d-8e24c11897d0",
+     "name": "Bofur, Reliable Guardian",
+     "colors": [
+      "W"
+     ],
+     "color_identity": [
+      "W"
+     ],
+     "parsed_cost": [
+      "w",
+      "1",
+      "split",
+      "w"
+     ],
+     "type": "Legendary Creature — Dwarf Scout",
+     "cmc": 1,
+     "power": "1",
+     "toughness": "1",
+     "oracle_text": "Lifelink\nTarget artifact or creature you control gains hexproof and indestructible until end of turn. (Then exile this card. You may cast the creature later from exile.)",
+     "keywords": [
+      "Lifelink"
+     ],
+     "oracle_tags": [
+      "single-target-instant-sorcery",
+      "repeatable-lifegain",
+      "lifegain",
+      "castable-from-exile",
+      "unexile",
+      "castable-from-nonhand",
+      "combat-trick",
+      "more-expensive-than-mv",
+      "virtual-french-vanilla",
+      "flavors-of-vanilla",
+      "protects-artifact",
+      "protection",
+      "protects-creature",
+      "exile-self",
+      "alliteration",
+      "card-names",
+      "gives-indestructible",
+      "gives-hexproof"
+     ],
+     "set": "hob",
+     "collector_number": "6",
+     "rarity": "uncommon",
+     "image_normal": "https://assets.cubecobra.com/cardimages/6b8e6435-7de4-41d5-bc7d-8e24c11897d0/normal.webp?v=1785496981",
+     "elo": 1232.3542263509771,
+     "cubeCount": 1041,
+     "pickCount": 768
+    }
+   }
+  ],
+  "basics": []
+ }
+}
