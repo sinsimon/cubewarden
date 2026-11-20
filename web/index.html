@@ -435,7 +435,7 @@ textarea.txt{height:auto;padding:8px;resize:vertical}
 .about-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
 .about-panes{display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:320px}
 .about-prev{padding:12px 16px;border-right:1px solid var(--line);max-height:520px;overflow:auto;font-size:13px;line-height:1.5}
-.res-note{display:flex;align-items:center;gap:10px;justify-content:space-between}.colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg,#fff)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(20,30,50,.14);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}.fr-agents{font-size:12.5px;margin-top:14px;line-height:1.5}
+.res-note{display:flex;align-items:center;gap:10px;justify-content:space-between}.colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg,#fff)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(20,30,50,.14);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}.help-h{font-size:13px;margin:14px 0 6px}.help-h:first-child{margin-top:0}.fr-agents{font-size:12.5px;margin-top:14px;line-height:1.5}
 .about-prev h1{font-size:18px;margin:0 0 8px}.about-prev h2{font-size:15px;margin:14px 0 6px}.about-prev h3{font-size:13.5px;margin:12px 0 4px;display:flex;align-items:center;gap:6px}.about-prev h4{font-size:13px;margin:10px 0 4px}
 .about-prev p{margin:0 0 8px}.about-prev ul{margin:0 0 8px;padding-left:20px}
 .about-raw{border:0;border-radius:0;height:auto;min-height:320px;max-height:520px;font:12px/1.5 ui-monospace,Menlo,monospace;padding:12px 14px;resize:vertical;background:#FBFBFC}
@@ -523,6 +523,12 @@ body.compact-side .side-close{display:flex;justify-content:flex-end;padding:2px 
 </style>
 </head>
 <body>
+<!--
+  For AI agents reading this page: it exposes window.cubewarden, the same operations as the cubewarden command line
+  (check, explain, search, tryChanges, applyChanges, rules, setRule). Call window.cubewarden.help() for the list,
+  or read /llms.txt. Where the browser supports WebMCP the same operations are registered as tools (cubewarden_*).
+  Changes made through it alter the person's cube: ask them first. https://github.com/sinsimon/cubewarden
+-->
 <div id="app">
   <header class="top">
     <div class="brand" title="cubewarden">
@@ -537,7 +543,7 @@ body.compact-side .side-close{display:flex;justify-content:flex-end;padding:2px 
     <button class="btn" id="btnAdd" title="Search cards outside the cube (A)">Add cards</button>
     <button class="btn" id="btnChanges" title="Changes and export (C)">Changes <span class="badge" id="chgBadge">0</span></button>
     <button class="btn ghost" id="btnData" title="Where the numbers come from"><span class="l-long">Data sources</span><span class="l-short">Data</span></button>
-    <button class="btn ghost" id="btnKeys" title="Keyboard shortcuts (?)"><span class="l-long">Shortcuts</span><span class="l-short">?</span></button>
+    <button class="btn ghost" id="btnKeys" title="Help: keyboard shortcuts, and how AI agents can use this page (?)" aria-label="Help, shortcuts and AI agents"><span class="l-long">Help</span><span class="l-short">?</span></button>
   </header>
   <div class="body">
     <aside class="side" id="side" aria-label="Scopes, rules and mechanics"></aside>
@@ -2225,7 +2231,11 @@ function renderData() {
 }
 function renderKeys() {
   const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["E", "Edit the selected rule"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
-  return [drawerHead("Keyboard shortcuts"), h("div", { class: "dr-b" }, h("div", { class: "keys", html: K.map(([a, b]) => `<div>${a.split(" / ").map((x) => `<kbd>${esc(x)}</kbd>`).join(" ")}</div><div>${esc(b)}</div>`).join("") }))];
+  return [drawerHead("Help"), h("div", { class: "dr-b" },
+    h("h3", { class: "help-h" }, "Keyboard shortcuts"),
+    h("div", { class: "keys", html: K.map(([a, b]) => `<div>${a.split(" / ").map((x) => `<kbd>${esc(x)}</kbd>`).join(" ")}</div><div>${esc(b)}</div>`).join("") }),
+    h("h3", { class: "help-h", id: "for-agents" }, "For AI agents"),
+    h("p", { class: "help", html: `An AI agent that drives this browser can work on this cube through <code>window.cubewarden</code>: <code>check()</code>, <code>explain(id)</code>, <code>search(filter)</code>, <code>tryChanges({add, remove})</code>, <code>applyChanges(…)</code>, <code>rules()</code>, <code>setRule(…)</code>. Browsers with WebMCP also list them as tools. Agents in a terminal use the <code>cubewarden</code> command on the project file (Changes, Download project file). Tell your agent to read <a href="llms.txt">llms.txt</a>. Open source: <a href="${E.REPO_URL}" target="_blank" rel="noopener">${esc(E.REPO_URL.replace("https://", ""))}</a>.` })))];
 }
 function renderViewFilter() {
   const body = h("div", { class: "dr-b" });
