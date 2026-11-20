@@ -14,3 +14,7 @@ export {
 } from "./cubecobra.ts";
 export { changelist, diff, exportCsv, mechanicTags, type Diff } from "./export.ts";
 export { aboutMarkdown, REPO_URL, type AboutOptions } from "./about.ts";
+export {
+  createWorkspace, scopeToText, summarizeCard,
+  type CardSummary, type Changes, type CheckResult, type Delta, type Explanation, type Finding, type Project, type RuleInput, type RuleLine, type Workspace,
+} from "./workspace.ts";
