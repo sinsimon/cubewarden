@@ -29,6 +29,9 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   rules                         every rule as text
   rule set <id> --text "<rule>" [--scope color:W] [--name "…"] [--priority secondary]
   rule rm <id>
+  mechanics                     every colour and archetype mechanic as text
+  mechanic set <id> --text "<filter> >= n" [--scope color:W | archetype:<id>] [--name "…"] [--priority secondary]
+  mechanic rm <id>
   changes                       adds and removes against the imported list
   about [--numbers] [--cube-id <id>]  About text for CubeCobra, ending with the hidden rules line
   export csv                    the whole list as a CSV for CubeCobra, with mechanic tags
@@ -128,6 +131,22 @@ export async function run(argv: string[], io: Io): Promise<number> {
         }
         if (rest[0] === "rm" && rest[1]) { w.removeRule(rest[1]); await save(w.project); out({ removed: rest[1] }, `removed ${rest[1]}`); return 0; }
         throw new UsageError('use: rule set <id> --text "<rule>" … or rule rm <id>');
+      }
+      case "mechanics": {
+        const r = (await load()).mechanics();
+        out(r, r.map((x) => `${x.id}  ${x.scope}  ${x.priority}  ${x.name}: ${x.text}`).join("\n"));
+        return 0;
+      }
+      case "mechanic": {
+        const w = await load();
+        if (rest[0] === "set" && rest[1]) {
+          const r = w.setMechanic({ id: rest[1], text: flag("text"), scope: flag("scope"), name: flag("name"), priority: flag("priority") as "primary" | undefined });
+          await save(w.project);
+          out(r, `saved ${r.id}: ${r.text}`);
+          return 0;
+        }
+        if (rest[0] === "rm" && rest[1]) { w.removeMechanic(rest[1]); await save(w.project); out({ removed: rest[1] }, `removed ${rest[1]}`); return 0; }
+        throw new UsageError('use: mechanic set <id> --text "<filter> >= n" … or mechanic rm <id>');
       }
       case "changes": {
         const c = (await load()).changes();

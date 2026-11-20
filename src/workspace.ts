@@ -2,7 +2,7 @@
  * The workspace: one cube project and the operations people and agents run on it. The CLI, the page's
  * window.cubewarden object and its WebMCP tools are thin doors onto these same functions.
  */
-import type { Card, Config, Rule, Scope } from "./model.ts";
+import type { Card, Config, Mechanic, Rule, Scope } from "./model.ts";
 import { WUBRG } from "./colors.ts";
 import { formatConstraint, inConstraint, type Status } from "./constraint.ts";
 import { evaluate, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
@@ -54,6 +54,7 @@ export interface Explanation extends Finding {
 
 export interface RuleLine { id: string; name: string; scope: string; priority: "primary" | "secondary"; text: string }
 export interface RuleInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string; description?: string }
+export interface MechanicInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string }
 export interface Changes { add?: string[]; remove?: string[] }
 export interface Delta {
   size: { before: number; after: number };
@@ -241,11 +242,56 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       notify();
     },
 
+    /** Every mechanic of every colour and archetype, as text (a mechanic is a count with an optional target). */
+    mechanics(): RuleLine[] {
+      return mechanicOwners().flatMap(({ scope, list }) => list.map((m) => ({ id: m.id, name: m.name, scope, priority: m.priority || "primary", text: ruleToText(m) })));
+    },
+
+    setMechanic(input: MechanicInput): RuleLine {
+      const found = findMechanic(input.id);
+      const scope = input.scope ?? found?.scope;
+      if (!scope) throw new Error(`New mechanic "${input.id}" needs a scope (color:W… or archetype:<id>) and a text`);
+      const target = ownerList(scope);
+      const old = found?.list[found.index];
+      if (!old && input.text == null) throw new Error(`New mechanic "${input.id}" needs a text`);
+      const body = input.text != null ? parseRule(input.text) : { measure: { kind: "count" as const }, filter: old!.filter, constraint: old!.constraint ?? null };
+      if (body.measure.kind !== "count") throw new Error("A mechanic counts cards: write it as count(filter) or filter >= n");
+      const mech: Mechanic = { id: input.id, name: input.name ?? old?.name ?? input.id, priority: input.priority ?? old?.priority ?? "primary", filter: body.filter, constraint: body.constraint };
+      if (found && found.list === target) target[found.index] = mech;
+      else { if (found) found.list.splice(found.index, 1); target.push(mech); }
+      notify();
+      return api.mechanics().find((m) => m.id === mech.id)!;
+    },
+
+    removeMechanic(id: string) {
+      const found = findMechanic(id);
+      if (!found) throw new Error(`Unknown mechanic "${id}"`);
+      found.list.splice(found.index, 1);
+      notify();
+    },
+
     onChange(f: (p: Project) => void) {
       listeners.add(f);
       return () => listeners.delete(f);
     },
   };
+
+  function mechanicOwners(): { scope: string; list: Mechanic[] }[] {
+    return [
+      ...project.config.colors.map((c) => ({ scope: `color:${c.code}`, list: (c.mechanics ||= []) })),
+      ...project.config.archetypes.map((a) => ({ scope: `archetype:${a.id}`, list: a.mechanics })),
+    ];
+  }
+  function ownerList(scope: string): Mechanic[] {
+    const s = parseScope(scope);
+    if (s.kind === "color") return mechanicOwners().find((o) => o.scope === `color:${s.color}`)!.list;
+    if (s.kind === "archetype") return project.config.archetypes.find((a) => a.id === s.id)!.mechanics;
+    throw new Error(`Mechanics belong to a colour or an archetype, not to "${scope}"`);
+  }
+  function findMechanic(id: string) {
+    for (const o of mechanicOwners()) { const index = o.list.findIndex((m) => m.id === id); if (index >= 0) return { ...o, index }; }
+    return null;
+  }
 
   function explainShared(s: SharedSummary): Explanation {
     const rule = project.config.rules.find((x) => x.id === s.id)!;

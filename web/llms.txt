@@ -15,11 +15,14 @@ The page exposes `window.cubewarden`, the same operations as the command line:
 - `cubewarden.applyChanges({ add, remove })`: make the swap; the page saves and redraws.
 - `cubewarden.changes()`: adds and removes against the imported list, with a changelist for CubeCobra.
 - `cubewarden.rules()`, `cubewarden.setRule({ id, name, scope, text, priority })`, `cubewarden.removeRule(id)`.
+- `cubewarden.mechanics()`, `cubewarden.setMechanic({ id, name, scope: "color:W" | "archetype:<id>", text, priority })`,
+  `cubewarden.removeMechanic(id)`: the "musts" of a colour and the mechanics of an archetype (a mechanic counts cards).
 - `cubewarden.syntax()`: the filter and rule syntax. `cubewarden.help()`: this list.
 
 Where the browser supports WebMCP (`document.modelContext`), the same operations are registered as tools named
 `cubewarden_check`, `cubewarden_explain`, `cubewarden_search`, `cubewarden_try_changes`, `cubewarden_apply_changes`,
-`cubewarden_rules`, `cubewarden_set_rule`, `cubewarden_changes`, `cubewarden_syntax`.
+`cubewarden_rules`, `cubewarden_set_rule`, `cubewarden_mechanics`, `cubewarden_set_mechanic`, `cubewarden_changes`,
+`cubewarden_syntax`.
 
 Ask the person before `applyChanges`, `setRule` or `removeRule`: they change the cube they are working on.
 

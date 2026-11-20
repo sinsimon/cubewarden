@@ -129,6 +129,24 @@ describe("rules as text", () => {
   });
 });
 
+describe("mechanics as text", () => {
+  it("lists the mechanics of colours and archetypes with their text", () => {
+    expect(ws().mechanics()).toContainEqual({ id: "fly", name: "Flyers", scope: "archetype:wu", priority: "primary", text: "count(kw:flying) >= 2" });
+  });
+  it("adds, changes and removes a mechanic in a colour or an archetype", () => {
+    const w = ws();
+    w.setMechanic({ id: "w-rem", name: "Removal", scope: "color:W", text: "otag:removal >= 1" });
+    expect(w.explain("w-rem")).toMatchObject({ kind: "mechanic", scope: "White", value: 1, status: "ok" });
+    w.setMechanic({ id: "fly", text: "kw:flying >= 1", priority: "secondary" });
+    expect(w.mechanics().find((m) => m.id === "fly")).toMatchObject({ name: "Flyers", priority: "secondary", text: "count(kw:flying) >= 1" });
+    w.removeMechanic("w-rem");
+    expect(w.mechanics().some((m) => m.id === "w-rem")).toBe(false);
+  });
+  it("needs a colour or archetype scope for a new mechanic", () => {
+    expect(() => ws().setMechanic({ id: "x", name: "x", scope: "cube", text: "otag:removal" })).toThrowError(/colour or an archetype/);
+  });
+});
+
 describe("listeners", () => {
   it("tells listeners when the project changes, so the page can redraw", () => {
     const w = ws();

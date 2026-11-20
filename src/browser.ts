@@ -130,6 +130,9 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
     rules: () => ws.rules(),
     setRule: (r: Parameters<typeof ws.setRule>[0]) => undoable(`rule ${r.id}`, () => ws.setRule(r)),
     removeRule: (id: string) => undoable(`remove rule ${id}`, () => ws.removeRule(id)),
+    mechanics: () => ws.mechanics(),
+    setMechanic: (m: Parameters<typeof ws.setMechanic>[0]) => undoable(`mechanic ${m.id}`, () => ws.setMechanic(m)),
+    removeMechanic: (id: string) => undoable(`remove mechanic ${id}`, () => ws.removeMechanic(id)),
     project: () => structuredClone(ws.project),
   };
 }
@@ -142,6 +145,7 @@ const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same o
   applyChanges({add, remove})     make the swap (the page saves and redraws)
   changes()                       adds/removes against the imported list, with a changelist
   rules() / setRule({id, name, scope, text, priority}) / removeRule(id)
+  mechanics() / setMechanic({id, name, scope: "color:W" | "archetype:<id>", text, priority}) / removeMechanic(id)
   syntax()                        the filter and rule syntax
 The page keeps its work in this browser (localStorage). To work from a terminal instead, use the CLI: ${REPO_URL}`;
 
@@ -167,6 +171,9 @@ function registerWebMcp(api: ReturnType<typeof pick> & { syntax: () => string })
     { name: "cubewarden_rules", description: "Every rule as text", inputSchema: { type: "object", properties: {} }, run: () => api.rules() },
     { name: "cubewarden_set_rule", description: "Add or change a rule written as text", inputSchema: { type: "object", properties: { id: str, name: str, scope: str, text: str, priority: str }, required: ["id"] },
       run: (a: Parameters<typeof api.setRule>[0]) => api.setRule(a) },
+    { name: "cubewarden_mechanics", description: "Every mechanic of the colours and archetypes as text", inputSchema: { type: "object", properties: {} }, run: () => api.mechanics() },
+    { name: "cubewarden_set_mechanic", description: "Add or change a colour or archetype mechanic written as text", inputSchema: { type: "object", properties: { id: str, name: str, scope: str, text: str, priority: str }, required: ["id"] },
+      run: (a: Parameters<typeof api.setMechanic>[0]) => api.setMechanic(a) },
     { name: "cubewarden_changes", description: "Cards added and removed against the imported list", inputSchema: { type: "object", properties: {} }, run: () => api.changes() },
     { name: "cubewarden_syntax", description: "Filter and rule syntax", inputSchema: { type: "object", properties: {} }, run: () => api.syntax() },
   ];
