@@ -21,6 +21,7 @@ import { SOURCES } from "./sources.ts";
 import { filterToText, parseFilter, parseRule, ruleToText } from "./syntax.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { createWorkspace, cubeAllows, sortCards, type Project, type SortKey } from "./workspace.ts";
+import { loadHosted, resolveNames } from "./hosted.ts";
 
 interface PageData { builtAt: string; cards: Card[]; cube: { name: string; source?: string; original: string[]; current: string[] }; seed: Config; sources?: Record<string, string> }
 type Win = typeof globalThis & { CUBE_DATA?: PageData; CubeEngine?: unknown; cubewarden?: unknown; cubewardenAttach?: unknown };
@@ -78,8 +79,11 @@ W.CubeEngine = {
   diff, exportChangelist: changelist, exportCsv, storage, boot,
   encodeConfig: encodeRules, decodeConfig: decodeRules, readCubeCobra, referenceCube, mechanicTags, cubeCobraListUrl,
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
-  REPO_URL, SYNTAX_HELP, SOURCES,
+  REPO_URL, SYNTAX_HELP, SOURCES, resolveNames,
 };
+
+/** Hosted page: assemble the card data before the page's own scripts run. */
+(W as Win & { cubewardenHosted?: unknown }).cubewardenHosted = { load: loadHosted };
 
 interface Hooks {
   /** Scale counts like the page does (the "scaled / actual" toggle). */

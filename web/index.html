@@ -541,6 +541,7 @@ body.compact-side .side-close{display:flex;justify-content:flex-end;padding:2px 
   or read /llms.txt. Where the browser supports WebMCP the same operations are registered as tools (cubewarden_*).
   Changes made through it alter the person's cube: ask them first. https://github.com/sinsimon/cubewarden
 -->
+<div id="bootMsg" style="position:fixed;inset:0;display:none;place-items:center;font:14px system-ui;color:#5b6474;background:#fff;z-index:100">Loading card data…</div>
 <div id="app">
   <header class="top">
     <div class="brand" title="cubewarden">
@@ -592,7 +593,7 @@ body.compact-side .side-close{display:flex;justify-content:flex-end;padding:2px 
 
 <script src="data.js"></script>
 <script src="dist/cubewarden.js"></script>
-<script>
+<script type="text/x-cubewarden-app">
 "use strict";
 window.__errors = [];
 window.addEventListener("error", (e) => window.__errors.push(String(e.message || e)));
@@ -950,9 +951,20 @@ function toast(msg, action) {
   t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 4200);
 }
 </script>
-<script>
+<script type="text/x-cubewarden-app">
 "use strict";
 /* ================= top bar ================= */
+/** Hosted page: card files load at start, so a set rule naming sets not loaded yet asks for a reload. */
+function renderSetsNotice() {
+  if (!D.hosted) return;
+  const published = new Set(D.hosted.index.sets.map((x) => x.code)), loaded = new Set(D.hosted.loadedSets);
+  const need = (allowedSets() || []).filter((x) => published.has(x) && !loaded.has(x));
+  let b = $("#setsNotice");
+  if (!need.length) { if (b) b.remove(); return; }
+  if (!b) { b = h("button", { class: "btn primary sm", id: "setsNotice", type: "button", onclick: () => { save(); location.reload(); } }); $("#btnAdd").before(b); }
+  b.textContent = `Load cards from ${need.length} new set${need.length > 1 ? "s" : ""}`;
+  b.title = "Your rules now allow " + need.map((x) => x.toUpperCase()).join(", ") + ": reload to search their cards";
+}
 function renderTop() {
   $("#cubeName").textContent = S.config.cube.name || "cubewarden";
   const t = S.config.cube.targetSize;
@@ -962,6 +974,7 @@ function renderTop() {
   sc.querySelector("input").checked = !!U.scale;
   sc.querySelector(".lbl").textContent = t ? `Scaled to ${t}` : "Scaled";
   $("#viewSeg").querySelectorAll("button").forEach((b) => { const on = b.dataset.view === U.view; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
+  renderSetsNotice();
   const d = diffNow(), n = d.adds.length + d.removes.length;
   const bd = $("#chgBadge"); bd.textContent = n; bd.classList.toggle("dirty", isDirty());
   bd.title = isDirty() ? "Changes not exported yet" : n ? "All changes exported" : "No changes";
@@ -1578,7 +1591,7 @@ function cycleSel(d) {
 }
 window.addEventListener("beforeunload", (e) => { if (!suppressUnload && S.started && isDirty()) { e.preventDefault(); e.returnValue = ""; } });
 </script>
-<script>
+<script type="text/x-cubewarden-app">
 "use strict";
 /* ================= filter builder (Airtable-style) ================= */
 const FIELD_GROUPS = [
@@ -2626,6 +2639,11 @@ $("#overview").addEventListener("mouseover", (e) => {
 
 /* ================= first run: import ================= */
 const NAME_IDX = (() => { const m = new Map(); for (const c of D.cards) { m.set(c.name.toLowerCase(), c.id); if (c.name.includes(" // ")) m.set(c.name.split(" // ")[0].toLowerCase(), c.id); } return m; })();
+/** The card names of a pasted list (quantities, set codes and collector numbers removed). */
+function listNames(text) {
+  return text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^(#|\/\/)/.test(l))
+    .map((l) => l.replace(/^\d+\s*x?\s+/i, "").replace(/\s+\*[A-Z]+\*$/, "").replace(/\s+\([A-Za-z0-9]{2,6}\)(\s+[\w-]+)?$/, "").trim());
+}
 function parseList(text) {
   const ids = [], missing = [];
   for (let line of text.split(/\r?\n/)) {
@@ -2640,7 +2658,9 @@ function parseList(text) {
 function emptyConfig(name, target) {
   return { version: 1, cube: Object.assign({ name: name || "My cube" }, target ? { targetSize: target } : {}), colors: D.seed.colors.map((c) => ({ code: c.code, mechanics: [] })), archetypes: [], rules: [] };
 }
-function renderFirstRun(step, payload) {
+/** The example cube offered on the hosted page's first screen (a public CubeCobra cube). */
+const EXAMPLE_CUBE = "22d9659d-10b1-4768-94dc-0dc2af5d6306";
+function renderFirstRun(step, payload, autoImport) {
   const fr = $("#firstRun"); fr.classList.add("on");
   const logo = `<svg width="40" height="40" viewBox="0 0 22 22" aria-hidden="true"><polygon points="11,1.5 20.5,8.4 16.9,19.6 5.1,19.6 1.5,8.4" fill="none" stroke="#1A2130" stroke-width="1.3"/><polygon points="11,1.5 16.9,19.6 1.5,8.4 20.5,8.4 5.1,19.6" fill="none" stroke="#2546C9" stroke-width="1"/></svg>`;
   if (step === "rules") {
@@ -2649,7 +2669,7 @@ function renderFirstRun(step, payload) {
       <h1>${p.ids.length} cards imported</h1><p class="lead">Next, the rules your cube should meet: size, sets, win rates, counts per colour and archetype. cubewarden ships no rules of its own. With a target size, colour and archetype counts can be read as if the cube already had that size.</p>
       <div class="fr-card"><div class="row" style="gap:16px"><div class="fld" style="flex:1"><label for="frName">Cube name</label><input class="txt" id="frName" value="${esc(p.name || "My cube")}"></div><div class="fld" style="width:190px"><label for="frTarget">Target size (optional)</label><input class="txt" id="frTarget" type="number" placeholder="e.g. 360"></div></div></div>
       <div class="choice"><button id="frEmpty"><b>Write my own rules</b><span>Opens the workbench with the rule editor on the whole cube. Add colours' musts and archetypes from the sidebar.</span></button>
-      <button id="frCopy"><b>Start from this folder's rules</b><span>Copies the rules, colour mechanics and archetypes of the project cubewarden is serving, then edit them.</span></button></div>
+      ${D.hosted ? "" : `<button id="frCopy"><b>Start from this folder's rules</b><span>Copies the rules, colour mechanics and archetypes of the project cubewarden is serving, then edit them.</span></button>`}</div>
       ${p.tags && Object.keys(p.tags).length ? `<label class="fr-card row" style="gap:10px;margin-top:12px;cursor:pointer"><input type="checkbox" id="frTagMech" checked><span><b>Also create one mechanic per CubeCobra tag</b> (${new Set(Object.values(p.tags).flat()).size} tags). A tag like “UG Ramp” goes into the archetype with those colours (one is created, unnamed, if missing); “U Counterspells” into Blue; others become count rules on the whole cube, to move later.</span></label>` : ""}
       <p class="muted" style="margin-top:14px"><button class="btn ghost sm" id="frBack">Back</button></p></div>`;
     const start = (cfg) => {
@@ -2658,13 +2678,14 @@ function renderFirstRun(step, payload) {
       cfg.cube.name = $("#frName").value.trim() || "My cube";
       const t = Number($("#frTarget").value); if (t > 0) cfg.cube.targetSize = t; else delete cfg.cube.targetSize;
       Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {} });
-      applyCcTags();
       U.scope = { kind: "cube" }; U.sel = null; U.view = "work";
+      if (D.hosted) { if (p.poolSets) S.poolSets = p.poolSets; save(); location.reload(); return; } // the loader fetches this cube's cards
+      applyCcTags();
       save(); fr.classList.remove("on"); recompute(); renderAll();
       if (!cfg.rules.length && !configStats(cfg).mechanics) openEditor("rule", { kind: "cube" }, null);
     };
     $("#frEmpty").onclick = () => start(emptyConfig());
-    $("#frCopy").onclick = () => start(clone(D.seed));
+    if ($("#frCopy")) $("#frCopy").onclick = () => start(clone(D.seed));
     $("#frBack").onclick = () => renderFirstRun("import", p.source ? "cc" : "paste");
     return;
   }
@@ -2681,14 +2702,26 @@ function renderFirstRun(step, payload) {
         <form class="row" id="frCCForm"><input class="txt" id="frCC" style="flex:1" placeholder="Cube address or id" aria-label="CubeCobra cube address or id"><button class="btn primary" id="frCCGo">Read cube</button></form>
         <div id="frCCOut"></div>`}
     </div>
-    <div class="fr-card"><h2>Open the cube in this folder</h2><p>${esc(D.cube.name)}: ${D.cube.current.length} cards with ${D.seed.rules.length} rules and ${D.seed.archetypes.length} archetypes, from the project files cubewarden serves.</p><button class="btn primary" id="frDemo">Open ${esc(D.cube.name)}</button></div>
+    ${D.hosted ? `<div class="fr-card"><h2>Try it with an example</h2><p>Import a public cube from CubeCobra and look around: nothing is changed on CubeCobra, and your work stays in this browser.</p><button class="btn primary" id="frExample">Import the example cube</button></div>`
+      : `<div class="fr-card"><h2>Open the cube in this folder</h2><p>${esc(D.cube.name)}: ${D.cube.current.length} cards with ${D.seed.rules.length} rules and ${D.seed.archetypes.length} archetypes, from the project files cubewarden serves.</p><button class="btn primary" id="frDemo">Open ${esc(D.cube.name)}</button></div>`}
     <p class="muted fr-agents">cubewarden is open source: <a href="${E.REPO_URL}" target="_blank" rel="noopener">${E.REPO_URL.replace("https://", "")}</a>. Run it on your computer (<code>npx cubewarden serve</code>) and AI agents can work on the same cube: in this page through <code>window.cubewarden</code> or WebMCP, or from a terminal with the <code>cubewarden</code> command. See <a href="llms.txt">llms.txt</a>.</p></div>`;
   fr.querySelectorAll("[data-tab]").forEach((b) => (b.onclick = () => renderFirstRun("import", b.dataset.tab)));
-  $("#frDemo").onclick = () => { Object.assign(S, demoState()); U.scope = { kind: "cube" }; U.sel = null; U.view = "work"; save(); fr.classList.remove("on"); recompute(); renderAll(); };
+  if ($("#frExample")) $("#frExample").onclick = () => renderFirstRun("import", "cc", EXAMPLE_CUBE);
+  if ($("#frDemo")) $("#frDemo").onclick = () => { Object.assign(S, demoState()); U.scope = { kind: "cube" }; U.sel = null; U.view = "work"; save(); fr.classList.remove("on"); recompute(); renderAll(); };
   if (tab === "paste") {
-    $("#frSample").onclick = () => { $("#frList").value = D.cube.current.slice(0, 40).map((id) => "1 " + byId[id].name).join("\n") + "\nNot A Real Card"; };
-    $("#frMatch").onclick = () => {
-      const p = parseList($("#frList").value);
+    $("#frSample").onclick = () => { $("#frList").value = (D.cube.current.length ? D.cube.current.slice(0, 40).map((id) => "1 " + byId[id].name) : ["1 Lightning Bolt", "1 Counterspell", "1 Llanowar Elves", "1 Pacifism", "1 Doom Blade"]).join("\n") + "\nNot A Real Card"; };
+    $("#frMatch").onclick = async () => {
+      let p;
+      if (D.hosted) {
+        $("#frMsg").textContent = "Looking the names up on Scryfall…";
+        try {
+          const r = await E.resolveNames(listNames($("#frList").value));
+          const published = new Set(D.hosted.index.sets.map((x) => x.code)), n = {};
+          r.cards.forEach((c) => c.printSets.filter((x) => published.has(x)).forEach((x) => (n[x] = (n[x] || 0) + 1)));
+          p = { ids: r.ids, missing: r.missing, poolSets: Object.keys(n).filter((x) => n[x] >= 3) };
+        }
+        catch (e) { $("#frMsg").textContent = "Scryfall did not answer: " + e.message; return; }
+      } else p = parseList($("#frList").value);
       $("#frMissing").innerHTML = p.missing.length ? `Not found (${p.missing.length}): ` + p.missing.slice(0, 40).map(esc).join(", ") : "";
       if (!p.ids.length) { $("#frMsg").textContent = "No card names matched. Check the spelling or use English names."; return; }
       $("#frMsg").innerHTML = `${p.ids.length} matched${p.missing.length ? `, ${p.missing.length} not found` : ""}. `;
@@ -2696,6 +2729,7 @@ function renderFirstRun(step, payload) {
     };
   } else {
     $("#frCCForm").onsubmit = (e) => { e.preventDefault(); importFromCubeCobra($("#frCC").value); };
+    if (autoImport) { $("#frCC").value = autoImport; importFromCubeCobra(autoImport); }
   }
 }
 /** "https://cubecobra.com/cube/overview/abc?x" or "abc" → "abc". */
@@ -2734,20 +2768,20 @@ async function importFromCubeCobra(text) {
   catch (e) { out.innerHTML = `<div class="note" style="color:var(--fail)">Could not read the cube: ${esc(e.message === "Failed to fetch" ? "the request was blocked or you are offline." : e.message)} Check the address, or load the demo below.</div>`; return; }
   const seen = new Set(), known = [], unknown = [];
   let dup = 0;
-  for (const c of cc.mainboard) { if (seen.has(c.id)) { dup++; continue; } seen.add(c.id); (byId[c.id] ? known : unknown).push(c); }
+  for (const c of cc.mainboard) { if (seen.has(c.id)) { dup++; continue; } seen.add(c.id); (byId[c.id] || D.hosted ? known : unknown).push(c); }
   const ids = known.map((c) => c.id);
   const src = { id: cc.id, name: cc.name, at: new Date().toISOString() };
   const cfgSt = cc.config ? configStats(cc.config) : null;
   const saved = cc.config && cc.config.savedAt ? new Date(cc.config.savedAt) : null;
   out.innerHTML = `<div class="note" style="color:var(--ink)"><b>${esc(cc.name)}</b>: ${cc.mainboard.length} cards in the mainboard${cc.maybeboard.length ? `, ${cc.maybeboard.length} in the maybeboard (ignored)` : ""}${dup ? `, ${dup} duplicate${dup > 1 ? "s" : ""} counted once` : ""}.
     ${(() => { const n = new Set(Object.values(cc.tagsById || {}).flat()).size; return n ? `<br>${n} CubeCobra tag${n > 1 ? "s" : ""} found on ${Object.keys(cc.tagsById).length} cards${cc.config ? "" : ": the next step can turn them into mechanics"}.` : ""; })()}
-    <br>${known.length} known to cubewarden${unknown.length ? `, <span style="color:var(--fail)">${unknown.length} unknown</span> (the card data only covers the pool you built): ${unknown.slice(0, 30).map((c) => esc(c.name)).join(", ")}${unknown.length > 30 ? "…" : ""}` : "."}</div>
+    ${D.hosted ? "" : `<br>${known.length} known to cubewarden`}${unknown.length ? `, <span style="color:var(--fail)">${unknown.length} unknown</span> (the card data only covers the pool you built): ${unknown.slice(0, 30).map((c) => esc(c.name)).join(", ")}${unknown.length > 30 ? "…" : ""}` : "."}</div>
     ${cc.config ? `<div class="fr-found"><b>Rules found in this cube</b>${saved && !isNaN(saved) ? `, saved ${esc(saved.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }))}` : ""}, in ${esc(cc.where)}: ${cfgSt.rules} rules, ${cfgSt.archetypes} archetypes, ${cfgSt.mechanics} mechanics.
       <div class="choice" style="margin-top:10px"><button id="ccRestore"><b>Restore them</b><span>Your rules, archetypes, descriptions and target size, as saved.</span></button><button id="ccRules"><b>Start empty or from the demo rules</b><span>Ignore the saved block and choose on the next step.</span></button></div></div>`
       : cc.bad ? `<div class="note" style="color:var(--fail)">A cubewarden block was found but it is damaged, probably changed while pasting. Continue to set up rules.</div>` : `<div class="note">No saved cubewarden rules in this cube. You can save them later from Overview, About for CubeCobra.</div>`}
     ${known.length ? `<div class="row" style="margin-top:10px">${cc.config ? "" : `<button class="btn primary" id="ccNext">Continue with ${known.length} cards</button>`}</div>` : `<div class="note" style="color:var(--fail)">None of the cards are in the card data. Build it for this cube with <code>cubewarden data build</code>.</div>`}`;
   if (!known.length) { if ($("#ccRestore")) $("#ccRestore").disabled = true; return; }
-  const tagsKnown = Object.fromEntries(Object.entries(cc.tagsById || {}).filter(([id]) => byId[id]));
+  const tagsKnown = Object.fromEntries(Object.entries(cc.tagsById || {}).filter(([id]) => byId[id] || D.hosted));
   const payload = { ids, name: cc.name, source: src, tags: tagsKnown };
   if ($("#ccNext")) $("#ccNext").onclick = () => renderFirstRun("rules", payload);
   if ($("#ccRules")) $("#ccRules").onclick = () => renderFirstRun("rules", payload);
@@ -2756,6 +2790,7 @@ async function importFromCubeCobra(text) {
     if (!cfg.cube.name) cfg.cube.name = cc.name;
     cfg.cube.cubeCobraId = cfg.cube.cubeCobraId || cc.id;
     Object.assign(S, { version: 1, config: cfg, original: ids.slice(), current: ids.slice(), started: true, exportedSig: null, source: src, ccTags: tagsKnown });
+    if (D.hosted) { U.scope = { kind: "cube" }; U.sel = null; U.view = "work"; save(); location.reload(); return; } // the loader fetches this cube's cards
     applyCcTags();
     U.scope = { kind: "cube" }; U.sel = null; U.view = "work";
     save(); $("#firstRun").classList.remove("on"); recompute(); renderAll();
@@ -2782,5 +2817,22 @@ async function importFromCubeCobra(text) {
 </script>
 
 
+<script>
+/* Start: in a project folder (cubewarden serve) data.js already holds the cards; on the hosted page they are
+   assembled first from the published set files and the person's CubeCobra cube. Then the page scripts run. */
+(async () => {
+  const runApp = () => document.querySelectorAll('script[type="text/x-cubewarden-app"]').forEach((s) => {
+    const n = document.createElement("script"); n.textContent = s.textContent; document.body.appendChild(n);
+  });
+  if (!window.CUBE_DATA) {
+    const box = document.getElementById("bootMsg");
+    if (box) box.style.display = "grid";
+    try { await window.cubewardenHosted.load({ storageKey: "cubewarden:v1", base: "data" }); }
+    catch (e) { if (box) box.textContent = "Could not load the card data: " + e.message + ". Reload to try again."; return; }
+    if (box) box.style.display = "none";
+  }
+  runApp();
+})();
+</script>
 </body>
 </html>
