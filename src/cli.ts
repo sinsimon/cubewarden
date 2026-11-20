@@ -3,6 +3,7 @@
  * rules + card list) and a card database (cards.json). Exit codes: 0 = done / all primary rules met,
  * 1 = check found primary rules not met, 2 = bad input.
  */
+import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Card } from "./model.ts";
@@ -31,7 +32,8 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   changes                       adds and removes against the imported list
   about [--numbers] [--cube-id <id>]  About text for CubeCobra, ending with the hidden rules line
   export csv                    the whole list as a CSV for CubeCobra, with mechanic tags
-  import <CubeCobra id>         start a project from a public CubeCobra cube (read only)
+  import <CubeCobra id> [--force]  start a project from a public CubeCobra cube (read only); --force replaces
+                                an existing project in this folder
   serve [--port 3300]           open the page on this project, for you and for agents in the browser
   data build [--winrates <file>|17lands] [--pool "<Scryfall query>"] [--refresh]
                                 cards.json: the cube's cards and every card you may add (see data help)
@@ -39,7 +41,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
 `;
 
 interface Args { _: string[]; flags: Record<string, string[]>; bool: Set<string> }
-const BOOL = new Set(["json", "numbers", "all-cards", "help"]);
+const BOOL = new Set(["json", "numbers", "all-cards", "help", "force", "refresh"]);
 function parseArgs(argv: string[]): Args {
   const a: Args = { _: [], flags: {}, bool: new Set() };
   for (let i = 0; i < argv.length; i++) {
@@ -145,6 +147,9 @@ export async function run(argv: string[], io: Io): Promise<number> {
       }
       case "import": {
         if (!rest[0]) throw new UsageError("import needs a CubeCobra cube id");
+        for (const p of [projectPath, cardsPath]) {
+          if (!args.bool.has("force") && existsSync(p)) throw new UsageError(`${p} already exists: import would replace it. Use another folder, or --force to replace it.`);
+        }
         const cube = await fetchCubeCobra(rest[0], {}, io.fetch ?? fetch);
         const project: Project = {
           version: 1, cubeId: cube.id, original: cube.mainboard, current: [...cube.mainboard],
@@ -154,7 +159,10 @@ export async function run(argv: string[], io: Io): Promise<number> {
         await writeFile(cardsPath, JSON.stringify(Object.values(cube.cards)) + "\n");
         out({ cubeId: cube.id, cards: cube.mainboard.length, rulesRestored: !!cube.config },
           `Imported "${cube.name}": ${cube.mainboard.length} cards, ${cube.config ? "rules restored from the cube's text" : "no saved rules found"}.\n` +
-          `Cards outside the cube (for search) come from a full card database: see README, "Card data".`);
+          (cube.duplicates ? `${cube.duplicates} repeated card(s) counted once.\n` : "") +
+          `cards.json now holds the cube's cards only. Next: cubewarden data build, which adds the cards you may add\n` +
+          `(from the sets your rules allow, e.g. cubewarden rule set sets --scope cube --name "Sets" --text "every(s:fdn,tla)",\n` +
+          `or with --pool "<Scryfall query>"). Then cubewarden check, or cubewarden serve for the page.`);
         return 0;
       }
       case "data": {

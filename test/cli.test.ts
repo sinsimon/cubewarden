@@ -26,6 +26,29 @@ const cli = async (dir: string, ...argv: string[]) => {
   return { code, out };
 };
 
+const SAMPLE = readFileSync(new URL("./fixtures/cubecobra-cube.json", import.meta.url), "utf8");
+const fakeFetch = (async () => new Response(SAMPLE, { status: 200 })) as unknown as typeof fetch;
+
+describe("cubewarden import", () => {
+  it("starts a project from a CubeCobra cube", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cubewarden-"));
+    let out = "";
+    const code = await run(["import", "sample"], { cwd: dir, write: (s) => (out += s), fetch: fakeFetch });
+    expect(code).toBe(0);
+    expect(out).toMatch(/Imported "Sample cube": 5 cards/);
+    expect(JSON.parse(readFileSync(join(dir, "cubewarden.json"), "utf8")).current).toHaveLength(5);
+  });
+  it("refuses to overwrite an existing project unless asked with --force", async () => {
+    const dir = setup();
+    let out = "";
+    expect(await run(["import", "sample"], { cwd: dir, write: (s) => (out += s), fetch: fakeFetch })).toBe(2);
+    expect(out).toMatch(/already exists.*--force/);
+    expect(JSON.parse(readFileSync(join(dir, "cubewarden.json"), "utf8")).current).toHaveLength(4);
+    expect(await run(["import", "sample", "--force"], { cwd: dir, write: () => {}, fetch: fakeFetch })).toBe(0);
+    expect(JSON.parse(readFileSync(join(dir, "cubewarden.json"), "utf8")).current).toHaveLength(5);
+  });
+});
+
 describe("cubewarden CLI", () => {
   it("check: exits 1 when a primary rule is not met, and prints JSON for agents", async () => {
     const dir = setup();

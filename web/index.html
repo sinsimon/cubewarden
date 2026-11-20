@@ -38,6 +38,18 @@ kbd{font:600 10.5px/1 var(--sans);padding:2px 4px;border:1px solid var(--line-2)
 .btn.danger{color:var(--fail)}
 .btn.danger.armed{background:var(--fail);color:#fff;border-color:var(--fail)}
 .btn.sm{height:24px;padding:0 8px;font-size:12px}
+.tabs{display:inline-flex;align-self:stretch;gap:4px;margin:-8px 0}
+.tabs button{border:0;background:none;padding:0 8px;font-size:13px;color:var(--ink-2);border-bottom:2px solid transparent;border-top:2px solid transparent;white-space:nowrap;cursor:pointer}
+.tabs button:hover{color:var(--ink)}
+.tabs button.on{color:var(--ink);font-weight:600;border-bottom-color:#2546C9}
+.tabs button:focus-visible{outline:2px solid #2546C9;outline-offset:-2px}
+.switch{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer;position:relative;white-space:nowrap}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{width:28px;height:16px;border-radius:9px;background:var(--line-2);position:relative;transition:background .15s;flex:none}
+.switch .track::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.switch input:checked+.track{background:var(--ink)}
+.switch input:checked+.track::after{transform:translateX(12px)}
+.switch input:focus-visible+.track{outline:2px solid #2546C9;outline-offset:2px}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:6px;overflow:hidden;background:var(--paper)}
 .seg button{border:0;background:none;height:26px;padding:0 10px;font-size:12px;color:var(--ink-2);white-space:nowrap}
 .seg button+button{border-left:1px solid var(--line-2)}
@@ -535,9 +547,9 @@ body.compact-side .side-close{display:flex;justify-content:flex-end;padding:2px 
       <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><polygon points="11,1.5 20.5,8.4 16.9,19.6 5.1,19.6 1.5,8.4" fill="none" stroke="#1A2130" stroke-width="1.6"/><polygon points="11,1.5 16.9,19.6 1.5,8.4 20.5,8.4 5.1,19.6" fill="none" stroke="#2546C9" stroke-width="1.1"/></svg>
       <span id="cubeName">cubewarden</span>
     </div>
-    <div class="seg" id="viewSeg"><button data-view="work" title="Workbench (O)">Workbench</button><button data-view="overview" title="Overview: statistics and archetype star (O)">Overview</button></div>
+    <nav class="tabs" id="viewSeg" role="tablist" aria-label="View"><button role="tab" data-view="work" title="Workbench (O)">Workbench</button><button role="tab" data-view="overview" title="Overview: statistics and archetype star (O)">Overview</button></nav>
     <span class="sizeinfo" id="sizeInfo"></span>
-    <div class="seg" id="scaleSeg" title="Counts at colour and archetype scope, scaled to the target size or as they are now (S)"><button data-scale="1">Scaled</button><button data-scale="0">Actual</button></div>
+    <label class="switch" id="scaleSeg" title="On: counts at colour and archetype scope are scaled to the target size. Off: counts as they are now (S)"><input type="checkbox" role="switch"><span class="track" aria-hidden="true"></span><span class="lbl">Scaled</span></label>
     <span class="spacer"></span>
     <span class="top-break" aria-hidden="true"></span>
     <button class="btn" id="btnAdd" title="Search cards outside the cube (A)">Add cards</button>
@@ -955,10 +967,9 @@ function renderTop() {
   $("#sizeInfo").innerHTML = `<b>${R.size}</b> cards${t ? `, target <b>${t}</b>` : ""}`;
   const sc = $("#scaleSeg");
   sc.classList.toggle("hidden", !t);
-  sc.querySelectorAll("button").forEach((b) => b.classList.toggle("on", (b.dataset.scale === "1") === !!U.scale));
-  sc.querySelector('[data-scale="1"]').textContent = t ? `Scaled to ${t}` : "Scaled";
-  sc.querySelector('[data-scale="1"]').disabled = !t;
-  $("#viewSeg").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.view === U.view));
+  sc.querySelector("input").checked = !!U.scale;
+  sc.querySelector(".lbl").textContent = t ? `Scaled to ${t}` : "Scaled";
+  $("#viewSeg").querySelectorAll("button").forEach((b) => { const on = b.dataset.view === U.view; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
   const d = diffNow(), n = d.adds.length + d.removes.length;
   const bd = $("#chgBadge"); bd.textContent = n; bd.classList.toggle("dirty", isDirty());
   bd.title = isDirty() ? "Changes not exported yet" : n ? "All changes exported" : "No changes";
@@ -1439,7 +1450,7 @@ function handleAct(a) {
   }
 }
 $("#viewSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) { U.view = b.dataset.view; renderAll(); } });
-$("#scaleSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-scale]"); if (b && !b.disabled) { U.scale = b.dataset.scale === "1"; save(); recompute(); renderAll(); } });
+$("#scaleSeg input").addEventListener("change", (e) => { U.scale = e.target.checked; save(); recompute(); renderAll(); });
 $("#btnAdd").addEventListener("click", () => openFind("add", false));
 $("#btnChanges").addEventListener("click", () => openDrawer("changes"));
 $("#btnData").addEventListener("click", () => openDrawer("data"));
