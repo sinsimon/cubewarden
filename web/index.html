@@ -292,7 +292,7 @@ table.grid.w-m,table.grid.w-s,table.grid.w-xs{min-width:0}
 .fld .help{font-size:12px;color:var(--ink-3)}
 .txt{height:30px;border:1px solid var(--line-2);border-radius:6px;padding:0 8px;background:var(--paper);min-width:0}
 .txt:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px rgba(37,70,201,.15)}
-select.txt{padding-right:4px}
+select.txt,.fb-conj select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
 textarea.txt{height:auto;padding:8px;resize:vertical}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .sentence{border:1px solid var(--line-2);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;background:#FBFBFC}
@@ -308,16 +308,16 @@ textarea.txt{height:auto;padding:8px;resize:vertical}
 /* filter builder */
 .fb{display:flex;flex-direction:column;gap:6px}
 .fb-group{display:flex;flex-direction:column;gap:6px}
-.fb-group.nested{border:1px solid var(--line-2);background:var(--chrome);border-radius:8px;padding:8px}
+.fb-group.nested{border:1px solid var(--line-2);background:var(--chrome);border-radius:8px;padding:6px}
 .fb-group.nested .fb-group.nested{background:var(--paper)}
 .fb-group.neg{box-shadow:inset 3px 0 0 var(--fail)}
 .fb-negnote{font-size:11.5px;color:var(--fail);font-weight:600;padding-left:4px}
-.fb-row{display:grid;grid-template-columns:52px minmax(0,1.1fr) minmax(0,.9fr) minmax(0,1.4fr) 22px;gap:5px;align-items:start}
+.fb-row{display:grid;grid-template-columns:46px minmax(92px,1.1fr) minmax(64px,.8fr) minmax(64px,1.4fr) 22px;gap:5px;align-items:start}
 .fb-group.nested{min-width:0}
 .fb-row>.fb-group{grid-column:2/-1}
 .fb-row>*{min-width:0}.fb-row select.txt{max-width:100%}
 .fb-conj{height:28px;display:flex;align-items:center;font-size:12px;color:var(--ink-2)}
-.fb-conj select{height:26px;border:1px solid var(--line-2);border-radius:5px;background:var(--paper);font-size:12px;padding:0 2px;width:50px}
+.fb-conj select{height:26px;border:1px solid var(--line-2);border-radius:5px;background-color:var(--paper);font-size:12px;padding:0 16px 0 5px;background-position:right 4px center;width:46px}
 .fb-row select.txt,.fb-row input.txt{height:28px;font-size:12px;width:100%}
 .fb-val{min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .fb-val .pct{display:flex;align-items:center;gap:3px;width:100%}
@@ -1597,7 +1597,7 @@ const SETS = (() => { const m = {}; D.cards.forEach((c) => (c.printSets || [c.se
 const RARITIES = ["common", "uncommon", "rare", "mythic"];
 const SYNTAX = { ccTag: 'tag:', name: 'name:', tag: "otag:", type: "t:", text: "o:", keyword: "kw:", manaCost: "m:", mv: "mv", power: "pow", toughness: "tou", colors: "c", colorCount: "ncolors", hybrid: "is:hybrid", set: "s:", rarity: "r:", wrAdj: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", member: "member:", scryfall: "raw" };
 function fieldOptions() {
-  return FIELD_GROUPS.map(([g, ids]) => ({ group: g, items: ids.filter((id) => E.FIELD[id]).map((id) => [id, `${E.FIELD[id].label}  ${SYNTAX[id] || ""}`]) }));
+  return FIELD_GROUPS.map(([g, ids]) => ({ group: g, items: ids.filter((id) => E.FIELD[id]).map((id) => [id, E.FIELD[id].label]) }));
 }
 function opOptions(f) {
   const o = [];
@@ -1671,7 +1671,7 @@ function makeBuilder(root, opts) {
   function condCells(c, g, i) {
     let f = E.FIELD[c.field] || E.FIELD.tag;
     const fieldSel = selEl(fieldOptions(), c.field, (v) => { c.field = v; const nf = E.FIELD[v]; c.op = nf.ops[0]; delete c.not; c.value = defaultValue(nf, c.op); changed(true); });
-    fieldSel.title = f.hint || (f.source && D.sources[f.source] ? D.sources[f.source] : "");
+    fieldSel.title = [SYNTAX[c.field] ? "Text syntax: " + SYNTAX[c.field] : "", f.hint || (f.source && D.sources[f.source] ? D.sources[f.source] : "")].filter(Boolean).join("\n");
     const opSel = selEl(opOptions(f), c.op + "|" + (c.not ? 1 : 0), (v) => {
       const [op, n] = v.split("|"); const prev = c.op; c.op = op;
       if (n === "1") c.not = true; else delete c.not;
