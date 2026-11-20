@@ -16,7 +16,8 @@
     "build:web": "node scripts/build-web.ts",
     "build:cli": "node scripts/build-cli.ts",
     "build": "npm run build:web && npm run build:cli",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "build:site": "npm run build:web && node scripts/build-site.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

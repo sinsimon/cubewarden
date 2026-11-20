@@ -21,7 +21,7 @@ async function ensureBundle() {
   await build({ entryPoints: [fileURLToPath(new URL("./browser.ts", import.meta.url))], bundle: true, format: "iife", target: "es2022", outfile: join(WEB, "dist/cubewarden.js") });
 }
 
-async function dataJs(projectPath: string, cardsPath: string): Promise<string> {
+export async function dataJs(projectPath: string, cardsPath: string): Promise<string> {
   const project: Project = JSON.parse(await readFile(projectPath, "utf8"));
   const raw = JSON.parse(await readFile(cardsPath, "utf8"));
   const cards = Array.isArray(raw) ? raw : raw.cards;
