@@ -1,0 +1,40 @@
+# cubewarden
+
+> cubewarden keeps a Magic: The Gathering cube balanced against rules its designer writes: for the whole cube,
+> for each colour and for each archetype. Open source (MIT): https://github.com/sinsimon/cubewarden
+
+## For agents using this page (browser)
+
+The page exposes `window.cubewarden`, the same operations as the command line:
+
+- `cubewarden.check()`: rules and mechanics not met (`failing` = primary, `warnings` = secondary).
+- `cubewarden.explain(id)`: a rule's value, target and the cards behind it.
+- `cubewarden.search(filter, { scope, sort, limit })`: cards outside the cube that match; only cards the cube's
+  "every card" rules allow. `sort`: `cubes` (default: most used on CubeCobra), `elo`, `picks`, `wr`, `wrraw`, `mv`, `name`.
+- `cubewarden.tryChanges({ add: [names], remove: [names] })`: effect of a swap on every rule, nothing saved.
+- `cubewarden.applyChanges({ add, remove })`: make the swap; the page saves and redraws.
+- `cubewarden.changes()`: adds and removes against the imported list, with a changelist for CubeCobra.
+- `cubewarden.rules()`, `cubewarden.setRule({ id, name, scope, text, priority })`, `cubewarden.removeRule(id)`.
+- `cubewarden.syntax()`: the filter and rule syntax. `cubewarden.help()`: this list.
+
+Where the browser supports WebMCP (`document.modelContext`), the same operations are registered as tools named
+`cubewarden_check`, `cubewarden_explain`, `cubewarden_search`, `cubewarden_try_changes`, `cubewarden_apply_changes`,
+`cubewarden_rules`, `cubewarden_set_rule`, `cubewarden_changes`, `cubewarden_syntax`.
+
+Ask the person before `applyChanges`, `setRule` or `removeRule`: they change the cube they are working on.
+
+## For agents in a terminal
+
+Run `npx cubewarden help`. The project is two files: `cubewarden.json` (rules + card list) and `cards.json`
+(card data). `cubewarden check --json` exits 1 when a primary rule is not met. `cubewarden serve` opens this page
+on the same files.
+
+## Rule syntax (short)
+
+- Filters: `otag:removal t:creature kw:flying mv>=4 c=wu c<=wu c=scope is:hybrid s:fdn,trk wr>=55% cubes>=1000 tag:"UG Ramp" member:any`, with `or`, `( )`, `-`.
+- Rules: `count(F) >= 6`, `count(F) in 13..14`, `count(t:creature) >= 50%`, `count(c=scope -is:hybrid) = 3 fixed`,
+  `avg(wr, member:any) in 55%..60%`, `every(s:fdn,trk)`, `every(mv, t:creature) <= 5`.
+- Scopes: `cube`, `color:W` … `color:G`, `color:C` (colourless nonland), `color:L` (lands), `archetype:<id>`, `allColors`, `allArchetypes`.
+
+CubeCobra has no write API: changes go back as a changelist or a CSV the person uploads, and rules travel in a
+hidden line at the end of the cube's About text (`[cubewarden-v1]: cw:…`).

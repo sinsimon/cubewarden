@@ -32,6 +32,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   about [--numbers] [--cube-id <id>]  About text for CubeCobra, ending with the hidden rules line
   export csv                    the whole list as a CSV for CubeCobra, with mechanic tags
   import <CubeCobra id>         start a project from a public CubeCobra cube (read only)
+  serve [--port 3300]           open the page on this project, for you and for agents in the browser
   syntax                        the filter and rule syntax
 `;
 
@@ -153,6 +154,11 @@ export async function run(argv: string[], io: Io): Promise<number> {
           `Imported "${cube.name}": ${cube.mainboard.length} cards, ${cube.config ? "rules restored from the cube's text" : "no saved rules found"}.\n` +
           `Cards outside the cube (for search) come from a full card database: see README, "Card data".`);
         return 0;
+      }
+      case "serve": {
+        const { serve } = await import("./serve.ts");
+        await serve({ cwd: io.cwd, project: flag("project"), cards: flag("cards"), port: flag("port") ? Number(flag("port")) : undefined, write: io.write });
+        return await new Promise<number>(() => {});
       }
       default:
         throw new UsageError(`Unknown command "${cmd}". Run cubewarden help.`);

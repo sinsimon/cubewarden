@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluate, parseFilter } from "../src/index.ts";
+import { evaluate, parseFilter, validateFilter } from "../src/index.ts";
 import { ALL, BY_ID, config, rule } from "./fixtures/cards.ts";
 
 const cube = { kind: "cube" } as const;
@@ -140,5 +140,13 @@ describe("scaling to a target cube size", () => {
   it("can be turned off, and does nothing without a target size", () => {
     expect(evaluate(cfg("count(t:creature) = 2"), ALL, BY_ID, { scale: false }).colors.W.rules[0].value).toBe(2);
     expect(evaluate(config(), ALL, BY_ID).factor).toBe(1);
+  });
+});
+
+describe("checking a filter built in the editor", () => {
+  it("names unknown fields, wrong operators and Scryfall terms the engine cannot run", () => {
+    expect(validateFilter(parseFilter("otag:removal mv>=2"))).toEqual([]);
+    expect(validateFilter({ op: "and", items: [{ field: "tag", op: ">=", value: "x" }] })).toEqual(['Operator ">=" not valid for Oracle tag']);
+    expect(validateFilter({ op: "and", items: [{ field: "scryfall", op: "matches", value: "is:commander" }] })[0]).toMatch(/not supported/);
   });
 });

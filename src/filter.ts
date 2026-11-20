@@ -70,3 +70,24 @@ export function matches(card: Card, filter: Filter | Condition | null | undefine
   else r = filter.items.every((x) => matches(card, x, ctx));
   return filter.not ? !r : r;
 }
+
+/** Problems in a filter, in plain words; empty when it can run. Scryfall terms are tried on an empty card. */
+export function validateFilter(filter: Filter | Condition | null | undefined): string[] {
+  const errors: string[] = [];
+  const probe: Card = { id: "", name: "", colors: "", identity: "", manaCost: "", hybrid: false, type: "", mv: 0, power: null, toughness: null,
+    text: "", keywords: [], tags: [], set: null, number: null, rarity: null, printSets: [], image: null };
+  (function walk(f: Filter | Condition | null | undefined) {
+    if (!f) return;
+    if ("field" in f) {
+      const info = FIELD[f.field];
+      if (!info) errors.push("Unknown field " + f.field);
+      else if (!info.ops.includes(f.op)) errors.push(`Operator "${f.op}" not valid for ${info.label}`);
+      if (f.field === "scryfall") {
+        try { scryMatches(probe, String(f.value)); } catch (e) { errors.push((e as Error).message); }
+      }
+      return;
+    }
+    f.items.forEach(walk);
+  })(filter);
+  return errors;
+}
