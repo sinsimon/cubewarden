@@ -1,0 +1,20 @@
+{
+  "name": "cubewarden",
+  "version": "0.1.0",
+  "description": "Keep a Magic: The Gathering cube balanced against rules you write: for the whole cube, each colour and each archetype.",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "cubewarden": "bin/cubewarden.js" },
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build:web": "node scripts/build-web.ts"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  }
+}
