@@ -2332,7 +2332,7 @@ function renderRefList() {
   const L = refsList();
   box.replaceChildren(...(L.length ? L.map((r) => {
     const st = refStore[r.id] || {};
-    const info = st.status === "ok" ? `${st.ref.ids.length} cards` : st.status === "error" ? `could not read: ${st.error}` : "loading…";
+    const info = st.status === "ok" ? `${st.ref.name && st.ref.name !== r.name ? st.ref.name + " · " : ""}${st.ref.ids.length} cards` : st.status === "error" ? `could not read: ${st.error}` : "loading…";
     return h("div", { class: "refrow" }, h("a", { href: E.cubeCobraListUrl(r.id), target: "_blank", rel: "noopener", title: "Open on CubeCobra", style: "font-weight:700;color:inherit" }, (r.name || r.id) + " ↗"), h("span", { class: "muted", style: "font-size:12px" }, info), h("span", { class: "spacer" }), h("button", { class: "btn sm ghost", type: "button", title: "Remove reference", onclick: () => { S.config.references = L.filter((x) => x.id !== r.id); save(); recompute(); renderAll(); renderRefList(); } }, "Remove"));
   }) : [h("div", { class: "kempty" }, "No reference cubes.")]));
 }
