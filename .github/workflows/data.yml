@@ -1,0 +1,103 @@
+# Generic card data for the hosted site (no one's cube): one JSON file per set plus index.json, published
+# as the single commit of the `data` branch. Runs unattended every night; `cubewarden data publish` decides
+# what to rebuild (see src/data/publish.ts) and stops starting sets after a 300-minute budget, so a long
+# backlog spreads over several nights and each night publishes what it has. A night with nothing to do
+# takes under a minute.
+# Sets: released paper sets with 17Lands Premier Draft data (an archive, or Card Ratings for the set being
+# drafted now), found by themselves; spm (OM1 Pick Two Draft) is the one documented exception.
+# Only released sets: Scryfall released_at on or before the day of the run, never a set in spoiler season.
+# When a set fails, its old file is kept, the rest is still published, and the run ends red so GitHub
+# emails the owner. A budget stop is not a failure.
+#
+# Win rates: 17Lands Public Datasets (CC BY 4.0, https://www.17lands.com/public_datasets) and 17Lands Card Ratings.
+name: Card data
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Rebuild every set
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: card-data
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Restore the data branch into data-out/
+        run: |
+          set -euo pipefail
+          mkdir -p data-out
+          set +e
+          git ls-remote --exit-code --heads origin data > /dev/null
+          status=$?
+          set -e
+          case "$status" in
+            0) git fetch --depth 1 origin data
+               git archive FETCH_HEAD | tar -x -C data-out
+               echo "data branch restored: $(ls data-out/sets | wc -l) set files" ;;
+            2) echo "no data branch yet: first run starts empty" ;;
+            *) echo "::error::could not read the data branch (git ls-remote exit $status)"; exit 1 ;;
+          esac
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: astral-sh/setup-uv@v10.4.0
+
+      # Only the computed 17Lands archive results (small, keyed by the archive's date) are worth keeping
+      # between nights; HTTP answers expire after 3 days anyway. A new key each run, so each run saves.
+      - uses: actions/cache@v6
+        with:
+          path: .cache/winrates
+          key: card-winrates-${{ github.run_id }}
+          restore-keys: card-winrates-
+
+      - name: Build the card data
+        id: publish
+        run: |
+          set +e
+          node bin/cubewarden.js data publish --out data-out --budget 300 ${{ inputs.all && '--all' || '' }}
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+
+      # Exit 0 = done or stopped by the budget, 1 = some set failed (old files kept): publish both.
+      # 2 = the run never started: publish nothing.
+      - name: Publish data-out/ as the single commit of the data branch
+        if: steps.publish.outputs.code == '0' || steps.publish.outputs.code == '1'
+        run: |
+          set -euo pipefail
+          node -e '
+            const i = JSON.parse(require("fs").readFileSync("data-out/index.json", "utf8"));
+            if (i.version !== 1 || !Array.isArray(i.sets) || i.sets.length === 0) { console.error("index.json is not valid"); process.exit(1); }
+            console.log(`index.json: ${i.sets.length} sets`);'
+          export GIT_INDEX_FILE="$RUNNER_TEMP/data-branch.index"
+          rm -f "$GIT_INDEX_FILE"
+          git --work-tree=data-out add -A -- index.json sets
+          tree=$(git write-tree)
+          commit=$(git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit-tree "$tree" -m "Card data $(date -u +%F)")
+          git push --force origin "$commit:refs/heads/data"
+
+      - name: Fail the run when a set failed
+        if: steps.publish.outputs.code != '0'
+        run: |
+          echo "::error::cubewarden data publish exited ${{ steps.publish.outputs.code }}: see the Build the card data step"
+          exit 1

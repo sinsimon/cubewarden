@@ -6,6 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Project } from "../workspace.ts";
 import { BuildError, buildCards, provenanceText } from "./build.ts";
+import { publish, publishSummary } from "./publish.ts";
 
 export const DATA_HELP = `  data build                    write cards.json: the cube's cards plus every card that may be added
                                 (Scryfall, CubeCobra tags and stats). Pool = the sets of the cube's
@@ -14,8 +15,15 @@ export const DATA_HELP = `  data build                    write cards.json: the 
                                 --refresh                     ignore the .cache/ folder next to the project
 `;
 
+export const PUBLISH_HELP = `  data publish --out <dir>      generic card data for the hosted site, one file per set (sets/<code>.json)
+                                and index.json; rebuilds only what changed (see src/data/publish.ts).
+                                --all  rebuild every set   --sets fdn,tla  only consider these sets
+                                --budget <minutes>  stop starting sets after this (default 300)
+                                --cache <dir>  HTTP cache (default .cache)   exit 1 only if a set failed
+`;
+
 interface DataArgs { _: string[]; flags: Record<string, string>; bool: Set<string> }
-const BOOL = new Set(["refresh", "json"]);
+const BOOL = new Set(["refresh", "json", "all"]);
 
 function parse(argv: string[]): DataArgs {
   const a: DataArgs = { _: [], flags: {}, bool: new Set() };
@@ -40,8 +48,10 @@ async function readProject(path: string): Promise<Project | null> {
 /** `args` = what follows `data` on the command line, e.g. ["build", "--winrates", "17lands"]. */
 export async function runDataCommand(args: string[], io: { cwd: string; write: (s: string) => void }): Promise<number> {
   const a = parse(args);
+  if (a._[0] === "publish") return runPublish(a, io);
   if (a._[0] !== "build") {
-    io.write("use: cubewarden data build [--pool \"<Scryfall query>\"] [--winrates <file>|17lands] [--refresh]\n");
+    io.write("use: cubewarden data build [--pool \"<Scryfall query>\"] [--winrates <file>|17lands] [--refresh]\n" +
+      "     cubewarden data publish --out <dir> [--all] [--sets a,b]\n");
     return 2;
   }
   const projectPath = resolve(io.cwd, a.flags.project || "cubewarden.json");
@@ -57,6 +67,23 @@ export async function runDataCommand(args: string[], io: { cwd: string; write: (
     await writeFile(cardsPath, JSON.stringify(r.cards) + "\n");
     io.write((a.bool.has("json") ? JSON.stringify(r.provenance, null, 2) : `Wrote ${cardsPath}\n${provenanceText(r.provenance)}`) + "\n");
     return 0;
+  } catch (e) {
+    io.write((e instanceof Error ? e.message : String(e)) + "\n");
+    return 2;
+  }
+}
+
+/** `data publish`: 0 = done or stopped by the time budget, 1 = some set failed (its old shard kept), 2 = the run could not start. */
+async function runPublish(a: DataArgs, io: { cwd: string; write: (s: string) => void }): Promise<number> {
+  try {
+    const r = await publish({
+      outDir: resolve(io.cwd, a.flags.out || "data-out"), cacheDir: resolve(io.cwd, a.flags.cache || ".cache"),
+      all: a.bool.has("all"), refresh: a.bool.has("refresh"), budgetMinutes: a.flags.budget ? Number(a.flags.budget) : undefined,
+      only: a.flags.sets ? a.flags.sets.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) : undefined,
+      log: (s) => process.stderr.write(s + "\n"),
+    });
+    io.write((a.bool.has("json") ? JSON.stringify({ ...r, universe: r.universe.length }, null, 2) : publishSummary(r)) + "\n");
+    return r.failed.length ? 1 : 0;
   } catch (e) {
     io.write((e instanceof Error ? e.message : String(e)) + "\n");
     return 2;

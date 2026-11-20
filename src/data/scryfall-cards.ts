@@ -18,7 +18,7 @@ export interface ScryfallCard extends ScryfallFace {
   card_faces?: ScryfallFace[];
 }
 interface SearchPage { object: string; data?: ScryfallCard[]; has_more?: boolean; next_page?: string; code?: string }
-export interface ScryfallSet { code: string; released_at?: string; digital?: boolean }
+export interface ScryfallSet { code: string; name?: string; set_type?: string; released_at?: string; digital?: boolean; card_count?: number }
 
 const NOT_CARDS = new Set(["token", "double_faced_token", "emblem", "art_series"]);
 
@@ -36,6 +36,11 @@ export async function searchAll(http: Http, query: string, unique = "prints"): P
     url = page.has_more ? page.next_page : undefined;
   }
   return out;
+}
+
+/** Every set Scryfall knows. */
+export async function fetchSets(http: Http): Promise<ScryfallSet[]> {
+  return (await http.json<{ data: ScryfallSet[] }>(`${API}/sets`)).data;
 }
 
 /** Release date of every set Scryfall knows, by code. */

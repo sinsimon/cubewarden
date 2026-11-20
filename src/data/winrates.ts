@@ -26,11 +26,21 @@ export const MIN_GAMES = 500;
 /**
  * Sets drafted on Arena under another event. Marvel's Spider-Man was drafted as Through the Omenpaths (OM1)
  * in Pick Two Draft, with Arena names: Scryfall's printed_name in set om1 maps them back to the paper cards.
+ * The hosted data (`data publish`) takes Premier Draft only; the sets listed here are its documented exceptions
+ * (today: spm alone).
  */
 export const EVENTS: Record<string, { event: string; format: string; printedNamesFrom?: string }> = {
   spm: { event: "OM1", format: "PickTwoDraft", printedNamesFrom: "om1" },
 };
-const eventOf = (set: string) => EVENTS[set] ?? { event: set.toUpperCase(), format: "PremierDraft" };
+/** The 17Lands event and format of a Scryfall set code. */
+export const eventOf = (set: string) => EVENTS[set] ?? { event: set.toUpperCase(), format: "PremierDraft" };
+
+/** True when 17Lands' Card Ratings report games for the set's event (Premier Draft, or its EVENTS exception): it is being drafted now. */
+export async function hasLiveRatings(http: Http, set: string): Promise<boolean> {
+  const { event, format } = eventOf(set);
+  const rows = await http.json<RatingRow[]>(`https://www.17lands.com/card_ratings/data?expansion=${event}&format=${format}`);
+  return Array.isArray(rows) && rows.some((r) => (r.ever_drawn_game_count ?? 0) > 0);
+}
 
 // ---- precomputed file -------------------------------------------------------------------------
 
@@ -89,7 +99,7 @@ export function adjustedFromPairs(gihWr: number, cardColors: string, decks: Reco
 }
 
 /** Arena name → paper name, from Scryfall's printed_name in a reskinned set. */
-async function printedNames(http: Http, set: string): Promise<Map<string, string>> {
+export async function printedNames(http: Http, set: string): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (const c of await searchAll(http, `set:${set}`)) {
     for (const f of [c, ...(c.card_faces || [])]) {
@@ -99,19 +109,36 @@ async function printedNames(http: Http, set: string): Promise<Map<string, string
   return out;
 }
 
-/** Card name (full and front face, lower case) → oracle id, for the cards printed in a set. */
-function nameIndex(cards: Card[], set: string): Map<string, string> {
-  const out = new Map<string, string>();
+/** Lower case, and the "?" spelling 17Lands archives use for non-ASCII letters ("Bespoke B?"). */
+const nameKeys = (name: string) => {
+  const keys = [name, name.split(" // ")[0]].map((n) => n.toLowerCase());
+  return [...new Set([...keys, ...keys.map((k) => k.replace(/[^\x00-\x7f]/g, "?"))])];
+};
+
+/**
+ * A 17Lands name → the oracle id of the card printed in `set` with that name (full name or front face),
+ * after renaming Arena names with `rename` (Arena name → paper name, lower case keys).
+ */
+export function nameMatcher(cards: Card[], set: string, rename: Map<string, string> = new Map()): (name: string) => string | undefined {
+  const index = new Map<string, string>();
   for (const c of cards) {
     if (!c.printSets.includes(set)) continue;
-    for (const n of [c.name, c.name.split(" // ")[0]]) if (!out.has(n.toLowerCase())) out.set(n.toLowerCase(), c.id);
+    for (const k of nameKeys(c.name)) if (!index.has(k)) index.set(k, c.id);
   }
-  return out;
+  return (name) => {
+    const paper = rename.get(name.toLowerCase()) ?? name;
+    for (const k of nameKeys(paper)) if (index.has(k)) return index.get(k);
+    return undefined;
+  };
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-async function setFrom17Lands(http: Http, set: string, cards: Card[]) {
+/**
+ * One set from 17Lands' Card Ratings (GIH WR) and Color Ratings (deck baselines for the adjusted WR, see
+ * adjustedFromPairs). Card Ratings only carries games while the set is being drafted.
+ */
+export async function cardRatingsForSet(http: Http, set: string, cards: Card[]) {
   const { event, format, printedNamesFrom } = eventOf(set);
   const ratingsUrl = `https://www.17lands.com/card_ratings/data?expansion=${event}&format=${format}`;
   const colorBase = `https://www.17lands.com/color_ratings/data?expansion=${event}&event_type=${format}&start_date=2020-01-01`;
@@ -120,28 +147,28 @@ async function setFrom17Lands(http: Http, set: string, cards: Card[]) {
   const colorRows = await http.json<ColorRow[]>(`${colorBase}&end_date=${today()}&combine_splash=true`, { cacheKey: `${colorBase}&combine_splash=true` });
   const rows: RatingRow[] = JSON.parse(ratings.text);
   const { overall, decks } = deckBaselines(colorRows);
+  const all = colorRows.find((r) => r.is_summary && r.short_name === "All");
   const rename = printedNamesFrom ? await printedNames(http, printedNamesFrom) : new Map<string, string>();
-  const index = nameIndex(cards, set);
+  const match = nameMatcher(cards, set, rename);
   const found: Record<string, WinRate> = {};
   const unmatched: string[] = [];
   for (const r of rows) {
     const games = r.ever_drawn_game_count ?? 0;
     if (r.ever_drawn_win_rate == null || games < MIN_GAMES) continue;
-    const name = (rename.get(r.name.toLowerCase()) ?? r.name).toLowerCase();
-    const id = index.get(name) ?? index.get(name.split(" // ")[0]);
+    const id = match(r.name);
     if (!id) { unmatched.push(r.name); continue; }
     const adjWr = overall == null ? null : adjustedFromPairs(r.ever_drawn_win_rate, r.color ?? "", decks, overall);
     found[id] = { gihWr: r.ever_drawn_win_rate, adjWr, games };
   }
   const games = rows.reduce((n, r) => n + (r.ever_drawn_game_count ?? 0), 0);
-  return { found, unmatched, asOf: ratings.fetchedAt.slice(0, 10), rows: rows.length, games };
+  return { found, unmatched, asOf: ratings.fetchedAt.slice(0, 10), rows: rows.length, games, deckGames: all?.games ?? null };
 }
 
 /** Win rates for every set from 17Lands' public endpoints, matched by name to the cards printed in that set. */
 export async function fetch17Lands(http: Http, sets: string[], cards: Card[], released: Record<string, string>, log?: (s: string) => void): Promise<WinRateTable> {
   const table: WinRateTable = { source: "17Lands Card Ratings and Color Ratings", sets: {}, cards: {}, unmatched: {} };
   for (const set of sets) {
-    const r = await setFrom17Lands(http, set, cards);
+    const r = await cardRatingsForSet(http, set, cards);
     for (const [id, w] of Object.entries(r.found)) (table.cards[id] ||= {})[set] = w;
     table.sets[set] = { released: released[set] ?? null, asOf: r.asOf };
     if (r.unmatched.length) table.unmatched![set] = r.unmatched;
