@@ -57,7 +57,21 @@ describe("search", () => {
   it("finds cards outside the cube that match a filter and that the cube's 'every card' rules allow", () => {
     const names = ws().search("c=w").cards.map((c) => c.name);
     expect(names).toEqual(["Dawn Skirmisher"]);
-    expect(ws().search("c=w", { respectCubeRules: false }).cards.map((c) => c.name)).toEqual(["Old White Flyer", "Dawn Skirmisher"]);
+    expect(ws().search("c=w", { respectCubeRules: false, sort: "wr" }).cards.map((c) => c.name)).toEqual(["Old White Flyer", "Dawn Skirmisher"]);
+  });
+  it("applies any 'every card' rule of the cube, letting through cards with no data for its metric", () => {
+    const w = ws();
+    w.setRule({ id: "sets", text: "every(r:common,uncommon)" });
+    w.setRule({ id: "wr-floor", name: "WR floor", scope: "cube", text: "every(wr) >= 60%" });
+    const pool = { ...cardsById, R1: card("R1", { name: "Rare White", colors: "W", rarity: "rare", wrAdj: 0.7 }), N1: card("N1", { name: "No Data White", colors: "W" }) };
+    const names = createWorkspace(w.project, pool).search("c=w", { sort: "name" }).cards.map((c) => c.name);
+    expect(names).toEqual(["Dawn Skirmisher", "No Data White", "Old White Flyer"]);
+  });
+  it("sorts by CubeCobra popularity by default, or by any metric", () => {
+    const pool = { ...cardsById, P1: card("P1", { name: "Popular", colors: "W", ccCubes: 900, wrAdj: 0.5 }), P2: card("P2", { name: "Niche", colors: "W", ccCubes: 10, wrAdj: 0.65 }) };
+    const w = createWorkspace(project(), pool);
+    expect(w.search("c=w").cards.map((c) => c.name)).toEqual(["Popular", "Niche", "Dawn Skirmisher"]);
+    expect(w.search("c=w", { sort: "wr" }).cards.map((c) => c.name)).toEqual(["Niche", "Dawn Skirmisher", "Popular"]);
   });
   it("limits the search to a colour or archetype", () => {
     const names = ws().search("t:creature", { scope: "wu" }).cards.map((c) => c.id).sort();

@@ -149,19 +149,6 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
     return out.concat(add.map((c) => c.id));
   }
 
-  /** Cube-scope "every card" rules, as a card test: what the cube allows at all (sets, rarities, any metric). */
-  function allowedByCube(priorities: ("primary" | "secondary")[] = ["primary"]) {
-    const every = project.config.rules.filter((r) => r.scope.kind === "cube" && r.measure.kind === "every" && priorities.includes(r.priority || "primary"));
-    return (c: Card) => every.every((r) => {
-      const m = r.measure;
-      if (m.kind !== "every") return true;
-      if (!m.metric) return matches(c, r.filter);
-      if (!matches(c, r.filter)) return true;
-      const v = metricOf(c, m.metric);
-      return v == null || inConstraint(v, r.constraint);
-    });
-  }
-
   const api = {
     get project() { return project; },
     cardsById,
@@ -193,11 +180,11 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       };
     },
 
-    search(filterText: string, o: { scope?: string; limit?: number; respectCubeRules?: boolean } = {}) {
+    search(filterText: string, o: { scope?: string; limit?: number; respectCubeRules?: boolean; sort?: SortKey } = {}) {
       const filter = parseFilter(filterText);
       const inCube = new Set(project.current);
       let pool = Object.values(cardsById).filter((c) => !inCube.has(c.id));
-      if (o.respectCubeRules !== false) pool = pool.filter(allowedByCube());
+      if (o.respectCubeRules !== false) pool = pool.filter(cubeAllows(project.config));
       let ctx: MatchContext | undefined;
       if (o.scope) {
         const s = o.scope.includes(":") ? parseScope(o.scope)
@@ -206,7 +193,7 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
         ctx = { scopeColors: s.kind === "archetype" ? project.config.archetypes.find((a) => a.id === s.id)!.colors : s.kind === "color" && WUBRG.includes(s.color) ? s.color : "" };
       }
       const hits = pool.filter((c) => matches(c, filter, ctx));
-      hits.sort((a, b) => (b.wrAdj ?? -1) - (a.wrAdj ?? -1) || a.name.localeCompare(b.name));
+      sortCards(hits, o.sort ?? "cubes");
       return { total: hits.length, cards: hits.slice(0, o.limit ?? 50).map(summarizeCard) };
     },
 
@@ -286,6 +273,40 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
 }
 
 export type Workspace = ReturnType<typeof createWorkspace>;
+
+/**
+ * The cube's "every card" rules (scope cube, primary) as one card test: what the cube allows at all, such as
+ * sets, rarities or a metric floor. A card with no data for a rule's metric is allowed.
+ */
+export function cubeAllows(config: Config): (c: Card) => boolean {
+  const every = config.rules.filter((r) => r.scope.kind === "cube" && r.measure.kind === "every" && (r.priority || "primary") === "primary");
+  return (c) => every.every((r) => {
+    const m = r.measure;
+    if (m.kind !== "every") return true;
+    if (!m.metric) return matches(c, r.filter);
+    if (!matches(c, r.filter)) return true;
+    const v = metricOf(c, m.metric);
+    return v == null || inConstraint(v, r.constraint);
+  });
+}
+
+/** Sort keys for search results; numbers sort high to low (mv low to high), missing values last, then by name. */
+export const SORT_KEYS = { cubes: "ccCubes", elo: "ccElo", picks: "ccPicks", wr: "wrAdj", wrraw: "wrRaw", mv: "mv", name: "name" } as const;
+export type SortKey = keyof typeof SORT_KEYS;
+
+export function sortCards<T extends Card>(cards: T[], key: SortKey): T[] {
+  const f = SORT_KEYS[key];
+  if (!f) throw new Error(`Unknown sort "${key}" (${Object.keys(SORT_KEYS).join(", ")})`);
+  const val = (c: Card) => (f === "name" ? null : metricOf(c, f));
+  return cards.sort((a, b) => {
+    if (f !== "name") {
+      const x = val(a), y = val(b);
+      if (x == null || y == null) { if (x != null) return -1; if (y != null) return 1; }
+      else if (x !== y) return f === "mv" ? x - y : y - x;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
 
 /** Edit distance ≤ 2, for "did you mean". */
 function closeEnough(a: string, b: string): boolean {

@@ -161,6 +161,10 @@ describe("writing rules back as text", () => {
   it.each(examples)("writes %s back unchanged", (src) => {
     expect(ruleToText(parseRule(src))).toBe(src);
   });
+  it("writes a group holding a single group without extra parentheses", () => {
+    const f = { op: "or" as const, items: [{ op: "and" as const, items: [parseFilter("kw:flying").items[0], parseFilter("mv<=3").items[0]] }] };
+    expect(ruleToText({ measure: { kind: "count" }, filter: f })).toBe("count(kw:flying mv<=3)");
+  });
   it("writes a filter on its own", () => {
     expect(filterToText(parseFilter("otag:removal or kw:flying"))).toBe("otag:removal or kw:flying");
   });

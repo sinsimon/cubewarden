@@ -10,7 +10,7 @@ import { aboutMarkdown } from "./about.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
 import { exportCsv, mechanicTags } from "./export.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
-import { createWorkspace, type Finding, type Project } from "./workspace.ts";
+import { createWorkspace, type Finding, type Project, type SortKey } from "./workspace.ts";
 
 export interface Io { cwd: string; write: (s: string) => void; fetch?: typeof fetch }
 
@@ -20,8 +20,9 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
 
   check                         every rule and mechanic not met; exit 1 if a primary one is not met
   explain <rule id>             a rule's value, target and the cards behind it
-  search "<filter>"             cards outside the cube that match (--scope W|wu, --limit 50, --all-cards
-                                to ignore the cube's "every card" rules)
+  search "<filter>"             cards outside the cube that match (--scope W|wu, --limit 50,
+                                --sort cubes|elo|picks|wr|wrraw|mv|name (default cubes: most used on
+                                CubeCobra), --all-cards to ignore the cube's "every card" rules)
   try --add <card> --remove <card>    effect of a swap on every rule, without saving
   apply --add <card> --remove <card>  make the swap and save the project
   rules                         every rule as text
@@ -93,7 +94,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       }
       case "search": {
         if (!rest[0]) throw new UsageError('search needs a filter, e.g. cubewarden search "otag:removal c=w"');
-        const r = (await load()).search(rest[0], { scope: flag("scope"), limit: flag("limit") ? Number(flag("limit")) : undefined, respectCubeRules: !args.bool.has("all-cards") });
+        const r = (await load()).search(rest[0], { scope: flag("scope"), limit: flag("limit") ? Number(flag("limit")) : undefined, respectCubeRules: !args.bool.has("all-cards"), sort: flag("sort") as SortKey | undefined });
         out(r, [`${r.total} card(s)`, ...r.cards.map((c) => `  ${c.name} (${c.colors || "C"}, mv ${c.mv}${c.wrAdj != null ? `, wr ${(c.wrAdj * 100).toFixed(1)}%` : ""})`)].join("\n"));
         return 0;
       }

@@ -255,6 +255,7 @@ export function conditionToText(c: Condition): string {
 export function filterToText(f: Filter | Condition | null | undefined, nested = false): string {
   if (!f) return "";
   if ("field" in f) return conditionToText(f);
+  if (f.items.length === 1 && !f.not) return filterToText(f.items[0], nested);
   const items = f.items.map((x) => filterToText(x, true)).filter(Boolean);
   let s = items.join(f.op === "or" ? " or " : " ");
   if (f.not) return `-(${s})`;

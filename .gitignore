@@ -3,3 +3,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
+# project data: never commit someone's cube or third-party card data
+cards.json
+cubewarden.json
+data.js
+web/dist/
