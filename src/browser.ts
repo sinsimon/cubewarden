@@ -84,6 +84,9 @@ W.CubeEngine = {
 interface Hooks {
   /** Scale counts like the page does (the "scaled / actual" toggle). */
   scale: () => boolean;
+  /** Called before an agent changes the project, with a short label: the page records an undo step and returns
+   *  a function that drops it again if the change fails. */
+  before?: (label: string) => (() => void) | void;
   /** Called after an agent changed the project: save, recompute, redraw. */
   changed: () => void;
 }
@@ -94,7 +97,7 @@ W.cubewardenAttach = (state: Project, cardsById: Record<string, Card>, hooks: Ho
   const ws = createWorkspace(state, cardsById, opts);
   ws.onChange(() => hooks.changed());
   const api = {
-    ...pick(ws),
+    ...pick(ws, hooks.before ?? (() => {})),
     syntax: () => SYNTAX_HELP,
     help: () => AGENT_HELP,
   };
@@ -104,17 +107,25 @@ W.cubewardenAttach = (state: Project, cardsById: Record<string, Card>, hooks: Ho
   return api;
 };
 
-function pick(ws: ReturnType<typeof createWorkspace>) {
+const names = (ch: { add?: string[]; remove?: string[] }) =>
+  [ch.add?.length ? "add " + ch.add.join(", ") : "", ch.remove?.length ? "remove " + ch.remove.join(", ") : ""].filter(Boolean).join("; ");
+
+function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) => (() => void) | void) {
+  /** Records an undo step, runs the change, and drops the step if the change throws. */
+  const undoable = <T>(label: string, f: () => T): T => {
+    const drop = before(label);
+    try { return f(); } catch (e) { if (drop) drop(); throw e; }
+  };
   return {
     check: () => ws.check(),
     explain: (id: string) => ws.explain(id),
     search: (filter: string, o?: Parameters<typeof ws.search>[1]) => ws.search(filter, { respectCubeRules: true, ...o }),
     tryChanges: (ch: Parameters<typeof ws.tryChanges>[0]) => ws.tryChanges(ch),
-    applyChanges: (ch: Parameters<typeof ws.applyChanges>[0]) => ws.applyChanges(ch),
+    applyChanges: (ch: Parameters<typeof ws.applyChanges>[0]) => undoable(names(ch), () => ws.applyChanges(ch)),
     changes: () => ws.changes(),
     rules: () => ws.rules(),
-    setRule: (r: Parameters<typeof ws.setRule>[0]) => ws.setRule(r),
-    removeRule: (id: string) => ws.removeRule(id),
+    setRule: (r: Parameters<typeof ws.setRule>[0]) => undoable(`rule ${r.id}`, () => ws.setRule(r)),
+    removeRule: (id: string) => undoable(`remove rule ${id}`, () => ws.removeRule(id)),
     project: () => structuredClone(ws.project),
   };
 }

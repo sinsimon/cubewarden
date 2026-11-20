@@ -927,11 +927,14 @@ function diffNow() { return E.diff(S.original, S.current); }
 function diffSig(d) { return d.adds.slice().sort().join(",") + "|" + d.removes.slice().sort().join(","); }
 function isDirty() { const d = diffNow(); return (d.adds.length + d.removes.length) > 0 && diffSig(d) !== S.exportedSig; }
 
-function pushUndo(label) { undoStack.push({ current: S.current.slice(), label }); if (undoStack.length > 50) undoStack.shift(); }
+/** Undo keeps the card list and the rules as they were, so it also undoes rule edits and changes made by an agent. */
+function pushUndo(label) { undoStack.push({ current: S.current.slice(), config: clone(S.config), label }); if (undoStack.length > 50) undoStack.shift(); }
 function undo() {
   const u = undoStack.pop();
   if (!u) { toast("Nothing to undo"); return; }
-  S.current = u.current; afterChange("Undid: " + u.label, false);
+  S.current = u.current;
+  if (u.config) S.config = u.config;
+  afterChange("Undid: " + u.label, false);
 }
 function afterChange(msg, undoable = true) {
   const inCube = new Set(S.current);
@@ -1984,6 +1987,7 @@ function saveDraft() {
   if (!draft) return;
   if (!draft.obj.name.trim()) draft.obj.name = draft.type === "rule" ? "Untitled rule" : "Untitled mechanic";
   const name = draft.obj.name, isNew = draft.isNew, type = draft.type;
+  pushUndo(`${isNew ? "create" : "edit"} ${type} "${name}"`);
   S.config = draftConfig();
   draft = null; RD = null; drawerKind = null;
   $("#drawer").classList.remove("open");
@@ -1992,6 +1996,7 @@ function saveDraft() {
 }
 function deleteDraftTarget() {
   const d = draft; if (!d) return;
+  pushUndo(`delete ${d.type} "${d.obj.name}"`);
   if (d.type === "rule") S.config.rules = S.config.rules.filter((r) => r.id !== d.obj.id);
   else { const l = mechList(S.config, d.owner); const i = l.findIndex((m) => m.id === d.obj.id); if (i >= 0) l.splice(i, 1); }
   draft = null; RD = null; drawerKind = null; U.sel = null;
@@ -2766,7 +2771,12 @@ async function importFromCubeCobra(text) {
   $("#dl-kw").innerHTML = [...kws].sort().map((t) => `<option value="${esc(t)}">`).join("");
   setTopVar(); recompute(); renderAll(); loadRefs();
   // Agents driving this browser: window.cubewarden (and WebMCP tools where the browser supports them).
-  window.cubewardenAttach(S, byId, { scale: () => U.scale, changed: () => { save(); recompute(); renderAll(); } });
+  window.cubewardenAttach(S, byId, {
+    scale: () => U.scale,
+    // An agent's change goes on the same undo stack as the person's, labelled as the agent's.
+    before: (label) => { pushUndo("agent: " + label); return () => undoStack.pop(); },
+    changed: () => { save(); recompute(); renderAll(); if (drawerKind === "changes") renderDrawer(); },
+  });
   if (!S.started) renderFirstRun("import");
 })();
 </script>
