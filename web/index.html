@@ -2235,7 +2235,7 @@ function renderKeys() {
     h("h3", { class: "help-h" }, "Keyboard shortcuts"),
     h("div", { class: "keys", html: K.map(([a, b]) => `<div>${a.split(" / ").map((x) => `<kbd>${esc(x)}</kbd>`).join(" ")}</div><div>${esc(b)}</div>`).join("") }),
     h("h3", { class: "help-h", id: "for-agents" }, "For AI agents"),
-    h("p", { class: "help", html: `An AI agent that drives this browser can work on this cube through <code>window.cubewarden</code>: <code>check()</code>, <code>explain(id)</code>, <code>search(filter)</code>, <code>tryChanges({add, remove})</code>, <code>applyChanges(…)</code>, <code>rules()</code>, <code>setRule(…)</code>. Browsers with WebMCP also list them as tools. Agents in a terminal use the <code>cubewarden</code> command on the project file (Changes, Download project file). Tell your agent to read <a href="llms.txt">llms.txt</a>. Open source: <a href="${E.REPO_URL}" target="_blank" rel="noopener">${esc(E.REPO_URL.replace("https://", ""))}</a>.` })))];
+    h("p", { class: "help", html: `An AI agent that drives this browser can work on this cube through <code>window.cubewarden</code>: <code>check()</code>, <code>explain(id)</code>, <code>search(filter)</code>, <code>tryChanges({add, remove})</code>, <code>applyChanges(…)</code>, <code>rules()</code>, <code>setRule(…)</code>. Browsers with WebMCP also list them as tools. Agents in a terminal use the <code>cubewarden</code> command on the project file (Changes, Download project file). Tell your agent to read <a href="llms.txt">llms.txt</a>. Open source: <a href="${E.REPO_URL}" target="_blank" rel="noopener">${esc(E.REPO_URL.replace("https://", ""))}</a>.` }))];
 }
 function renderViewFilter() {
   const body = h("div", { class: "dr-b" });
