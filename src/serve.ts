@@ -27,7 +27,9 @@ export async function dataJs(projectPath: string, cardsPath: string): Promise<st
   const cards = Array.isArray(raw) ? raw : raw.cards;
   const built = (await stat(cardsPath)).mtime.toISOString().slice(0, 10);
   const data = {
-    builtAt: built, cards, sources: SOURCES, seed: project.config,
+    builtAt: built, cards, sources: SOURCES,
+    // The cube's CubeCobra id travels with the rules, so the hosted page can reload the cube's cards later.
+    seed: project.cubeId ? { ...project.config, cube: { ...project.config.cube, cubeCobraId: project.cubeId } } : project.config,
     cube: { name: project.config.cube?.name || "My cube", source: project.cubeId ? `CubeCobra cube ${project.cubeId}` : projectPath,
       original: project.original, current: project.current },
   };
