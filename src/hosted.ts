@@ -7,13 +7,13 @@
  */
 import type { Card, Config } from "./model.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
-import { allowedSets, cardFromPrintings, type ScryfallCard } from "./data/scryfall-cards.ts";
+import { cardFromPrintings, type ScryfallCard } from "./data/scryfall-cards.ts";
 import { SOURCES } from "./sources.ts";
 
 export interface SetInfo { code: string; name: string; released: string; cards: number; wr?: { source: string | null; asOf: string | null } }
 export interface DataIndex { version: 1; builtAt: string; sets: SetInfo[] }
 interface Shard { set: string; cards: Card[] }
-interface SavedState { config?: Config; current?: string[]; original?: string[]; source?: { id?: string } | null; poolSets?: string[] }
+interface SavedState { config?: Config; current?: string[]; original?: string[]; source?: { id?: string } | null }
 
 const COLORS = ["W", "U", "B", "R", "G", "C", "L"] as const;
 export const EMPTY_CONFIG: Config = { version: 1, cube: { name: "My cube" }, colors: COLORS.map((code) => ({ code, mechanics: [] })), archetypes: [], rules: [] };
@@ -55,18 +55,6 @@ export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<
     });
   }
   return [...out.values()];
-}
-
-/** Sets to load: the ones the cube's rules allow, else the sets most of the cube's cards come from. */
-export function poolSets(config: Config | undefined, cubeCards: Card[], index: DataIndex, saved?: string[]): string[] {
-  const known = new Set(index.sets.map((s) => s.code));
-  const rule = allowedSets(config)?.filter((s) => known.has(s));
-  if (rule?.length) return rule;
-  if (saved?.length) return saved.filter((s) => known.has(s));
-  const count = new Map<string, number>();
-  for (const c of cubeCards) for (const s of c.printSets.length ? c.printSets : c.set ? [c.set] : []) if (known.has(s)) count.set(s, (count.get(s) || 0) + 1);
-  const many = [...count].filter(([, n]) => n >= 3).map(([s]) => s);
-  return many.length ? many : index.sets.slice(0, 6).map((s) => s.code);
 }
 
 async function json<T>(url: string): Promise<T> {
@@ -113,7 +101,8 @@ export async function loadHosted(opts: { storageKey: string; base: string }) {
   if (cubeId) {
     try { cubeCards = (await fetchCubeCobra(cubeId)).cards; } catch (e) { errors.push(`CubeCobra cube ${cubeId}: ${(e as Error).message}`); }
   }
-  const sets = state ? poolSets(state.config, Object.values(cubeCards), index, state.poolSets) : [];
+  // Every published set: about 2 MB compressed. The cube's own "every card" rules still narrow the searches.
+  const sets = index.sets.map((x) => x.code);
   const shards = (await Promise.all(sets.map((s) => json<Shard>(`${opts.base}/sets/${s}.json`).catch((e) => { errors.push(`set ${s}: ${e.message}`); return null; }))))
     .filter((x): x is Shard => !!x);
   let cards = mergeCards(shards, index, cubeCards);

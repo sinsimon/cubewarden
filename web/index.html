@@ -954,17 +954,6 @@ function toast(msg, action) {
 <script type="text/x-cubewarden-app">
 "use strict";
 /* ================= top bar ================= */
-/** Hosted page: card files load at start, so a set rule naming sets not loaded yet asks for a reload. */
-function renderSetsNotice() {
-  if (!D.hosted) return;
-  const published = new Set(D.hosted.index.sets.map((x) => x.code)), loaded = new Set(D.hosted.loadedSets);
-  const need = (allowedSets() || []).filter((x) => published.has(x) && !loaded.has(x));
-  let b = $("#setsNotice");
-  if (!need.length) { if (b) b.remove(); return; }
-  if (!b) { b = h("button", { class: "btn primary sm", id: "setsNotice", type: "button", onclick: () => { save(); location.reload(); } }); $("#btnAdd").before(b); }
-  b.textContent = `Load cards from ${need.length} new set${need.length > 1 ? "s" : ""}`;
-  b.title = "Your rules now allow " + need.map((x) => x.toUpperCase()).join(", ") + ": reload to search their cards";
-}
 function renderTop() {
   $("#cubeName").textContent = S.config.cube.name || "cubewarden";
   const t = S.config.cube.targetSize;
@@ -974,7 +963,6 @@ function renderTop() {
   sc.querySelector("input").checked = !!U.scale;
   sc.querySelector(".lbl").textContent = t ? `Scaled to ${t}` : "Scaled";
   $("#viewSeg").querySelectorAll("button").forEach((b) => { const on = b.dataset.view === U.view; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); });
-  renderSetsNotice();
   const d = diffNow(), n = d.adds.length + d.removes.length;
   const bd = $("#chgBadge"); bd.textContent = n; bd.classList.toggle("dirty", isDirty());
   bd.title = isDirty() ? "Changes not exported yet" : n ? "All changes exported" : "No changes";
@@ -2675,7 +2663,7 @@ function renderFirstRun(step, payload, autoImport) {
       const t = Number($("#frTarget").value); if (t > 0) cfg.cube.targetSize = t; else delete cfg.cube.targetSize;
       Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {} });
       U.scope = { kind: "cube" }; U.sel = null; U.view = "work";
-      if (D.hosted) { if (p.poolSets) S.poolSets = p.poolSets; save(); location.reload(); return; } // the loader fetches this cube's cards
+      if (D.hosted) { save(); location.reload(); return; } // the loader fetches this cube's cards
       applyCcTags();
       save(); fr.classList.remove("on"); recompute(); renderAll();
       if (!cfg.rules.length && !configStats(cfg).mechanics) openEditor("rule", { kind: "cube" }, null);
@@ -2710,12 +2698,7 @@ function renderFirstRun(step, payload, autoImport) {
       let p;
       if (D.hosted) {
         $("#frMsg").textContent = "Looking the names up on Scryfall…";
-        try {
-          const r = await E.resolveNames(listNames($("#frList").value));
-          const published = new Set(D.hosted.index.sets.map((x) => x.code)), n = {};
-          r.cards.forEach((c) => c.printSets.filter((x) => published.has(x)).forEach((x) => (n[x] = (n[x] || 0) + 1)));
-          p = { ids: r.ids, missing: r.missing, poolSets: Object.keys(n).filter((x) => n[x] >= 3) };
-        }
+        try { const r = await E.resolveNames(listNames($("#frList").value)); p = { ids: r.ids, missing: r.missing }; }
         catch (e) { $("#frMsg").textContent = "Scryfall did not answer: " + e.message; return; }
       } else p = parseList($("#frList").value);
       $("#frMissing").innerHTML = p.missing.length ? `Not found (${p.missing.length}): ` + p.missing.slice(0, 40).map(esc).join(", ") : "";
