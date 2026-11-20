@@ -106,6 +106,15 @@ describe("archetypes", () => {
     const cfg = config({ archetypes: [WU], rules: [rule("wr", { kind: "archetype", id: "wu" }, "avg(wr, member:any) >= 55%")] });
     expect(evaluate(cfg, ALL, BY_ID).archetypes.wu.rules[0].value).toBeCloseTo(0.575, 5);
   });
+  it("counts members of the primary mechanics apart from the secondary ones", () => {
+    const arch = { ...WU, mechanics: [WU.mechanics[0], { ...WU.mechanics[1], priority: "secondary" as const }] };
+    const cfg = config({ archetypes: [arch], rules: [
+      rule("p", { kind: "archetype", id: "wu" }, "count(member:primary)"),
+      rule("s", { kind: "archetype", id: "wu" }, "count(member:secondary)"),
+    ] });
+    const r = evaluate(cfg, ALL, BY_ID).archetypes.wu.rules;
+    expect(r.map((x) => [x.id, x.cards])).toEqual([["p", ["W2"]], ["s", ["W3"]]]);
+  });
   it("leaves unnamed archetypes out of the 'all archetypes' summary", () => {
     const cfg = config({ archetypes: [WU, { id: "ug", name: "", colors: "UG", mechanics: [] }],
       rules: [rule("any", { kind: "allArchetypes" }, "count() >= 1")] });

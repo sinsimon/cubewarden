@@ -8,7 +8,8 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   wr>=55% (17Lands adjusted WR)  wrraw>=55% (GIH WR)  games>=500
   elo>=1300  cubes>=1000  picks>=100 (CubeCobra card data)
   tag:"UG Ramp"         a CubeCobra tag on the card in your cube
-  member:any            member of the archetype (matches one of its mechanics); member:<mechanic id>
+  member:any            member of the archetype (matches one of its mechanics)
+  member:primary        matches one of its primary mechanics (member:secondary, member:<mechanic id>)
 
 Rules
   count(F) >= 6         count(F) in 13..14      count(F) = 3     count(F) <= 360

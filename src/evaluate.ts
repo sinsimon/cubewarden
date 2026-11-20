@@ -177,10 +177,10 @@ export function evaluate(config: Config, cubeIds: string[], cardsById: Record<st
       return r;
     });
     const memberIds = new Set(mechanics.flatMap((r) => r.cards));
-    const ctx: MatchContext = {
-      scopeColors: a.colors,
-      member: (id, v) => (v === "any" || v == null ? memberIds.has(id) : !!byMech[v]?.has(id)),
-    };
+    const byPriority = (p: "primary" | "secondary") => new Set(mechanics.filter((r) => r.priority === p).flatMap((r) => r.cards));
+    const members: Record<string, Set<string>> = { any: memberIds, primary: byPriority("primary"), secondary: byPriority("secondary") };
+    // member:any, member:primary, member:secondary, or member:<mechanic id>
+    const ctx: MatchContext = { scopeColors: a.colors, member: (id, v) => !!(members[v ?? "any"] ?? byMech[v])?.has(id) };
     const own = config.rules.filter((r) => r.scope.kind === "archetype" && r.scope.id === a.id).map((r) => measureRule(r, pool, ctx, factor));
     const rules = own.concat(allArchetypes.map((r) => inherit(measureRule(r, pool, ctx, factor), r)));
     archetypes[a.id] = { cards: pool.map((c) => c.id), members: [...memberIds], membersScaled: Math.round(memberIds.size * factor),
