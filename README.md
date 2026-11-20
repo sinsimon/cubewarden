@@ -74,6 +74,13 @@ query>"`). Win rates are optional: `--winrates <file>` reads precomputed win rat
 public card ratings, which today only carry games for sets still being drafted. Data is fetched on your computer
 and cached in `.cache/` (`--refresh` to fetch again). Nothing is written to CubeCobra.
 
+## Hosting
+
+The public site (Vercel) is the page alone: `npm run build:site` without a project folder builds it, and
+`vercel.json` serves the card data from this repo's `data` branch at `/data`. A nightly GitHub Action
+(`.github/workflows/data.yml`) rebuilds that branch: one JSON file per released set with 17Lands Premier Draft
+data, rebuilt only when something changed. People's cubes never leave their browser.
+
 ## Develop
 
 ```sh
