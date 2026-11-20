@@ -21,6 +21,12 @@ describe("reading a CubeCobra cube", () => {
     expect(byName(cube.cards, "Exhibition Tidecaller").tags).toContain("mill");
     expect(cube.config).toBeNull();
   });
+  it("counts a card listed twice once, and says how many duplicates it dropped", async () => {
+    const json = { ...SAMPLE, cards: { ...SAMPLE.cards, mainboard: [...SAMPLE.cards.mainboard, SAMPLE.cards.mainboard[0]] } };
+    const cube = await readCubeCobra(json);
+    expect(cube.mainboard).toHaveLength(5);
+    expect(cube.duplicates).toBe(1);
+  });
   it("keeps the cube's own CubeCobra tags on the cards", async () => {
     const cube = await readCubeCobra(SAMPLE);
     expect(byName(cube.cards, "North Pole Gates").ccTags).toEqual(["TLA Lands"]);

@@ -96,6 +96,8 @@ export interface CubeCobraCube {
   maybeboard: string[];
   /** Every card of both boards; cards found in `known` are reused, with the cube's own tags added. */
   cards: Record<string, Card>;
+  /** Cards listed more than once in the mainboard, counted once. */
+  duplicates: number;
   /** The CubeCobra tags used in the cube. */
   tags: string[];
   /** Rules saved in the cube's text, or null. */
@@ -116,7 +118,8 @@ export async function readCubeCobra(json: CubeCobraJson, known: Record<string, C
     cards[d.oracle_id] = ccTags.length ? { ...base, ccTags } : base;
     return [d.oracle_id];
   });
-  const mainboard = board(json.cards?.mainboard);
+  const listed = board(json.cards?.mainboard);
+  const mainboard = [...new Set(listed)];
   const maybeboard = board(json.cards?.maybeboard);
   const texts = [json.description || "", ...(json.primerTabs || []).map((t) => t.content || "")].filter(Boolean);
   let config: Config | null = null;
@@ -124,7 +127,7 @@ export async function readCubeCobra(json: CubeCobraJson, known: Record<string, C
     try { config = await decodeRules(t); } catch { config = null; }
     if (config) break;
   }
-  return { id: json.shortId || json.id || null, name: json.name || "", mainboard, maybeboard, cards, tags: [...tags], config, texts };
+  return { id: json.shortId || json.id || null, name: json.name || "", mainboard, duplicates: listed.length - mainboard.length, maybeboard, cards, tags: [...tags], config, texts };
 }
 
 /** Fetches a public cube (read only). */
