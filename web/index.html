@@ -620,26 +620,15 @@ function addMissingColours(cfg) {
   for (const c of D.seed.colors) if (!cfg.colors.some((x) => x.code === c.code)) cfg.colors.push(clone(c));
 }
 addMissingColours(S.config);
-// Configs saved before shared rules: per-archetype gold / hybrid / WR rules become the seed's "All archetypes" rules.
-let migratedShared = false;
-function migrateShared(cfg) {
-  if (cfg.rules.some((r) => r.scope.kind === "allArchetypes")) return false;
-  const old = new Set(cfg.archetypes.flatMap((a) => [a.id + "-gold", a.id + "-hybrid", a.id + "-wr"]));
-  if (!cfg.rules.some((r) => r.scope.kind === "archetype" && old.has(r.id))) return false;
-  cfg.rules = cfg.rules.filter((r) => !(r.scope.kind === "archetype" && old.has(r.id))).concat(clone(D.seed.rules.filter((r) => r.scope.kind === "allArchetypes")));
-  return true;
-}
 /** Make any config (saved, restored from CubeCobra, older versions) safe to use. */
 function normaliseConfig(cfg) {
   cfg.cube = cfg.cube || {}; cfg.colors = cfg.colors || []; cfg.archetypes = cfg.archetypes || []; cfg.rules = cfg.rules || [];
   if (cfg.cube.description == null) cfg.cube.description = "";
   cfg.archetypes.forEach((a) => (a.mechanics = a.mechanics || []));
   addMissingColours(cfg);
-  const migrated = migrateShared(cfg);
   delete cfg.savedAt;
-  return migrated;
 }
-migratedShared = normaliseConfig(S.config);
+normaliseConfig(S.config);
 for (const [id, t] of Object.entries(S.ccTags || {})) if (byId[id]) byId[id].ccTags = t;
 
 let R = null;          // evaluation of the saved config
@@ -2655,7 +2644,7 @@ function renderFirstRun(step, payload) {
       <h1>${p.ids.length} cards imported</h1><p class="lead">Next, the rules your cube should meet: size, sets, win rates, counts per colour and archetype. cubewarden ships no rules of its own. With a target size, colour and archetype counts can be read as if the cube already had that size.</p>
       <div class="fr-card"><div class="row" style="gap:16px"><div class="fld" style="flex:1"><label for="frName">Cube name</label><input class="txt" id="frName" value="${esc(p.name || "My cube")}"></div><div class="fld" style="width:190px"><label for="frTarget">Target size (optional)</label><input class="txt" id="frTarget" type="number" placeholder="e.g. 360"></div></div></div>
       <div class="choice"><button id="frEmpty"><b>Write my own rules</b><span>Opens the workbench with the rule editor on the whole cube. Add colours' musts and archetypes from the sidebar.</span></button>
-      <button id="frCopy"><b>Start from Simone's rules</b><span>Copies the demo rules, colours' musts and ten archetypes as a starting point, then edit them.</span></button></div>
+      <button id="frCopy"><b>Start from this folder's rules</b><span>Copies the rules, colour mechanics and archetypes of the project cubewarden is serving, then edit them.</span></button></div>
       ${p.tags && Object.keys(p.tags).length ? `<label class="fr-card row" style="gap:10px;margin-top:12px;cursor:pointer"><input type="checkbox" id="frTagMech" checked><span><b>Also create one mechanic per CubeCobra tag</b> (${new Set(Object.values(p.tags).flat()).size} tags). A tag like “UG Ramp” goes into the archetype with those colours (one is created, unnamed, if missing); “U Counterspells” into Blue; others become count rules on the whole cube, to move later.</span></label>` : ""}
       <p class="muted" style="margin-top:14px"><button class="btn ghost sm" id="frBack">Back</button></p></div>`;
     const start = (cfg) => {
@@ -2683,7 +2672,7 @@ function renderFirstRun(step, payload) {
         <textarea class="txt" id="frList" placeholder="Aunt May&#10;Banishing Light&#10;…" aria-label="Card list"></textarea>
         <div class="row" style="margin-top:10px"><button class="btn primary" id="frMatch">Match cards</button><button class="btn ghost" id="frSample">Paste a sample</button><span class="muted" id="frMsg"></span></div>
         <div class="unmatched" id="frMissing"></div>`
-      : `<p>Paste the cube's address or its id, e.g. cubecobra.com/cube/list/<b>22d9659d-…</b>. cubewarden only reads the public cube; it never changes anything on CubeCobra.</p>
+      : `<p>Paste the cube's address or its id, e.g. cubecobra.com/cube/list/<b>your-cube-id</b>. cubewarden only reads the public cube; it never changes anything on CubeCobra.</p>
         <form class="row" id="frCCForm"><input class="txt" id="frCC" style="flex:1" placeholder="Cube address or id" aria-label="CubeCobra cube address or id"><button class="btn primary" id="frCCGo">Read cube</button></form>
         <div id="frCCOut"></div>`}
     </div>
@@ -2779,7 +2768,6 @@ async function importFromCubeCobra(text) {
   // Agents driving this browser: window.cubewarden (and WebMCP tools where the browser supports them).
   window.cubewardenAttach(S, byId, { scale: () => U.scale, changed: () => { save(); recompute(); renderAll(); } });
   if (!S.started) renderFirstRun("import");
-  else if (migratedShared) { save(); toast("Your per-archetype gold, hybrid and WR rules are now 3 shared rules under All archetypes"); }
 })();
 </script>
 
