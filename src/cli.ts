@@ -33,6 +33,8 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   export csv                    the whole list as a CSV for CubeCobra, with mechanic tags
   import <CubeCobra id>         start a project from a public CubeCobra cube (read only)
   serve [--port 3300]           open the page on this project, for you and for agents in the browser
+  data build [--winrates <file>|17lands] [--pool "<Scryfall query>"] [--refresh]
+                                cards.json: the cube's cards and every card you may add (see data help)
   syntax                        the filter and rule syntax
 `;
 
@@ -154,6 +156,10 @@ export async function run(argv: string[], io: Io): Promise<number> {
           `Imported "${cube.name}": ${cube.mainboard.length} cards, ${cube.config ? "rules restored from the cube's text" : "no saved rules found"}.\n` +
           `Cards outside the cube (for search) come from a full card database: see README, "Card data".`);
         return 0;
+      }
+      case "data": {
+        const { runDataCommand } = await import("./data/command.ts");
+        return await runDataCommand(argv.slice(argv.indexOf("data") + 1), io);
       }
       case "serve": {
         const { serve } = await import("./serve.ts");

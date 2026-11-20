@@ -63,9 +63,12 @@ is a ready-made skill for agent harnesses.
 |---|---|
 | Oracle text, types, costs, images, printings | [Scryfall](https://scryfall.com/docs/api) |
 | Oracle tags (functional tags), ELO, cube count, picks | [CubeCobra](https://cubecobra.com) card details (read only) |
-| Win rates (optional) | [17Lands](https://www.17lands.com) card ratings; adjusted WR = GIH WR minus the strength of the decks the card was played in |
+| Win rates (optional) | [17Lands](https://www.17lands.com); adjusted WR = GIH WR minus the strength of the decks the card was played in |
 
-Data is fetched on your computer and cached in `.cache/`. Nothing is written to CubeCobra.
+`cubewarden data build` takes the pool from the sets your cube's "every card" rule allows (or `--pool "<Scryfall
+query>"`). Win rates are optional: `--winrates <file>` reads precomputed win rates, `--winrates 17lands` reads 17Lands'
+public card ratings, which today only carry games for sets still being drafted. Data is fetched on your computer
+and cached in `.cache/` (`--refresh` to fetch again). Nothing is written to CubeCobra.
 
 ## Develop
 
