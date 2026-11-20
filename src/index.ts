@@ -18,3 +18,4 @@ export {
   createWorkspace, scopeToText, summarizeCard,
   type CardSummary, type Changes, type CheckResult, type Delta, type Explanation, type Finding, type Project, type RuleInput, type RuleLine, type Workspace,
 } from "./workspace.ts";
+export { SYNTAX_HELP } from "./syntax-help.ts";
