@@ -2176,6 +2176,21 @@ function renderChanges() {
       const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(project, null, 1)], { type: "application/json" })), download: "cubewarden.json" });
       document.body.append(a); a.click(); a.remove(); toast("Downloaded cubewarden.json");
     } }, "Download project file"),
+    h("button", { class: "btn", type: "button", title: "Load a cubewarden.json, e.g. one an agent changed with the cubewarden command line. It replaces the rules and list in this browser.", onclick: () => {
+      const inp = h("input", { type: "file", accept: ".json,application/json" });
+      inp.addEventListener("change", async () => {
+        const f = inp.files && inp.files[0]; if (!f) return;
+        let p;
+        try { p = JSON.parse(await f.text()); } catch (e) { toast("Not a cubewarden project file: " + e.message); return; }
+        if (!p || p.version !== 1 || !p.config || !Array.isArray(p.current) || !Array.isArray(p.original)) { toast("Not a cubewarden project file (needs version, config, original, current)"); return; }
+        const unknown = p.current.concat(p.original).filter((id) => !byId[id]);
+        if (!confirm(`Replace the rules and the ${S.current.length}-card list in this browser with ${f.name} (${p.current.length} cards)?${unknown.length ? `\n${new Set(unknown).size} card(s) are not in this page's card data and will be left out.` : ""}`)) return;
+        const cfg = clone(p.config); normaliseConfig(cfg);
+        Object.assign(S, { version: 1, config: cfg, original: p.original.filter((id) => byId[id]), current: p.current.filter((id) => byId[id]), started: true, exportedSig: null });
+        save(); recompute(); renderAll(); toast(`Opened ${f.name}`);
+      });
+      inp.click();
+    } }, "Open project file"),
     (() => { const cb = h("input", { type: "checkbox" }); cb.checked = U.csvTags !== false; cb.addEventListener("change", () => { U.csvTags = cb.checked; save(); }); return h("label", { class: "help", style: "display:flex;gap:6px;align-items:flex-start;flex-basis:100%;font-size:12px", title: "One tag per mechanic a card matches, e.g. UG Ramp" }, cb, "Add mechanic tags (UG Ramp, U Counterspells…) to the CSV. CubeCobra's Replace with CSV then shows them on every card."); })(),
     h("button", { class: "btn ghost", type: "button", disabled: !undoStack.length, onclick: undo, title: undoStack.length ? "Undo: " + undoStack[undoStack.length - 1].label : "" }, "Undo last ⌘Z")));
   body.append(ta);

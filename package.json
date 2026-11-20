@@ -4,17 +4,46 @@
   "description": "Keep a Magic: The Gathering cube balanced against rules you write: for the whole cube, each colour and each archetype.",
   "license": "MIT",
   "type": "module",
-  "bin": { "cubewarden": "bin/cubewarden.js" },
-  "engines": { "node": ">=22.18" },
+  "bin": {
+    "cubewarden": "bin/cubewarden.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:web": "node scripts/build-web.ts"
+    "build:web": "node scripts/build-web.ts",
+    "build:cli": "node scripts/build-cli.ts",
+    "build": "npm run build:web && npm run build:cli",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",
     "vitest": "5.1.1"
-  }
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "web/index.html",
+    "web/llms.txt",
+    "web/dist/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sinsimon/cubewarden.git"
+  },
+  "keywords": [
+    "mtg",
+    "magic-the-gathering",
+    "cube",
+    "cubecobra",
+    "scryfall",
+    "17lands"
+  ]
 }

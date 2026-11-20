@@ -36,7 +36,11 @@ npx cubewarden serve                          # the workbench on http://localhos
 npx cubewarden check                          # every rule not met; exit code 1 when a primary rule fails
 ```
 
-The workbench keeps your work in the browser. "Download project file" hands it back to the command line.
+Until cubewarden is on npm, run it from a clone: `git clone https://github.com/sinsimon/cubewarden && cd cubewarden
+&& npm install && npm link`, then use `cubewarden` instead of `npx cubewarden`.
+
+The workbench keeps your work in the browser. Changes → "Download project file" hands it to the command line, and
+"Open project file" loads one an agent changed.
 
 ### Saving rules inside CubeCobra
 

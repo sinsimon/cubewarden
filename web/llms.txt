@@ -25,9 +25,10 @@ Ask the person before `applyChanges`, `setRule` or `removeRule`: they change the
 
 ## For agents in a terminal
 
-Run `npx cubewarden help`. The project is two files: `cubewarden.json` (rules + card list) and `cards.json`
+Run `cubewarden help`. The project is two files: `cubewarden.json` (rules + card list) and `cards.json`
 (card data). `cubewarden check --json` exits 1 when a primary rule is not met. `cubewarden serve` opens this page
-on the same files.
+on those files; after that the page keeps its own copy in the browser. To hand work between the page and the
+terminal, use Changes → "Download project file" and "Open project file".
 
 ## Rule syntax (short)
 
