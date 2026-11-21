@@ -46,7 +46,7 @@ function mechanicLines(mechs: Mechanic[], results: Result[], prefix: string, sco
     if (!x) return `- ${m.name}`;
     const links: string[] = [];
     if (o.cubeId) links.push(`[see on CubeCobra](${mdUrl(cubeCobraListUrl(o.cubeId, `tag:"${prefix} ${m.name}"`))})`);
-    const sq = toScryfall(m.filter, { scope, sets: o.sets });
+    const sq = toScryfall(m.filter, { scope, sets: o.sets, mechanics: mechs });
     if (sq.query) links.push(`[Scryfall](${mdUrl(sq.url)})`);
     const target = x.constraint ? ` (target ${formatConstraint(x.constraint)})` : "";
     return `- ${m.name}: ${valueText(x, report)}${target}${links.length ? " · " + links.join(" · ") : ""}`;
