@@ -21,18 +21,19 @@ import { spellCosts } from "./spell-costs.ts";
 import { SOURCES } from "./sources.ts";
 import { filterToText, parseFilter, parseRule, ruleToText } from "./syntax.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
-import { createWorkspace, cubeAllows, sortCards, type Project, type SortKey } from "./workspace.ts";
+import { createWorkspace, cubeAllows, sortCards, type Project, type SearchSource, type SortKey } from "./workspace.ts";
 import { loadHosted, resolveNames } from "./hosted.ts";
 
 interface PageData { builtAt: string; cards: Card[]; cube: { name: string; source?: string; original: string[]; current: string[] }; seed: Config; sources?: Record<string, string> }
 type Win = typeof globalThis & { CUBE_DATA?: PageData; CubeEngine?: unknown; cubewarden?: unknown; cubewardenAttach?: unknown };
 const W = globalThis as Win;
 
-/** Cards outside the cube matching a filter in a scope's colours. Options: ctx, respectCubeRules, sort. */
+/** Cards outside the cube matching a filter in a scope's colours. Options: ctx, respectCubeRules, sort, and
+ *  within: look only at these cards (the maybeboard). */
 function candidates(filter: Filter, scope: Scope | null, config: Config, cardsById: Record<string, Card>, cubeIds: string[],
-  opts: { ctx?: MatchContext; respectCubeRules?: boolean; sort?: SortKey } = {}) {
+  opts: { ctx?: MatchContext; respectCubeRules?: boolean; sort?: SortKey; within?: string[] } = {}) {
   const inCube = new Set(cubeIds);
-  let pool = Object.values(cardsById).filter((c) => !inCube.has(c.id));
+  let pool = (opts.within ? [...new Set(opts.within)].map((id) => cardsById[id]).filter(Boolean) : Object.values(cardsById)).filter((c) => !inCube.has(c.id));
   if (opts.respectCubeRules) pool = pool.filter(cubeAllows(config));
   if (scope && scope.kind !== "cube") pool = scopeCards(scope, pool, config);
   const out: Card[] = [];
@@ -142,8 +143,9 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
 const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same operations as the cubewarden CLI.
   check()                         rules and mechanics not met (primary = failing, secondary = warnings)
   explain(id)                     a rule's value, target and cards
-  search(filter, {scope, sort, limit})   cards outside the cube; sort: cubes (default), elo, picks, wr, wrraw, mv, name;
-                                  member: needs a scope (a colour like "W" or an archetype id)
+  search(filter, {scope, sort, limit, source})   cards outside the cube; sort: cubes (default), elo, picks, wr, wrraw, mv, name;
+                                  source: "maybeboard" looks only at the cards kept aside (all of them, whatever the
+                                  "every card" rules say); member: needs a scope (a colour like "W" or an archetype id)
   wr = WR Δ: 17Lands adjusted WR in points above (+) or below (−) the average common/uncommon of the card's set
        (wr>=1.5, avg(wr, member:any) in 1..3.5); wrraw = raw GIH WR in percent (wrraw>=55%)
   tryChanges({add:[names], remove:[names]})   effect of a swap, nothing saved
@@ -170,8 +172,8 @@ function registerWebMcp(api: ReturnType<typeof pick> & { syntax: () => string })
   const tools = [
     { name: "cubewarden_check", description: "Rules and mechanics of the cube that are not met", inputSchema: { type: "object", properties: {} }, run: () => api.check() },
     { name: "cubewarden_explain", description: "A rule's value, target and the cards behind it", inputSchema: { type: "object", properties: { id: str }, required: ["id"] }, run: (a: { id: string }) => api.explain(a.id) },
-    { name: "cubewarden_search", description: "Cards outside the cube matching a filter (see cubewarden_syntax). sort: cubes (default), elo, picks, wr (WR Δ in points), wrraw, mv, name. member:<mechanic>|any|primary|secondary needs a scope: a colour (W) or an archetype id", inputSchema: { type: "object", properties: { filter: str, scope: str, sort: str, limit: { type: "number" } }, required: ["filter"] },
-      run: (a: { filter: string; scope?: string; sort?: SortKey; limit?: number }) => api.search(a.filter, a) },
+    { name: "cubewarden_search", description: "Cards outside the cube matching a filter (see cubewarden_syntax). sort: cubes (default), elo, picks, wr (WR Δ in points), wrraw, mv, name. member:<mechanic>|any|primary|secondary needs a scope: a colour (W) or an archetype id. source: \"maybeboard\" searches only the cards kept aside", inputSchema: { type: "object", properties: { filter: str, scope: str, sort: str, limit: { type: "number" }, source: { type: "string", enum: ["all", "maybeboard"] } }, required: ["filter"] },
+      run: (a: { filter: string; scope?: string; sort?: SortKey; limit?: number; source?: SearchSource }) => api.search(a.filter, a) },
     { name: "cubewarden_try_changes", description: "Effect of adding/removing cards on every rule, without saving", inputSchema: { type: "object", properties: { add: names, remove: names } }, run: (a: { add?: string[]; remove?: string[] }) => api.tryChanges(a) },
     { name: "cubewarden_apply_changes", description: "Add/remove cards in the cube shown on this page; toMaybeboard keeps the removed cards in the maybeboard", inputSchema: { type: "object", properties: { add: names, remove: names, toMaybeboard: { type: "boolean" } } }, run: (a: { add?: string[]; remove?: string[]; toMaybeboard?: boolean }) => api.applyChanges(a) },
     { name: "cubewarden_maybeboard", description: "Cards kept aside (CubeCobra's maybeboard): add or remove candidates, or list them with no arguments", inputSchema: { type: "object", properties: { add: names, remove: names } }, run: (a: { add?: string[]; remove?: string[] }) => api.maybeboard(a) },

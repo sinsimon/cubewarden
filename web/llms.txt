@@ -9,8 +9,9 @@ The page exposes `window.cubewarden`, the same operations as the command line:
 
 - `cubewarden.check()`: rules and mechanics not met (`failing` = primary, `warnings` = secondary).
 - `cubewarden.explain(id)`: a rule's value, target and the cards behind it.
-- `cubewarden.search(filter, { scope, sort, limit })`: cards outside the cube that match; only cards the cube's
+- `cubewarden.search(filter, { scope, sort, limit, source })`: cards outside the cube that match; only cards the cube's
   "every card" rules allow. `sort`: `cubes` (default: most used on CubeCobra), `elo`, `picks`, `wr`, `wrraw`, `mv`, `name`.
+  `source: "maybeboard"` looks only at the cards kept aside (all of them, whatever the "every card" rules say).
   With a colour or archetype as `scope`, the filter can use `member:<mechanic id>`, `member:any`, `member:primary`,
   `member:secondary` (that scope's mechanics); without a scope `member:` is an error.
 - `cubewarden.tryChanges({ add: [names], remove: [names] })`: effect of a swap on every rule, nothing saved.

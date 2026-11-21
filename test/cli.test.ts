@@ -85,6 +85,16 @@ describe("cubewarden CLI", () => {
     expect(file().maybeboard).toEqual([]);
     expect((await cli(dir, "maybeboard", "--add", "W1")).code).toBe(2);
   });
+  it("search --maybeboard looks only at the cards kept aside", async () => {
+    const dir = setup();
+    expect((await cli(dir, "maybeboard", "--add", "Sky Spy")).code).toBe(0);
+    const r = await cli(dir, "search", "t:creature", "--maybeboard", "--json");
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.out).cards.map((c: { name: string }) => c.name)).toEqual(["Sky Spy"]);
+    const t = await cli(dir, "search", "c=w", "--maybeboard");
+    expect(t.out).toContain("0 card(s) in the maybeboard");
+    expect((await cli(dir, "search", "c=u", "--maybeboard")).out).toContain("1 card(s) in the maybeboard");
+  });
   it("import keeps the cube's maybeboard", async () => {
     const dir = mkdtempSync(join(tmpdir(), "cubewarden-"));
     expect(await run(["import", "sample"], { cwd: dir, write: () => {}, fetch: fakeFetch })).toBe(0);
@@ -134,6 +144,6 @@ describe("cubewarden CLI", () => {
   });
   it("prints help listing every command", async () => {
     const r = await cli(setup(), "help");
-    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set", "maybeboard [--add"]) expect(r.out).toContain(c);
+    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set", "maybeboard [--add", "--maybeboard"]) expect(r.out).toContain(c);
   });
 });

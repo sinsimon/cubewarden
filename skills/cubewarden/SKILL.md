@@ -16,6 +16,7 @@ changes; otherwise use the CLI in the project folder.
 3. `cubewarden search "<filter>" --scope <colour or archetype id> --json`: candidates outside the cube. Only cards the
    cube's "every card" rules allow. Default order: most used on CubeCobra (`--sort cubes`); `--sort wr` for win rate.
    With `--scope`, `member:<mechanic id>` or `member:any` finds cards that fit that colour's or archetype's mechanics.
+   `--maybeboard` looks only at the cards the person kept aside: check there first when they already have candidates.
 4. `cubewarden try --add "<card>" --remove "<card>" --json`: the effect on every rule. Nothing is saved.
 5. Show the person the swap and its effect. Run `cubewarden apply …` only after they agree.
    Cards the person wants to keep in view without counting them go to the maybeboard: `cubewarden maybeboard --add "<card>"`,

@@ -24,7 +24,8 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   explain <rule id>             a rule's value, target and the cards behind it
   search "<filter>"             cards outside the cube that match (--scope W|wu, --limit 50,
                                 --sort cubes|elo|picks|wr|wrraw|mv|name (default cubes: most used on
-                                CubeCobra; wr = WR Δ), --all-cards to ignore the cube's "every card" rules);
+                                CubeCobra; wr = WR Δ), --all-cards to ignore the cube's "every card" rules,
+                                --maybeboard to look only at the cards kept aside);
                                 member:<mechanic>|any|primary|secondary needs --scope
   try --add <card> --remove <card>    effect of a swap on every rule, without saving
   apply --add <card> --remove <card> [--to-maybeboard]  make the swap and save the project
@@ -47,7 +48,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
 `;
 
 interface Args { _: string[]; flags: Record<string, string[]>; bool: Set<string> }
-const BOOL = new Set(["json", "numbers", "all-cards", "help", "force", "refresh", "to-maybeboard"]);
+const BOOL = new Set(["json", "numbers", "all-cards", "help", "force", "refresh", "to-maybeboard", "maybeboard"]);
 function parseArgs(argv: string[]): Args {
   const a: Args = { _: [], flags: {}, bool: new Set() };
   for (let i = 0; i < argv.length; i++) {
@@ -106,8 +107,9 @@ export async function run(argv: string[], io: Io): Promise<number> {
       }
       case "search": {
         if (!rest[0]) throw new UsageError('search needs a filter, e.g. cubewarden search "otag:removal c=w"');
-        const r = (await load()).search(rest[0], { scope: flag("scope"), limit: flag("limit") ? Number(flag("limit")) : undefined, respectCubeRules: !args.bool.has("all-cards"), sort: flag("sort") as SortKey | undefined });
-        out(r, [`${r.total} card(s)`, ...r.cards.map((c) => `  ${c.name} (${c.colors || "C"}, mv ${c.mv}${c.wrDelta != null ? `, WR Δ ${points(c.wrDelta)}` : ""})`)].join("\n"));
+        const mb = args.bool.has("maybeboard");
+        const r = (await load()).search(rest[0], { scope: flag("scope"), limit: flag("limit") ? Number(flag("limit")) : undefined, respectCubeRules: !args.bool.has("all-cards"), sort: flag("sort") as SortKey | undefined, source: mb ? "maybeboard" : "all" });
+        out(r, [`${r.total} card(s)${mb ? " in the maybeboard" : ""}`, ...r.cards.map((c) => `  ${c.name} (${c.colors || "C"}, mv ${c.mv}${c.wrDelta != null ? `, WR Δ ${points(c.wrDelta)}` : ""})`)].join("\n"));
         return 0;
       }
       case "try": case "apply": {

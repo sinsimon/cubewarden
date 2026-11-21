@@ -16,7 +16,7 @@ export {
 export { changelist, diff, exportCsv, mechanicTags, type Diff } from "./export.ts";
 export { aboutMarkdown, REPO_URL, type AboutOptions } from "./about.ts";
 export {
-  createWorkspace, cubeAllows, scopeToText, sortCards, summarizeCard, SORT_KEYS,
+  createWorkspace, cubeAllows, scopeToText, sortCards, summarizeCard, SEARCH_SOURCES, SORT_KEYS, type SearchSource,
   type CardSummary, type Changes, type CheckResult, type Delta, type Explanation, type Finding, type MechanicInput, type Project, type RuleInput, type RuleLine, type SortKey, type Workspace,
 } from "./workspace.ts";
 export { SYNTAX_HELP } from "./syntax-help.ts";

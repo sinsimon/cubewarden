@@ -421,6 +421,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .res-scroll{max-height:380px;overflow:auto}
 .res-note{font-size:12px;color:var(--ink-2);padding:6px 8px;background:var(--chrome);display:flex;align-items:center;gap:10px;justify-content:space-between}
 .colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}
+.find-src{align-self:flex-start;max-width:100%}.find-src button{min-height:30px;padding:0 12px}
 .mb-details{margin-top:10px}.mb-details summary{cursor:pointer;font-size:12.5px;color:var(--ink-2);padding:4px 0}
 .outchips{display:flex;flex-wrap:wrap;gap:4px}
 .outchips .chip{text-transform:none;background:var(--fail-bg)}
@@ -2610,7 +2611,7 @@ function openFind(mode, useRule) {
       filter = { op: "and", items: [filter, ...conds].filter((x) => x.field || x.items.length) };
     }
   }
-  find = { mode, out: mode === "replace" ? [...selected] : [], scope: (useRule || mode === "replace") && !isShared(U.scope) ? clone(U.scope) : { kind: "cube" }, onlySets: gateRules().length > 0, q: "", filter, picked: [], from };
+  find = { mode, out: mode === "replace" ? [...selected] : [], scope: (useRule || mode === "replace") && !isShared(U.scope) ? clone(U.scope) : { kind: "cube" }, onlySets: gateRules().length > 0, q: "", filter, picked: [], from, source: "all" };
   drawerKind = "find"; U.view = "work";
   renderAll(); renderDrawer();
 }
@@ -2620,11 +2621,17 @@ function findCompute() {
   if (q) items.push({ field: "name", op: "contains", value: q });
   const sc = find.scope;
   const ctx = archOf(sc) || sc.kind === "color" ? memberCtxByFilters(sc) : undefined;
-  return E.candidates({ op: "and", items }, sc, S.config, byId, S.current, { ctx, respectCubeRules: find.onlySets, sort: U.findSort || "cubes" });
+  const mb = find.source === "maybeboard";
+  return E.candidates({ op: "and", items }, sc, S.config, byId, S.current, { ctx, respectCubeRules: !mb && find.onlySets, sort: U.findSort || "cubes", within: mb ? mbIds() : undefined });
 }
+/** Maybeboard cards this page knows, out of the cube. */
+function mbIds() { const inCube = new Set(S.current); return (S.maybeboard || []).filter((id) => byId[id] && !inCube.has(id)); }
 function renderFind() {
-  const f = find, gate = gateRules().length;
+  const f = find, gate = gateRules().length, mb = f.source === "maybeboard";
   const body = h("div", { class: "dr-b" });
+  // Where to look: the whole pool or only the cards kept aside (the maybeboard).
+  body.append(h("div", { class: "seg find-src", role: "group", "aria-label": "Look in" }, ...[["all", "All cards"], ["maybeboard", `Maybeboard (${mbIds().length})`]].map(([k, l]) =>
+    h("button", { type: "button", "aria-pressed": String(f.source === k), title: k === "maybeboard" ? "Only the cards kept aside (⇧⌫ moves selected cards there)" : "Every card outside the cube", onclick: () => { if (f.source !== k) { f.source = k; renderDrawer(); } } }, l))));
   if (f.mode === "replace") {
     body.append(h("div", { class: "fld" }, h("span", { class: "lbl" }, `Taking out (${f.out.length})`),
       h("div", { class: "outchips" }, ...f.out.map((id) => h("span", { class: "chip", "data-card": id }, byId[id].name)))));
@@ -2633,7 +2640,7 @@ function renderFind() {
   body.append(h("div", { class: "row" },
     h("div", { class: "fld", style: "flex:1;min-width:170px" }, h("label", null, "Search in"), selEl(scopeOpts, scopeKey(f.scope), (v) => { f.scope = parseScopeKey(v); renderDrawer(); })),
     h("div", { class: "fld", style: "flex:1;min-width:150px" }, h("label", null, "Name contains"), (() => { const i = inp("search", f.q, (v) => { f.q = v; refreshFind(); }, "card name"); i.id = "findQ"; return i; })())));
-  if (gate) {
+  if (gate && !mb) {
     const cb = h("input", { type: "checkbox" }); cb.checked = f.onlySets;
     cb.addEventListener("change", () => { f.onlySets = cb.checked; refreshFind(); });
     body.append(h("label", { class: "row help", style: "gap:6px", title: gateTitle() }, cb, gateLabel(false)));
@@ -2644,7 +2651,8 @@ function renderFind() {
   const foot = h("div", { class: "dr-f", id: "findFoot" });
   setTimeout(() => refreshFind(true), 0);
   const title = f.mode === "replace" ? `Replace ${f.out.length} card${f.out.length > 1 ? "s" : ""}` : "Add cards";
-  return [drawerHead(title, f.from ? `Cards outside the cube matching "${f.from}"` : `Cards outside the cube, sorted by ${sortLabel()}`), body, foot];
+  const what = mb ? "Maybeboard cards" : "Cards outside the cube";
+  return [drawerHead(title, f.from ? `${what} matching "${f.from}"` : `${what}, sorted by ${sortLabel()}`), body, foot];
 }
 /** Columns of the Add/Replace results: the user picks which ones; numeric ones sort (high to low, MV low to high). */
 const nd = '<span class="nd">no data</span>';
@@ -2670,7 +2678,7 @@ const refreshFind = debounce(() => {
   const list = res.cards, LIM = 150, cols = findCols(), sort = U.findSort || "cubes";
   const sortTh = (c) => c.sort ? `<th data-fsort="${c.sort}" style="cursor:pointer" title="${esc(c.title || "Sort by " + c.label)}" aria-sort="${sort === c.sort ? "descending" : "none"}">${c.label}${sort === c.sort ? " ↓" : ""}</th>` : `<th title="${esc(c.title || "")}">${c.label}</th>`;
   const picker = `<details class="colpick"><summary>Columns</summary><div class="colpick-menu">${FIND_COLS.map((c) => `<label><input type="checkbox" data-fcol="${c.k}" ${cols.some((x) => x.k === c.k) ? "checked" : ""}> ${esc(c.long || c.label)}</label>`).join("")}</div></details>`;
-  box.innerHTML = `<div class="res"><div class="res-note"><span>${list.length ? `${list.length} cards outside the cube match.` : "No cards outside the cube match. Loosen the filter or change the colours."}${list.length > LIM ? ` Showing the first ${LIM}.` : ""} Click a row to pick it.</span>${picker}</div>
+  box.innerHTML = `<div class="res"><div class="res-note"><span>${find.source === "maybeboard" ? (list.length ? `${list.length} maybeboard card${list.length > 1 ? "s" : ""} match.` : mbIds().length ? "No maybeboard cards match. Loosen the filter or change the colours." : "The maybeboard is empty: ⇧⌫ in the list moves selected cards there.") : list.length ? `${list.length} cards outside the cube match.` : "No cards outside the cube match. Loosen the filter or change the colours."}${list.length > LIM ? ` Showing the first ${LIM}.` : ""} Click a row to pick it.</span>${picker}</div>
     ${list.length ? `<div class="res-scroll"><table><colgroup><col style="width:28px"><col>${cols.map((c) => `<col style="width:${c.w}px">`).join("")}</colgroup>
     <thead><tr><th></th>${sortTh({ label: "Name", sort: "name" })}${cols.map(sortTh).join("")}</tr></thead><tbody>
     ${list.slice(0, LIM).map((c) => `<tr data-pick="${c.id}" class="${find.picked.includes(c.id) ? "pk" : ""}"><td><input type="checkbox" tabindex="-1" ${find.picked.includes(c.id) ? "checked" : ""} aria-label="Pick ${esc(c.name)}"></td><td title="${esc(c.type)}"><span class="nm" data-card="${c.id}">${esc(c.name)}</span></td>${cols.map((col) => `<td>${col.cell(c)}</td>`).join("")}</tr>`).join("")}
@@ -2718,7 +2726,11 @@ function commitFind() {
   const f = find; if (!f || !f.picked.length) return;
   pushUndo(f.mode === "replace" ? `swap ${f.out.length} for ${f.picked.length}` : `add ${f.picked.length}`);
   S.current = S.current.filter((id) => !f.out.includes(id)).concat(f.picked.filter((id) => !S.current.includes(id)));
-  const msg = f.mode === "replace" ? `Swapped ${f.out.length} out, ${f.picked.length} in` : `Added ${f.picked.length === 1 ? byId[f.picked[0]].name : f.picked.length + " cards"}`;
+  // A card that goes into the cube leaves the maybeboard (as applyChanges does).
+  const fromMb = f.picked.filter((id) => (S.maybeboard || []).includes(id));
+  if (fromMb.length) S.maybeboard = S.maybeboard.filter((id) => !fromMb.includes(id));
+  const one = f.picked.length === 1 ? byId[f.picked[0]].name : f.picked.length + " cards";
+  const msg = f.mode === "replace" ? `Swapped ${f.out.length} out, ${f.picked.length} in${fromMb.length ? " from the maybeboard" : ""}` : fromMb.length === f.picked.length ? `Put ${one} in the cube from the maybeboard` : `Added ${one}`;
   selected = new Set(f.picked); focusId = f.picked[0];
   find = null; drawerKind = null; $("#drawer").classList.remove("open");
   afterChange(msg);

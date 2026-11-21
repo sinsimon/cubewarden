@@ -190,11 +190,17 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       };
     },
 
-    search(filterText: string, o: { scope?: string; limit?: number; respectCubeRules?: boolean; sort?: SortKey } = {}) {
+    /** Cards outside the cube that match. source "maybeboard": only the cards kept aside, all of them (the cube's
+     *  "every card" rules do not apply to cards the designer chose to keep). */
+    search(filterText: string, o: { scope?: string; limit?: number; respectCubeRules?: boolean; sort?: SortKey; source?: SearchSource } = {}) {
       const filter = parseFilter(filterText);
+      const source = o.source ?? "all";
+      if (!SEARCH_SOURCES.includes(source)) throw new Error(`Unknown source "${source}" (${SEARCH_SOURCES.join(", ")})`);
       const inCube = new Set(project.current);
-      let pool = Object.values(cardsById).filter((c) => !inCube.has(c.id));
-      if (o.respectCubeRules !== false) pool = pool.filter(cubeAllows(project.config));
+      let pool = source === "maybeboard"
+        ? [...new Set(project.maybeboard || [])].map((id) => cardsById[id]).filter((c) => c && !inCube.has(c.id))
+        : Object.values(cardsById).filter((c) => !inCube.has(c.id));
+      if (source === "all" && o.respectCubeRules !== false) pool = pool.filter(cubeAllows(project.config));
       let ctx: MatchContext | undefined;
       if (o.scope) {
         const s = o.scope.includes(":") || o.scope === "cube" ? parseScope(o.scope)
@@ -376,6 +382,10 @@ export function cubeAllows(config: Config): (c: Card) => boolean {
     return v == null || inConstraint(v, r.constraint);
   });
 }
+
+/** Where a search looks: every card outside the cube, or only the maybeboard. */
+export const SEARCH_SOURCES = ["all", "maybeboard"] as const;
+export type SearchSource = (typeof SEARCH_SOURCES)[number];
 
 /** Sort keys for search results; numbers sort high to low (mv low to high), missing values last, then by name. */
 export const SORT_KEYS = { cubes: "ccCubes", elo: "ccElo", picks: "ccPicks", wr: "wrDelta", wrraw: "wrRaw", mv: "mv", name: "name" } as const;

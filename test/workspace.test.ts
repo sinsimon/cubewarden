@@ -221,6 +221,23 @@ describe("maybeboard", () => {
   it("refuses a card already in the cube", () => {
     expect(() => ws().maybeboard({ add: ["W1"] })).toThrowError(/in the cube/);
   });
+  it("searches the maybeboard: only its cards, every one of them whatever the 'every card' rules say", () => {
+    const w = ws();
+    w.maybeboard({ add: ["Old White Flyer", "U2"] });
+    expect(w.search("c=w", { source: "maybeboard", sort: "name" }).cards.map((c) => c.name)).toEqual(["Old White Flyer"]);
+    expect(w.search("", { source: "maybeboard", sort: "name" }).cards.map((c) => c.id)).toEqual(["W5", "U2"].sort((a, b) => cardsById[a].name.localeCompare(cardsById[b].name)));
+    expect(w.search("c=w").cards.map((c) => c.name)).toEqual(["Dawn Skirmisher"]);
+  });
+  it("searches the maybeboard in a colour or archetype, with member:", () => {
+    const w = ws();
+    w.maybeboard({ add: ["Old White Flyer", "Dawn Skirmisher"] });
+    expect(w.search("member:fly", { source: "maybeboard", scope: "wu" }).cards.map((c) => c.name)).toEqual(["Old White Flyer"]);
+    expect(w.search("t:creature", { source: "maybeboard", scope: "U" }).total).toBe(0);
+  });
+  it("finds nothing in an empty maybeboard and refuses an unknown source", () => {
+    expect(ws().search("c=w", { source: "maybeboard" })).toEqual({ total: 0, cards: [] });
+    expect(() => ws().search("c=w", { source: "sideboard" as "maybeboard" })).toThrowError(/Unknown source "sideboard"/);
+  });
 });
 
 describe("rules as text", () => {
