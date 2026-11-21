@@ -39,7 +39,14 @@ terminal, use Changes → "Download project file" and "Open project file".
 
 ## Rule syntax (short)
 
-- Filters: `otag:removal t:creature kw:flying mv>=4 c=wu c<=wu c=scope is:hybrid s:fdn,trk wr>=1.5 wrraw>=55% cubes>=1000 tag:"UG Ramp" member:any`, with `or`, `( )`, `-`.
+- Filters: `otag:removal t:creature kw:flying mv>=4 spellmv<=2 c=wu c<=wu c=scope is:hybrid s:fdn,trk wr>=1.5 wrraw>=55% cubes>=1000 tag:"UG Ramp" member:any`, with `or`, `( )`, `-`.
+- `spellmv` compares every mana value a card can be cast for as a noncreature spell, and matches when any of them
+  passes: its own mana value, the spell side of an adventure, omen or prepared creature, each half of a split card,
+  kicker (each and both), multikicker (one kick), tiered (each tier), spree (all modes), entwine, and the costs of
+  flashback, harmonize, beam me up, escape, mayhem, overload, foretell, cleave, sneak, web-slinging, warp, madness,
+  miracle, surge. `count(spellmv<=2)` counts cheap spells, `count(spellmv>=5)` big ones. An X spell matches any
+  `>=`/`>` and `<=`/`<` from its X=0 cost. Creatures without a spell side and lands never match (`-spellmv>=0`
+  finds them). Scryfall has no such filter: "Open in Scryfall" leaves it out and says so.
 - Win rates (17Lands): `wr` is the WR Δ, in percentage points: the card's adjusted WR (GIH WR minus the strength of
   the decks it was played in) minus the average adjusted WR of its set's commons and uncommons. `wr>=1.5` = 1.5 points
   above an average common or uncommon, `wr<0` = below it; cards from different sets compare. Pages show it signed

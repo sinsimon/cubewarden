@@ -15,7 +15,7 @@ export type Color = "W" | "U" | "B" | "R" | "G";
 export type ScopeCode = Color | "C" | "L";
 
 export type FieldId =
-  | "name" | "tag" | "type" | "text" | "keyword" | "manaCost" | "mv" | "power" | "toughness"
+  | "name" | "tag" | "type" | "text" | "keyword" | "manaCost" | "mv" | "spellMv" | "power" | "toughness"
   | "colors" | "colorCount" | "hybrid" | "set" | "rarity" | "wrDelta" | "wrRaw" | "games"
   | "ccElo" | "ccCubes" | "ccPicks" | "ccTag" | "member" | "scryfall";
 

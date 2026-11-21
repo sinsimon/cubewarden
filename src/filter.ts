@@ -4,6 +4,7 @@ import { colorSet } from "./colors.ts";
 import { FIELD, RETIRED } from "./fields.ts";
 import { cmp, FilterError, num, scryMatches } from "./scryfall-subset.ts";
 import { slug } from "./slug.ts";
+import { spellMvMatches } from "./spell-costs.ts";
 
 export { FilterError };
 
@@ -54,6 +55,7 @@ function conditionMatches(card: Card, cond: Condition, ctx?: MatchContext): bool
       if (!ctx?.member) throw new FilterError("'Mechanic member' only works inside a colour or an archetype");
       r = ctx.member(card.id, String(v));
       break;
+    case "spellMv": r = spellMvMatches(card, cond.op, Number(v)); break;
     case "scryfall": r = scryMatches(card, String(v)); break;
     default: r = cmp(metricOf(card, cond.field), cond.op, Number(v));
   }

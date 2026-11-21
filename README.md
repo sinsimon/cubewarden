@@ -21,10 +21,13 @@ otag:counterspell >= 4                          blue: at least 4 counterspells
 curve(t:creature) 1:1..3 2:5..7 3:4..6 6+:0..2  creatures per mana value (6+ = six and above)
 curve(t:creature) 2:20%..30% 3:15%..25%         the same in percent of the creatures
 curve(-t:land) 1-2:8..12 3-4:6..9 5+:2..4       a bucket can cover a range of mana values (1-2 = one or two)
+count(spellmv<=2) >= 12                         spells castable for 2 or less (kicker, flashback, adventures… count)
 ```
 
 An **archetype** is 2 to 5 colours, a name and **mechanics**: a mechanic is a filter (with AND, OR, groups and NOT)
-plus an optional target. Filters use CubeCobra and Scryfall syntax (`otag:`, `t:`, `o:`, `kw:`, `mv`, `c=`…).
+plus an optional target. Filters use CubeCobra and Scryfall syntax (`otag:`, `t:`, `o:`, `kw:`, `mv`, `c=`…), plus
+terms of their own: `spellmv` (every mana value a card can be cast for as a noncreature spell: adventure and omen
+sides, kicker, flashback and other recasts), `wr`, `elo`, `member:`.
 `cubewarden syntax` prints the whole syntax.
 
 Rules are **primary** (they must pass) or **secondary** (warnings). Counts in a colour or archetype can be read as if

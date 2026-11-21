@@ -34,3 +34,6 @@ Every rule is the person's: never add one they did not ask for.
 - Win rates are a choice of the designer, not a quality score: do not suggest cuts by win rate unless a rule says so.
 - `wr` is the WR Δ in points above (+) or below (−) the average common or uncommon of the card's set
   (`avg(wr, member:any) in 1..3.5`, `wr>=1.5`); `wrraw` is the raw GIH WR in percent. Never write `wr` in percent.
+- `spellmv` matches any mana value a card can be cast for as a noncreature spell (its own, an adventure or omen side,
+  kicker, flashback and other recasts; X spells go up from X=0); `mv` is only the front face's printed mana value.
+  Creatures without a spell side and lands never match `spellmv`. Scryfall cannot filter it.

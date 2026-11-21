@@ -22,6 +22,7 @@ export const FIELDS: FieldInfo[] = [
   { id: "keyword", label: "Keyword", type: "keyword", ops: ["is"], source: "cards" },
   { id: "manaCost", label: "Mana cost", type: "text", ops: ["contains"], source: "cards" },
   { id: "mv", label: "Mana value", type: "number", ops: NUM_OPS, source: "cards" },
+  { id: "spellMv", label: "Spell mana value", type: "number", ops: NUM_OPS, source: "cards", hint: "every mana value the card can be cast for as a noncreature spell: its own, its adventure/omen/spell side, kicker, flashback and other recasts; an X spell goes up from its X=0 value; creatures and lands have none" },
   { id: "power", label: "Power", type: "number", ops: NUM_OPS, source: "cards" },
   { id: "toughness", label: "Toughness", type: "number", ops: NUM_OPS, source: "cards" },
   { id: "colors", label: "Colours", type: "colors", ops: ["is", "includes", "within"], source: "cards", hint: "value '@scope' = the colours of the colour/archetype being checked" },

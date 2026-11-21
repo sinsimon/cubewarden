@@ -7,6 +7,7 @@ export { FilterError, isCreature, isLand, matches, metricOf, validateFilter, typ
 export { bucketLabel, formatConstraint, gap, inBucket, inConstraint, statusOf, type Status } from "./constraint.ts";
 export { archetypePool, colorPool, evaluate, scopeCards, worst, type ArchetypeReport, type CurveBucketResult, type EvaluateOptions, type ScopeReport, type SharedSummary, type Report, type Result, type ScopeStatus } from "./evaluate.ts";
 export { describeFilter } from "./describe.ts";
+export { spellCosts, spellMvMatches, type SpellCost } from "./spell-costs.ts";
 export { toScryfall, type ScryfallScope } from "./scryfall.ts";
 export {
   cardFromCubeCobra, cubeCobraListUrl, decodeRules, encodeRules, fetchCubeCobra, isHybridCost, readCubeCobra,

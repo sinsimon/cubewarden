@@ -3,6 +3,10 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   otag:removal          Scryfall oracle tag (functional tag)
   t:creature  o:"draw a card"  kw:flying  m:{X}  name:bolt  !"Exact Name"
   mv>=4  pow>=3  tou<=2  ncolors>=2
+  spellmv<=2  spellmv>=5  any mana value the card can be cast for as a noncreature spell: its own, the spell side of
+                        an adventure/omen/prepared creature, each split half, kicker, tiered, spree (all modes),
+                        flashback, harmonize, escape, foretell, overload, mayhem, sneak, warp…; an X spell goes up
+                        from its X=0 cost; creatures and lands never match (Scryfall cannot filter it)
   c=wu (exactly)  c>=u (includes)  c<=wu (within)  c:c (colourless)  c=scope (the colour/archetype being checked)
   is:hybrid  r:common  r:u,r  s:fdn,trk (printed in any of these sets)
   wr>=1.5  wr<0 (17Lands WR Δ: points above or below the average common/uncommon of the card's set)

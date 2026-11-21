@@ -1,7 +1,7 @@
 /**
  * Text syntax for filters and rules, in the style of CubeCobra and Scryfall.
  *
- * Filters: otag:counterspell t:creature o:"draw a card" kw:flying m:{X} mv>=4 pow>=4 tou<=2
+ * Filters: otag:counterspell t:creature o:"draw a card" kw:flying m:{X} mv>=4 spellmv<=2 pow>=4 tou<=2
  *          c=wu c>=u c<=wu c=scope c:c is:hybrid r:common s:fdn,trk !"Exact Name" name:bolt
  *          wr>=1.5 wr<0 wrraw>=55% games>=500 elo>=1300 cubes>=1000 picks>=100 member:any ncolors>=2 tag:"CubeCobra tag"
  *          space = and, "or", ( ), "-" = not.
@@ -27,13 +27,13 @@ export class SyntaxError extends Error {
 const TERM_KEYS: Record<string, Condition["field"] | "is"> = {
   otag: "tag", oracletag: "tag", function: "tag", kw: "keyword", keyword: "keyword",
   t: "type", type: "type", o: "text", oracle: "text", text: "text", m: "manaCost", mana: "manaCost", name: "name",
-  mv: "mv", cmc: "mv", manavalue: "mv", pow: "power", power: "power", tou: "toughness", toughness: "toughness",
+  mv: "mv", cmc: "mv", manavalue: "mv", spellmv: "spellMv", pow: "power", power: "power", tou: "toughness", toughness: "toughness",
   c: "colors", color: "colors", colors: "colors", ncolors: "colorCount", is: "is", r: "rarity", rarity: "rarity",
   s: "set", set: "set", e: "set", edition: "set", wr: "wrDelta", wrraw: "wrRaw", gih: "wrRaw",
   games: "games", elo: "ccElo", cubes: "ccCubes", picks: "ccPicks", member: "member", tag: "ccTag",
 };
 const RARITY: Record<string, string> = { c: "common", u: "uncommon", r: "rare", m: "mythic" };
-const KNOWN_KEYS = "otag:, t:, o:, kw:, m:, mv, pow, tou, c=, s:, r:, wr, wrraw, elo, cubes, picks, tag:, member:";
+const KNOWN_KEYS = "otag:, t:, o:, kw:, m:, mv, spellmv, pow, tou, c=, s:, r:, wr, wrraw, elo, cubes, picks, tag:, member:";
 
 function termToCond(tok: string): Condition {
   let neg = false, t = tok;
@@ -305,7 +305,7 @@ export function parseRule(src: string): RuleBody {
 
 // ---------- writing ----------
 const TEXT_KEY: Partial<Record<Condition["field"], string>> = {
-  tag: "otag", keyword: "kw", type: "t", text: "o", manaCost: "m", mv: "mv", power: "pow", toughness: "tou",
+  tag: "otag", keyword: "kw", type: "t", text: "o", manaCost: "m", mv: "mv", spellMv: "spellmv", power: "pow", toughness: "tou",
   colorCount: "ncolors", rarity: "r", set: "s", wrDelta: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo",
   ccCubes: "cubes", ccPicks: "picks", member: "member", ccTag: "tag",
 };

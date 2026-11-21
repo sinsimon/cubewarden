@@ -4,7 +4,7 @@ import { WUBRG } from "./colors.ts";
 import { describeFilter } from "./describe.ts";
 import { conditionToText } from "./syntax.ts";
 
-const SKIP: FieldId[] = ["wrDelta", "wrRaw", "games", "member", "ccElo", "ccCubes", "ccPicks", "ccTag", "colorCount"];
+const SKIP: FieldId[] = ["spellMv", "wrDelta", "wrRaw", "games", "member", "ccElo", "ccCubes", "ccPicks", "ccTag", "colorCount"];
 
 export type ScryfallScope = { kind: "cube" } | { kind: "color"; color: string } | { kind: "archetype"; colors: string };
 
@@ -33,7 +33,7 @@ function memberMechanics(mechanics: Mechanic[], v: string): Mechanic[] {
 
 /**
  * Filter (+ scope and allowed sets) → a Scryfall search. Conditions Scryfall cannot express (win rates,
- * CubeCobra data) are left out and listed in `skipped`. With the scope's `mechanics`, member:<id> becomes that
+ * CubeCobra data, spell mana values) are left out and listed in `skipped`. With the scope's `mechanics`, member:<id> becomes that
  * mechanic's filter and member:any / primary / secondary the OR of those mechanics; a member: that cannot be
  * resolved is skipped too.
  */
