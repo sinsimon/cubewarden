@@ -17,6 +17,8 @@ changes; otherwise use the CLI in the project folder.
    cube's "every card" rules allow. Default order: most used on CubeCobra (`--sort cubes`); `--sort wr` for win rate.
 4. `cubewarden try --add "<card>" --remove "<card>" --json`: the effect on every rule. Nothing is saved.
 5. Show the person the swap and its effect. Run `cubewarden apply …` only after they agree.
+   Cards the person wants to keep in view without counting them go to the maybeboard: `cubewarden maybeboard --add "<card>"`,
+   or `cubewarden apply --remove "<card>" --to-maybeboard` for a cut.
 
 ## Rules
 

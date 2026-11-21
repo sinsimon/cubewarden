@@ -16,6 +16,10 @@ export interface Project {
   /** The list as imported: changes are measured against it. */
   original: string[];
   current: string[];
+  /** Cards kept aside (CubeCobra's maybeboard): cut cards and candidates. Optional. */
+  maybeboard?: string[];
+  /** The maybeboard as imported, to list what changed in it. */
+  originalMaybeboard?: string[];
   /** CubeCobra cube id, when the cube came from CubeCobra. */
   cubeId?: string | null;
 }
@@ -55,7 +59,7 @@ export interface Explanation extends Finding {
 export interface RuleLine { id: string; name: string; scope: string; priority: "primary" | "secondary"; text: string }
 export interface RuleInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string; description?: string }
 export interface MechanicInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string }
-export interface Changes { add?: string[]; remove?: string[] }
+export interface Changes { add?: string[]; remove?: string[]; /** Put the removed cards in the maybeboard. */ toMaybeboard?: boolean }
 export interface Delta {
   size: { before: number; after: number };
   changed: { id: string; scope: string; name: string; before: { value: number | null; status: Status }; after: { value: number | null; status: Status } }[];
@@ -204,14 +208,34 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
 
     applyChanges(ch: Changes): Delta {
       const before = report();
+      const removed = (ch.remove || []).map((n) => resolve(n).id);
+      const added = new Set((ch.add || []).map((n) => resolve(n).id));
       project.current = nextList(ch);
+      const mb = (project.maybeboard || []).filter((id) => !added.has(id));
+      if (ch.toMaybeboard) for (const id of removed) if (!mb.includes(id)) mb.push(id);
+      if (project.maybeboard || mb.length) project.maybeboard = mb;
       notify();
       return delta(before, report());
     },
 
-    changes(): Diff & { text: string } {
+    changes(): Diff & { maybeboard: string[]; text: string } {
       const d = diff(project.original, project.current);
-      return { ...d, text: changelist(d, cardsById) };
+      const before = new Set(project.originalMaybeboard || []);
+      const maybeboard = (project.maybeboard || []).filter((id) => !before.has(id));
+      return { ...d, maybeboard, text: changelist(d, cardsById, { maybeboard }) };
+    },
+
+    /** Keep candidates aside without putting them in the cube, or drop them from the maybeboard. */
+    maybeboard(ch: { add?: string[]; remove?: string[] } = {}): string[] {
+      const cur = new Set(project.current);
+      const add = (ch.add || []).map(resolve);
+      for (const c of add) if (cur.has(c.id)) throw new Error(`"${c.name}" is in the cube: remove it with toMaybeboard to move it`);
+      const drop = new Set((ch.remove || []).map((n) => resolve(n).id));
+      const mb = (project.maybeboard || []).filter((id) => !drop.has(id));
+      for (const c of add) if (!mb.includes(c.id)) mb.push(c.id);
+      project.maybeboard = mb;
+      if (add.length || drop.size) notify();
+      return mb;
     },
 
     rules(): RuleLine[] {

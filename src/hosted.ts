@@ -13,7 +13,7 @@ import { SOURCES } from "./sources.ts";
 export interface SetInfo { code: string; name: string; released: string; cards: number; wr?: { source: string | null; asOf: string | null } }
 export interface DataIndex { version: 1; builtAt: string; sets: SetInfo[] }
 interface Shard { set: string; cards: Card[] }
-interface SavedState { config?: Config; current?: string[]; original?: string[]; source?: { id?: string } | null }
+interface SavedState { config?: Config; current?: string[]; original?: string[]; maybeboard?: string[]; source?: { id?: string } | null }
 
 const COLORS = ["W", "U", "B", "R", "G", "C", "L"] as const;
 export const EMPTY_CONFIG: Config = { version: 1, cube: { name: "My cube" }, colors: COLORS.map((code) => ({ code, mechanics: [] })), archetypes: [], rules: [] };
@@ -107,7 +107,7 @@ export async function loadHosted(opts: { storageKey: string; base: string }) {
     .filter((x): x is Shard => !!x);
   let cards = mergeCards(shards, index, cubeCards);
   const have = new Set(cards.map((c) => c.id));
-  const missing = [...new Set([...(state?.current || []), ...(state?.original || [])])].filter((id) => !have.has(id));
+  const missing = [...new Set([...(state?.current || []), ...(state?.original || []), ...(state?.maybeboard || [])])].filter((id) => !have.has(id));
   if (missing.length) {
     try { cards = cards.concat((await scryfallCollection(missing.map((oracle_id) => ({ oracle_id })))).found.filter((c) => c.oracle_id).map((c) => cardFromPrintings([c]))); }
     catch (e) { errors.push(`Scryfall: ${(e as Error).message}`); }

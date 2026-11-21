@@ -25,7 +25,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
                                 --sort cubes|elo|picks|wr|wrraw|mv|name (default cubes: most used on
                                 CubeCobra), --all-cards to ignore the cube's "every card" rules)
   try --add <card> --remove <card>    effect of a swap on every rule, without saving
-  apply --add <card> --remove <card>  make the swap and save the project
+  apply --add <card> --remove <card> [--to-maybeboard]  make the swap and save the project
   rules                         every rule as text
   rule set <id> --text "<rule>" [--scope color:W] [--name "…"] [--priority secondary]
   rule rm <id>
@@ -33,6 +33,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   mechanic set <id> --text "<filter> >= n" [--scope color:W | archetype:<id>] [--name "…"] [--priority secondary]
   mechanic rm <id>
   changes                       adds and removes against the imported list
+  maybeboard [--add <card>] [--remove <card>]  cards kept aside (CubeCobra's maybeboard); lists them without flags
   about [--numbers] [--cube-id <id>]  About text for CubeCobra, ending with the hidden rules line
   export csv                    the whole list as a CSV for CubeCobra, with mechanic tags
   import <CubeCobra id> [--force]  start a project from a public CubeCobra cube (read only); --force replaces
@@ -44,7 +45,7 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
 `;
 
 interface Args { _: string[]; flags: Record<string, string[]>; bool: Set<string> }
-const BOOL = new Set(["json", "numbers", "all-cards", "help", "force", "refresh"]);
+const BOOL = new Set(["json", "numbers", "all-cards", "help", "force", "refresh", "to-maybeboard"]);
 function parseArgs(argv: string[]): Args {
   const a: Args = { _: [], flags: {}, bool: new Set() };
   for (let i = 0; i < argv.length; i++) {
@@ -108,7 +109,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       }
       case "try": case "apply": {
         const w = await load();
-        const ch = { add: args.flags.add || [], remove: args.flags.remove || [] };
+        const ch = { add: args.flags.add || [], remove: args.flags.remove || [], toMaybeboard: args.bool.has("to-maybeboard") };
         if (!ch.add.length && !ch.remove.length) throw new UsageError(`${cmd} needs --add and/or --remove`);
         const d = cmd === "try" ? w.tryChanges(ch) : w.applyChanges(ch);
         if (cmd === "apply") await save(w.project);
@@ -153,6 +154,15 @@ export async function run(argv: string[], io: Io): Promise<number> {
         out(c, c.text);
         return 0;
       }
+      case "maybeboard": {
+        const w = await load();
+        const ch = { add: args.flags.add || [], remove: args.flags.remove || [] };
+        const changed = ch.add.length + ch.remove.length > 0;
+        const ids = w.maybeboard(ch);
+        if (changed) await save(w.project);
+        out(ids, [`${ids.length} card(s) in the maybeboard${changed ? " (saved)" : ""}`, ...ids.map((id) => `  ${w.cardsById[id]?.name ?? id}`)].join("\n"));
+        return 0;
+      }
       case "about": {
         const w = await load();
         io.write(await aboutMarkdown(w.project.config, w.report(), { numbers: args.bool.has("numbers"), cubeId: flag("cube-id") || w.project.cubeId }));
@@ -161,7 +171,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       case "export": {
         if (rest[0] !== "csv") throw new UsageError("use: export csv");
         const w = await load();
-        io.write(exportCsv(w.project.current, w.cardsById, { tags: mechanicTags(w.project.config, w.report()) }) + "\n");
+        io.write(exportCsv(w.project.current, w.cardsById, { tags: mechanicTags(w.project.config, w.report()), maybeboard: w.project.maybeboard }) + "\n");
         return 0;
       }
       case "import": {
@@ -172,12 +182,13 @@ export async function run(argv: string[], io: Io): Promise<number> {
         const cube = await fetchCubeCobra(rest[0], {}, io.fetch ?? fetch);
         const project: Project = {
           version: 1, cubeId: cube.id, original: cube.mainboard, current: [...cube.mainboard],
+          ...(cube.maybeboard.length ? { maybeboard: [...new Set(cube.maybeboard)], originalMaybeboard: [...new Set(cube.maybeboard)] } : {}),
           config: cube.config ?? { version: 1, cube: { name: cube.name }, colors: "WUBRGCL".split("").map((code) => ({ code: code as "W", mechanics: [] })), archetypes: [], rules: [] },
         };
         await save(project);
         await writeFile(cardsPath, JSON.stringify(Object.values(cube.cards)) + "\n");
         out({ cubeId: cube.id, cards: cube.mainboard.length, rulesRestored: !!cube.config },
-          `Imported "${cube.name}": ${cube.mainboard.length} cards, ${cube.config ? "rules restored from the cube's text" : "no saved rules found"}.\n` +
+          `Imported "${cube.name}": ${cube.mainboard.length} cards${cube.maybeboard.length ? ` (${new Set(cube.maybeboard).size} kept in the maybeboard)` : ""}, ${cube.config ? "rules restored from the cube's text" : "no saved rules found"}.\n` +
           (cube.duplicates ? `${cube.duplicates} repeated card(s) counted once.\n` : "") +
           `cards.json now holds the cube's cards only. Next: cubewarden data build, which adds the cards you may add\n` +
           `(from the sets your rules allow, e.g. cubewarden rule set sets --scope cube --name "Sets" --text "every(s:fdn,tla)",\n` +

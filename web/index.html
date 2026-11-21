@@ -372,6 +372,7 @@ textarea.txt{height:auto;padding:8px;resize:vertical}
 .chg-row{display:grid;grid-template-columns:minmax(0,1fr) 44px 80px;gap:6px;align-items:center;padding:0 6px 0 10px;height:30px;border-top:1px solid var(--line)}
 .chg-row .nm{font:600 13px/1 var(--serif);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chg-row .set{font-size:11.5px;color:var(--ink-3);text-transform:uppercase}
+.mb-details .chg-row{grid-template-columns:minmax(0,1fr) 44px 80px 52px}
 .chg-scroll{max-height:260px;overflow:auto}
 .state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
 .state.dirty{color:var(--accent)} .state.clean{color:var(--ok)}
@@ -447,7 +448,8 @@ textarea.txt{height:auto;padding:8px;resize:vertical}
 .about-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
 .about-panes{display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:320px}
 .about-prev{padding:12px 16px;border-right:1px solid var(--line);max-height:520px;overflow:auto;font-size:13px;line-height:1.5}
-.res-note{display:flex;align-items:center;gap:10px;justify-content:space-between}.colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg,#fff)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(20,30,50,.14);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}.help-h{font-size:13px;margin:14px 0 6px}.help-h:first-child{margin-top:0}.fr-agents{font-size:12.5px;margin-top:14px;line-height:1.5}
+.res-note{display:flex;align-items:center;gap:10px;justify-content:space-between}.colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg,#fff)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(20,30,50,.14);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}.mb-details{margin-top:10px}.mb-details summary{cursor:pointer;font-size:12.5px;color:var(--ink-2);padding:4px 0}
+.help-h{font-size:13px;margin:14px 0 6px}.help-h:first-child{margin-top:0}.fr-agents{font-size:12.5px;margin-top:14px;line-height:1.5}
 .about-prev h1{font-size:18px;margin:0 0 8px}.about-prev h2{font-size:15px;margin:14px 0 6px}.about-prev h3{font-size:13.5px;margin:12px 0 4px;display:flex;align-items:center;gap:6px}.about-prev h4{font-size:13px;margin:10px 0 4px}
 .about-prev p{margin:0 0 8px}.about-prev ul{margin:0 0 8px;padding-left:20px}
 .about-raw{border:0;border-radius:0;height:auto;min-height:320px;max-height:520px;font:12px/1.5 ui-monospace,Menlo,monospace;padding:12px 14px;resize:vertical;background:#FBFBFC}
@@ -930,12 +932,13 @@ function diffSig(d) { return d.adds.slice().sort().join(",") + "|" + d.removes.s
 function isDirty() { const d = diffNow(); return (d.adds.length + d.removes.length) > 0 && diffSig(d) !== S.exportedSig; }
 
 /** Undo keeps the card list and the rules as they were, so it also undoes rule edits and changes made by an agent. */
-function pushUndo(label) { undoStack.push({ current: S.current.slice(), config: clone(S.config), label }); if (undoStack.length > 50) undoStack.shift(); }
+function pushUndo(label) { undoStack.push({ current: S.current.slice(), config: clone(S.config), maybeboard: S.maybeboard ? S.maybeboard.slice() : undefined, label }); if (undoStack.length > 50) undoStack.shift(); }
 function undo() {
   const u = undoStack.pop();
   if (!u) { toast("Nothing to undo"); return; }
   S.current = u.current;
   if (u.config) S.config = u.config;
+  if (u.maybeboard) S.maybeboard = u.maybeboard; else delete S.maybeboard;
   afterChange("Undid: " + u.label, false);
 }
 function afterChange(msg, undoable = true) {
@@ -2147,6 +2150,7 @@ function commitFind() {
 }
 
 /* ================= changes ================= */
+let mbOpen = false;
 function renderChanges() {
   const d = diffNow(), dirty = isDirty();
   const body = h("div", { class: "dr-b" });
@@ -2158,20 +2162,20 @@ function renderChanges() {
     h("span", { class: "state " + (dirty ? "dirty" : "clean"), style: "margin-left:auto;align-self:center" }, d.adds.length + d.removes.length === 0 ? "No changes" : dirty ? "Not exported yet" : "Exported")));
   const ta = h("textarea", { class: "txt hidden", rows: "8", readonly: true, "aria-label": "Changelist text" });
   body.append(h("div", { class: "row" },
-    h("button", { class: "btn primary", type: "button", disabled: !(d.adds.length + d.removes.length), onclick: () => {
-      const text = E.exportChangelist(diffNow(), byId);
+    h("button", { class: "btn primary", type: "button", disabled: !(d.adds.length + d.removes.length + (S.maybeboard || []).filter((id) => !(S.originalMaybeboard || []).includes(id)).length), onclick: () => {
+      const text = cubewarden.changes().text;
       ta.value = text;
       const done = (ok) => { S.exportedSig = diffSig(diffNow()); save(); renderTop(); renderDrawer(); toast(ok ? "Changelist copied" : "Copy blocked: select the text below and copy it"); if (!ok) { const t2 = $("#drawer textarea"); if (t2) { t2.value = text; t2.classList.remove("hidden"); t2.select(); } } };
       try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (e) { done(false); }
     } }, "Copy changelist"),
     h("button", { class: "btn", type: "button", onclick: () => {
-      const csv = E.exportCsv(S.current, byId, U.csvTags !== false ? { tags: E.mechanicTags(S.config, R) } : undefined);
+      const csv = E.exportCsv(S.current, byId, Object.assign({ maybeboard: (S.maybeboard || []).filter((id) => byId[id]) }, U.csvTags !== false ? { tags: E.mechanicTags(S.config, R) } : {}));
       const a = h("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: E.slug(S.config.cube.name || "cube") + ".csv" });
       document.body.append(a); a.click(); a.remove();
       S.exportedSig = diffSig(diffNow()); save(); renderTop(); renderDrawer(); toast(`Downloaded CSV with ${S.current.length} cards`);
     } }, "Download CSV"),
     h("button", { class: "btn", type: "button", title: "Rules and card list as cubewarden.json: the file the cubewarden command line (and agents in a terminal) work on", onclick: () => {
-      const project = { version: 1, config: S.config, original: S.original, current: S.current, cubeId: S.config.cube.cubeCobraId || (S.source && S.source.id) || null };
+      const project = { version: 1, config: S.config, original: S.original, current: S.current, maybeboard: S.maybeboard || [], originalMaybeboard: S.originalMaybeboard || [], cubeId: S.config.cube.cubeCobraId || (S.source && S.source.id) || null };
       const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(project, null, 1)], { type: "application/json" })), download: "cubewarden.json" });
       document.body.append(a); a.click(); a.remove(); toast("Downloaded cubewarden.json");
     } }, "Download project file"),
@@ -2185,7 +2189,7 @@ function renderChanges() {
         const unknown = p.current.concat(p.original).filter((id) => !byId[id]);
         if (!confirm(`Replace the rules and the ${S.current.length}-card list in this browser with ${f.name} (${p.current.length} cards)?${unknown.length ? `\n${new Set(unknown).size} card(s) are not in this page's card data and will be left out.` : ""}`)) return;
         const cfg = clone(p.config); normaliseConfig(cfg);
-        Object.assign(S, { version: 1, config: cfg, original: p.original.filter((id) => byId[id]), current: p.current.filter((id) => byId[id]), started: true, exportedSig: null });
+        Object.assign(S, { version: 1, config: cfg, original: p.original.filter((id) => byId[id]), current: p.current.filter((id) => byId[id]), maybeboard: (p.maybeboard || []).filter((id) => byId[id]), originalMaybeboard: (p.originalMaybeboard || []).filter((id) => byId[id]), started: true, exportedSig: null });
         save(); recompute(); renderAll(); toast(`Opened ${f.name}`);
       });
       inp.click();
@@ -2193,12 +2197,23 @@ function renderChanges() {
     (() => { const cb = h("input", { type: "checkbox" }); cb.checked = U.csvTags !== false; cb.addEventListener("change", () => { U.csvTags = cb.checked; save(); }); return h("label", { class: "help", style: "display:flex;gap:6px;align-items:flex-start;flex-basis:100%;font-size:12px", title: "One tag per mechanic a card matches, e.g. UG Ramp" }, cb, "Add mechanic tags (UG Ramp, U Counterspells…) to the CSV. CubeCobra's Replace with CSV then shows them on every card."); })(),
     h("button", { class: "btn ghost", type: "button", disabled: !undoStack.length, onclick: undo, title: undoStack.length ? "Undo: " + undoStack[undoStack.length - 1].label : "" }, "Undo last ⌘Z")));
   body.append(ta);
-  const list = (title, ids, btn, fn) => h("div", { class: "chg-list" }, h("h3", null, h("span", null, title), h("span", null, String(ids.length))),
+  const list = (title, ids, btn, fn, btn2, fn2) => h("div", { class: "chg-list" }, h("h3", null, h("span", null, title), h("span", null, String(ids.length))),
     ids.length ? h("div", { class: "chg-scroll" }, ...ids.slice().sort((a, b) => byId[a].name.localeCompare(byId[b].name)).map((id) => h("div", { class: "chg-row" },
       h("span", { class: "nm", "data-card": id }, byId[id] ? byId[id].name : id), h("span", { class: "set" }, byId[id] ? byId[id].set : ""),
-      h("button", { class: "btn sm", type: "button", onclick: () => fn(id) }, btn)))) : h("div", { class: "kempty", style: "padding:8px 10px" }, "None"));
-  body.append(list("Out of the cube", d.removes, "Put back", (id) => { pushUndo("put back " + byId[id].name); S.current.push(id); afterChange("Put back " + byId[id].name); }));
+      h("button", { class: "btn sm", type: "button", onclick: () => fn(id) }, btn),
+      btn2 ? h("button", { class: "btn sm ghost", type: "button", onclick: () => fn2(id) }, btn2) : null))) : h("div", { class: "kempty", style: "padding:8px 10px" }, "None"));
+  body.append(list("Out of the cube", d.removes, "Put back", (id) => { pushUndo("put back " + byId[id].name); S.current.push(id); if (S.maybeboard) S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Put back " + byId[id].name); }));
   body.append(list("Into the cube", d.adds, "Take out", (id) => { pushUndo("take out " + byId[id].name); S.current = S.current.filter((x) => x !== id); afterChange("Took out " + byId[id].name); }));
+  // Maybeboard: a secondary list, closed by default.
+  const mb = (S.maybeboard || []).filter((id) => byId[id]);
+  if (mb.length) {
+    const det = h("details", { class: "mb-details" }, h("summary", null, `Maybeboard (${mb.length})`));
+    if (mbOpen) det.open = true; // closed by default; stays open across redraws once opened
+    det.addEventListener("toggle", () => { mbOpen = det.open; });
+    det.append(list("Kept aside", mb, "Put in cube", (id) => { pushUndo("put in cube " + byId[id].name); S.current.push(id); S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Put " + byId[id].name + " in the cube"); },
+      "Drop", (id) => { pushUndo("drop " + byId[id].name + " from the maybeboard"); S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Dropped " + byId[id].name + " from the maybeboard"); }));
+    body.append(det);
+  }
   /** A button that asks for a second click before doing something that loses work. */
   const armed = (label, confirmLabel, cls, title, run) => h("button", { class: "btn " + cls, type: "button", title, onclick: (e) => {
     const b = e.currentTarget;
@@ -2235,7 +2250,7 @@ function mechanicsFromTags(cfg, tagsById) {
   }
   return all.length;
 }
-function demoState() { return { version: 1, config: clone(D.seed), original: D.cube.original.slice(), current: D.cube.current.slice(), started: true, ccTags: {} }; }
+function demoState() { return { version: 1, config: clone(D.seed), original: D.cube.original.slice(), current: D.cube.current.slice(), maybeboard: [], originalMaybeboard: [], started: true, ccTags: {} }; }
 
 /* ================= data sources / shortcuts / view filter ================= */
 function renderData() {
@@ -2665,7 +2680,7 @@ function renderFirstRun(step, payload, autoImport) {
       if ($("#frTagMech") && $("#frTagMech").checked) mechanicsFromTags(cfg, p.tags);
       cfg.cube.name = $("#frName").value.trim() || "My cube";
       const t = Number($("#frTarget").value); if (t > 0) cfg.cube.targetSize = t; else delete cfg.cube.targetSize;
-      Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {} });
+      Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), maybeboard: (p.maybeboard || []).slice(), originalMaybeboard: (p.maybeboard || []).slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {} });
       U.scope = { kind: "cube" }; U.sel = null; U.view = "work";
       if (D.hosted) { save(); location.reload(); return; } // the loader fetches this cube's cards
       applyCcTags();
@@ -2756,7 +2771,7 @@ async function importFromCubeCobra(text) {
   const src = { id: cc.id, name: cc.name, at: new Date().toISOString() };
   const cfgSt = cc.config ? configStats(cc.config) : null;
   const saved = cc.config && cc.config.savedAt ? new Date(cc.config.savedAt) : null;
-  out.innerHTML = `<div class="note" style="color:var(--ink)"><b>${esc(cc.name)}</b>: ${cc.mainboard.length} cards in the mainboard${cc.maybeboard.length ? `, ${cc.maybeboard.length} in the maybeboard (ignored)` : ""}${dup ? `, ${dup} duplicate${dup > 1 ? "s" : ""} counted once` : ""}.
+  out.innerHTML = `<div class="note" style="color:var(--ink)"><b>${esc(cc.name)}</b>: ${cc.mainboard.length} cards in the mainboard${cc.maybeboard.length ? `, ${cc.maybeboard.length} kept in the maybeboard` : ""}${dup ? `, ${dup} duplicate${dup > 1 ? "s" : ""} counted once` : ""}.
     ${(() => { const n = new Set(Object.values(cc.tagsById || {}).flat()).size; return n ? `<br>${n} CubeCobra tag${n > 1 ? "s" : ""} found on ${Object.keys(cc.tagsById).length} cards${cc.config ? "" : ": the next step can turn them into mechanics"}.` : ""; })()}
     ${D.hosted ? "" : `<br>${known.length} known to cubewarden`}${unknown.length ? `, <span style="color:var(--fail)">${unknown.length} unknown</span> (the card data only covers the pool you built): ${unknown.slice(0, 30).map((c) => esc(c.name)).join(", ")}${unknown.length > 30 ? "…" : ""}` : "."}</div>
     ${cc.config ? `<div class="fr-found"><b>Rules found in this cube</b>${saved && !isNaN(saved) ? `, saved ${esc(saved.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }))}` : ""}, in ${esc(cc.where)}: ${cfgSt.rules} rules, ${cfgSt.archetypes} archetypes, ${cfgSt.mechanics} mechanics.
@@ -2765,14 +2780,15 @@ async function importFromCubeCobra(text) {
     ${known.length ? `<div class="row" style="margin-top:10px">${cc.config ? "" : `<button class="btn primary" id="ccNext">Continue with ${known.length} cards</button>`}</div>` : `<div class="note" style="color:var(--fail)">None of the cards are in the card data. Build it for this cube with <code>cubewarden data build</code>.</div>`}`;
   if (!known.length) { if ($("#ccRestore")) $("#ccRestore").disabled = true; return; }
   const tagsKnown = Object.fromEntries(Object.entries(cc.tagsById || {}).filter(([id]) => byId[id] || D.hosted));
-  const payload = { ids, name: cc.name, source: src, tags: tagsKnown };
+  const mbIds = [...new Set(cc.maybeboard.map((c) => c.id))].filter((id) => byId[id] || D.hosted);
+  const payload = { ids, name: cc.name, source: src, tags: tagsKnown, maybeboard: mbIds };
   if ($("#ccNext")) $("#ccNext").onclick = () => renderFirstRun("rules", payload);
   if ($("#ccRules")) $("#ccRules").onclick = () => renderFirstRun("rules", payload);
   if ($("#ccRestore")) $("#ccRestore").onclick = () => {
     const cfg = clone(cc.config); normaliseConfig(cfg);
     if (!cfg.cube.name) cfg.cube.name = cc.name;
     cfg.cube.cubeCobraId = cfg.cube.cubeCobraId || cc.id;
-    Object.assign(S, { version: 1, config: cfg, original: ids.slice(), current: ids.slice(), started: true, exportedSig: null, source: src, ccTags: tagsKnown });
+    Object.assign(S, { version: 1, config: cfg, original: ids.slice(), current: ids.slice(), maybeboard: mbIds.slice(), originalMaybeboard: mbIds.slice(), started: true, exportedSig: null, source: src, ccTags: tagsKnown });
     if (D.hosted) { U.scope = { kind: "cube" }; U.sel = null; U.view = "work"; save(); location.reload(); return; } // the loader fetches this cube's cards
     applyCcTags();
     U.scope = { kind: "cube" }; U.sel = null; U.view = "work";

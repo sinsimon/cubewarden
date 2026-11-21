@@ -104,6 +104,30 @@ describe("trying and applying changes", () => {
   });
 });
 
+describe("maybeboard", () => {
+  it("moves removed cards to the maybeboard and keeps candidates there", () => {
+    const w = ws();
+    w.applyChanges({ add: ["Dawn Skirmisher"], remove: ["U1"], toMaybeboard: true });
+    w.maybeboard({ add: ["Old White Flyer"] });
+    expect(w.project.maybeboard).toEqual(["U1", "W5"]);
+    expect(w.project.current).not.toContain("U1");
+  });
+  it("takes a card out of the maybeboard when it goes back into the cube", () => {
+    const w = ws();
+    w.maybeboard({ add: ["Dawn Skirmisher"] });
+    w.applyChanges({ add: ["Dawn Skirmisher"] });
+    expect(w.project.maybeboard).toEqual([]);
+  });
+  it("lists the maybeboard changes in the changelist", () => {
+    const w = ws();
+    w.applyChanges({ remove: ["U1"], toMaybeboard: true });
+    expect(w.changes().text).toBe("Changes: 0 in, 1 out\n\nRemove:\n- U1\n\nMaybeboard:\n+ U1 (FDN) 1");
+  });
+  it("refuses a card already in the cube", () => {
+    expect(() => ws().maybeboard({ add: ["W1"] })).toThrowError(/in the cube/);
+  });
+});
+
 describe("rules as text", () => {
   it("lists every rule with its scope and text", () => {
     expect(ws().rules().find((r) => r.id === "w-cre")).toEqual({

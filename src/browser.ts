@@ -127,6 +127,7 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
     tryChanges: (ch: Parameters<typeof ws.tryChanges>[0]) => ws.tryChanges(ch),
     applyChanges: (ch: Parameters<typeof ws.applyChanges>[0]) => undoable(names(ch), () => ws.applyChanges(ch)),
     changes: () => ws.changes(),
+    maybeboard: (ch?: Parameters<typeof ws.maybeboard>[0]) => (ch && (ch.add?.length || ch.remove?.length) ? undoable("maybeboard", () => ws.maybeboard(ch)) : ws.maybeboard()),
     rules: () => ws.rules(),
     setRule: (r: Parameters<typeof ws.setRule>[0]) => undoable(`rule ${r.id}`, () => ws.setRule(r)),
     removeRule: (id: string) => undoable(`remove rule ${id}`, () => ws.removeRule(id)),
@@ -142,7 +143,8 @@ const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same o
   explain(id)                     a rule's value, target and cards
   search(filter, {scope, sort, limit})   cards outside the cube; sort: cubes (default), elo, picks, wr, wrraw, mv, name
   tryChanges({add:[names], remove:[names]})   effect of a swap, nothing saved
-  applyChanges({add, remove})     make the swap (the page saves and redraws)
+  applyChanges({add, remove, toMaybeboard})   make the swap (the page saves and redraws); toMaybeboard keeps the removed cards aside
+  maybeboard({add, remove})       candidates kept aside (CubeCobra's maybeboard)
   changes()                       adds/removes against the imported list, with a changelist
   rules() / setRule({id, name, scope, text, priority}) / removeRule(id)
   mechanics() / setMechanic({id, name, scope: "color:W" | "archetype:<id>", text, priority}) / removeMechanic(id)
@@ -167,7 +169,8 @@ function registerWebMcp(api: ReturnType<typeof pick> & { syntax: () => string })
     { name: "cubewarden_search", description: "Cards outside the cube matching a filter (see cubewarden_syntax)", inputSchema: { type: "object", properties: { filter: str, scope: str, sort: str, limit: { type: "number" } }, required: ["filter"] },
       run: (a: { filter: string; scope?: string; sort?: SortKey; limit?: number }) => api.search(a.filter, a) },
     { name: "cubewarden_try_changes", description: "Effect of adding/removing cards on every rule, without saving", inputSchema: { type: "object", properties: { add: names, remove: names } }, run: (a: { add?: string[]; remove?: string[] }) => api.tryChanges(a) },
-    { name: "cubewarden_apply_changes", description: "Add/remove cards in the cube shown on this page", inputSchema: { type: "object", properties: { add: names, remove: names } }, run: (a: { add?: string[]; remove?: string[] }) => api.applyChanges(a) },
+    { name: "cubewarden_apply_changes", description: "Add/remove cards in the cube shown on this page; toMaybeboard keeps the removed cards in the maybeboard", inputSchema: { type: "object", properties: { add: names, remove: names, toMaybeboard: { type: "boolean" } } }, run: (a: { add?: string[]; remove?: string[]; toMaybeboard?: boolean }) => api.applyChanges(a) },
+    { name: "cubewarden_maybeboard", description: "Cards kept aside (CubeCobra's maybeboard): add or remove candidates, or list them with no arguments", inputSchema: { type: "object", properties: { add: names, remove: names } }, run: (a: { add?: string[]; remove?: string[] }) => api.maybeboard(a) },
     { name: "cubewarden_rules", description: "Every rule as text", inputSchema: { type: "object", properties: {} }, run: () => api.rules() },
     { name: "cubewarden_set_rule", description: "Add or change a rule written as text", inputSchema: { type: "object", properties: { id: str, name: str, scope: str, text: str, priority: str }, required: ["id"] },
       run: (a: Parameters<typeof api.setRule>[0]) => api.setRule(a) },

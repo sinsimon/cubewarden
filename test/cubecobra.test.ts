@@ -101,6 +101,12 @@ describe("changes back to CubeCobra", () => {
     expect(csv[1]).toContain('"WU Flyers;W Removal"');
     expect(csv).toHaveLength(3);
   });
+  it("marks maybeboard cards in the CSV", () => {
+    const csv = exportCsv(["WU1"], BY_ID, { maybeboard: ["G1"] }).split("\n");
+    expect(csv).toHaveLength(3);
+    expect(csv[1]).toContain(",false,");
+    expect(csv[2]).toMatch(/^"G1",.*,true,/);
+  });
   it("links to the cube list filtered with CubeCobra's own syntax", () => {
     expect(cubeCobraListUrl("sample", 'tag:"UG Ramp"')).toBe("https://cubecobra.com/cube/list/sample?f=tag%3A%22UG%20Ramp%22");
   });

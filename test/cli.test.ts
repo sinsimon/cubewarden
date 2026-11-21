@@ -72,6 +72,25 @@ describe("cubewarden CLI", () => {
     expect((await cli(dir, "check")).code).toBe(0);
     expect((await cli(dir, "changes")).out).toContain("+ Dawn Skirmisher");
   });
+  it("maybeboard keeps candidates aside, lists them and drops them", async () => {
+    const dir = setup();
+    const file = () => JSON.parse(readFileSync(join(dir, "cubewarden.json"), "utf8"));
+    expect((await cli(dir, "maybeboard", "--add", "Dawn Skirmisher")).code).toBe(0);
+    expect(file().maybeboard).toEqual(["W4"]);
+    expect(file().current).not.toContain("W4");
+    expect((await cli(dir, "maybeboard")).out).toContain("Dawn Skirmisher");
+    expect(JSON.parse((await cli(dir, "maybeboard", "--json")).out)).toEqual(["W4"]);
+    expect((await cli(dir, "maybeboard", "--remove", "Dawn Skirmisher")).code).toBe(0);
+    expect(file().maybeboard).toEqual([]);
+    expect((await cli(dir, "maybeboard", "--add", "W1")).code).toBe(2);
+  });
+  it("import keeps the cube's maybeboard", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "cubewarden-"));
+    expect(await run(["import", "sample"], { cwd: dir, write: () => {}, fetch: fakeFetch })).toBe(0);
+    const p = JSON.parse(readFileSync(join(dir, "cubewarden.json"), "utf8"));
+    expect(p.maybeboard).toHaveLength(1);
+    expect(p.originalMaybeboard).toEqual(p.maybeboard);
+  });
   it("rule set writes a rule from text; rules lists them as text", async () => {
     const dir = setup();
     expect((await cli(dir, "rule", "set", "u-cre", "--scope", "color:U", "--name", "Blue creatures", "--text", "count(t:creature) >= 1")).code).toBe(0);
@@ -91,6 +110,6 @@ describe("cubewarden CLI", () => {
   });
   it("prints help listing every command", async () => {
     const r = await cli(setup(), "help");
-    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set"]) expect(r.out).toContain(c);
+    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set", "maybeboard [--add"]) expect(r.out).toContain(c);
   });
 });
