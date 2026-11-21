@@ -2670,6 +2670,9 @@ const FIND_COLS = [
 ];
 function sortLabel() { const k = U.findSort || "cubes"; return k === "name" ? "name" : (FIND_COLS.find((c) => c.sort === k) || {}).long || (FIND_COLS.find((c) => c.sort === k) || {}).label || k; }
 function findCols() { const on = U.findCols || ["cost", "cubes", "elo", "wr", "set"]; return FIND_COLS.filter((c) => on.includes(c.k)); }
+/** Name is the column that flexes: the table is never narrower than the fixed columns plus this, and scrolls sideways when the panel is. */
+const FIND_NAME_MIN = 150;
+const findTableMinWidth = (cols) => 28 + FIND_NAME_MIN + cols.reduce((s, c) => s + c.w, 0);
 const refreshFind = debounce(() => {
   if (!find) return;
   const box = $("#findRes"); if (!box) return;
@@ -2679,7 +2682,7 @@ const refreshFind = debounce(() => {
   const sortTh = (c) => c.sort ? `<th data-fsort="${c.sort}" style="cursor:pointer" title="${esc(c.title || "Sort by " + c.label)}" aria-sort="${sort === c.sort ? "descending" : "none"}">${c.label}${sort === c.sort ? " ↓" : ""}</th>` : `<th title="${esc(c.title || "")}">${c.label}</th>`;
   const picker = `<details class="colpick"><summary>Columns</summary><div class="colpick-menu">${FIND_COLS.map((c) => `<label><input type="checkbox" data-fcol="${c.k}" ${cols.some((x) => x.k === c.k) ? "checked" : ""}> ${esc(c.long || c.label)}</label>`).join("")}</div></details>`;
   box.innerHTML = `<div class="res"><div class="res-note"><span>${find.source === "maybeboard" ? (list.length ? `${list.length} maybeboard card${list.length > 1 ? "s" : ""} match.` : mbIds().length ? "No maybeboard cards match. Loosen the filter or change the colours." : "The maybeboard is empty: ⇧⌫ in the list moves selected cards there.") : list.length ? `${list.length} cards outside the cube match.` : "No cards outside the cube match. Loosen the filter or change the colours."}${list.length > LIM ? ` Showing the first ${LIM}.` : ""} Click a row to pick it.</span>${picker}</div>
-    ${list.length ? `<div class="res-scroll"><table><colgroup><col style="width:28px"><col>${cols.map((c) => `<col style="width:${c.w}px">`).join("")}</colgroup>
+    ${list.length ? `<div class="res-scroll"><table style="min-width:${findTableMinWidth(cols)}px"><colgroup><col style="width:28px"><col>${cols.map((c) => `<col style="width:${c.w}px">`).join("")}</colgroup>
     <thead><tr><th></th>${sortTh({ label: "Name", sort: "name" })}${cols.map(sortTh).join("")}</tr></thead><tbody>
     ${list.slice(0, LIM).map((c) => `<tr data-pick="${c.id}" class="${find.picked.includes(c.id) ? "pk" : ""}"><td><input type="checkbox" tabindex="-1" ${find.picked.includes(c.id) ? "checked" : ""} aria-label="Pick ${esc(c.name)}"></td><td title="${esc(c.type)}"><span class="nm" data-card="${c.id}">${esc(c.name)}</span></td>${cols.map((col) => `<td>${col.cell(c)}</td>`).join("")}</tr>`).join("")}
     </tbody></table></div>` : ""}</div>`;
