@@ -36,7 +36,7 @@ export const FIELDS: FieldInfo[] = [
   { id: "ccCubes", label: "CubeCobra cubes", type: "number", ops: NUM_OPS, source: "cubecobra", hint: "number of CubeCobra cubes that include the card" },
   { id: "ccPicks", label: "CubeCobra picks", type: "number", ops: NUM_OPS, source: "cubecobra" },
   { id: "ccTag", label: "CubeCobra tag", type: "text", ops: ["is"], source: "cube", hint: "a tag the card has in the imported CubeCobra cube" },
-  { id: "member", label: "Archetype member", type: "member", ops: ["is"], source: "config", hint: "'any' = matches at least one mechanic of this archetype; 'primary' / 'secondary' = one of its primary / secondary mechanics; or a mechanic id" },
+  { id: "member", label: "Mechanic member", type: "member", ops: ["is"], source: "config", hint: "a mechanic id = matches that mechanic of this colour or archetype; 'any' = at least one of its mechanics; 'primary' / 'secondary' = one of its primary / secondary mechanics" },
   { id: "scryfall", label: "Scryfall query", type: "query", ops: ["matches"], source: "cards", hint: "Subset of Scryfall syntax: t: o: otag: keyword: m: mv pow tou c: id: r: s: is:hybrid, 'or', '-'" },
 ];
 export const FIELD = Object.fromEntries(FIELDS.map((f) => [f.id, f])) as Record<FieldId, FieldInfo>;

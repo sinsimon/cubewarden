@@ -40,6 +40,10 @@ terminal, use Changes → "Download project file" and "Open project file".
 - Filters: `otag:removal t:creature kw:flying mv>=4 c=wu c<=wu c=scope is:hybrid s:fdn,trk wr>=55% cubes>=1000 tag:"UG Ramp" member:any`, with `or`, `( )`, `-`.
 - Rules: `count(F) >= 6`, `count(F) in 13..14`, `count(t:creature) >= 50%`, `count(c=scope -is:hybrid) = 3 fixed`,
   `avg(wr, member:any) in 55%..60%`, `every(s:fdn,trk)`, `every(mv, t:creature) <= 5`.
+- Mechanics are named filters; the numbers live in rules. In a colour or an archetype, `member:<mechanic id>` matches
+  the cards of that scope's mechanic, `member:any` any of its mechanics, `member:primary` / `member:secondary` by
+  priority: `count(member:removal) >= 4`. In an `allColors` or `allArchetypes` rule, `member:<id>` uses each scope's
+  own mechanics (a scope without that id matches no card).
 - Curves: `curve(t:creature) 1:1..3 2:5..7 3:4..6 4:2..4 5:1..3 6+:0..2` (a target per mana value; `6+` = 6 and above,
   `0:` = zero-drops), `curve(t:creature) 2:20%..30% 3:15%..25%` (percent of the filtered cards). Counts scale like
   `count()`, `fixed` at the end does not. `check()` and `explain(id)` return `buckets: [{ label, value, target, status }]`.
