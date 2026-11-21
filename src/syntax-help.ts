@@ -20,5 +20,13 @@ Rules
   every(mv, t:creature) <= 5                    every creature must have mv <= 5
   otag:counterspell >= 6                        shorthand for count(otag:counterspell) >= 6
 
+Curves: a target per mana value for the cards matching the filter (curve() = every card in scope)
+  curve(t:creature) 1:1..3 2:5..7 3:4..6 4:2..4 5:1..3 6+:0..2
+  curve(t:creature) 2:20%..30% 3:15%..25%      percent of the filtered cards
+  2:5..7 = mana value 2 (rounded down) · 0:1 = zero-drops (they count only in a 0 bucket) · 6+ = 6 and above
+  each bucket: a..b, a (exactly), >=a or <=b · buckets not written have no target
+  counts are scaled to the target cube size like count(); "fixed" at the end never scales, percent never scales
+  the rule is ok when every bucket is in range, near when each miss is within 1 card (or 1 point of %)
+
 Scopes: cube · color:W U B R G · color:C (colourless nonland) · color:L (lands) · archetype:<id> · allColors · allArchetypes
 `;

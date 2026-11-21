@@ -157,6 +157,12 @@ describe("writing rules back as text", () => {
     'count(otag:removal or (kw:flying pow>=3)) >= 4',
     'count(!"Lightning Bolt" or name:bolt)',
     'count(tag:"UG Ramp" c<=wu c>=g c:c r:common)',
+    "curve(t:creature) 1:1..3 2:5..7 3:4..6 4:2..4 5:1..3 6+:0..2",
+    "curve(t:creature) 2:20%..30% 3:15%..25%",
+    "curve() 0:1 2:3..5 fixed",
+    "curve(t:creature)",
+    "curve()",
+    "curve(t:creature -(kw:flying or kw:reach)) 4+:0..3",
   ];
   it.each(examples)("writes %s back unchanged", (src) => {
     expect(ruleToText(parseRule(src))).toBe(src);
@@ -167,5 +173,52 @@ describe("writing rules back as text", () => {
   });
   it("writes a filter on its own", () => {
     expect(filterToText(parseFilter("otag:removal or kw:flying"))).toBe("otag:removal or kw:flying");
+  });
+});
+
+describe("curve rules", () => {
+  it("reads a mana curve: a filter and a target per mana value, 6+ meaning six and above", () => {
+    expect(parseRule("curve(t:creature) 1:1..3 2:5..7 6+:0..2")).toEqual({
+      measure: { kind: "curve", buckets: [
+        { mv: 1, constraint: { kind: "range", min: 1, max: 3 } },
+        { mv: 2, constraint: { kind: "range", min: 5, max: 7 } },
+        { mv: 6, plus: true, constraint: { kind: "range", min: 0, max: 2 } },
+      ] },
+      filter: { op: "and", items: [{ field: "type", op: "contains", value: "creature" }] },
+      constraint: null,
+    });
+  });
+  it("reads targets in percent of the filtered cards, exact targets, no filter and 'fixed'", () => {
+    expect(parseRule("curve() 0:2 2:20%..30% fixed")).toEqual({
+      measure: { kind: "curve", absolute: true, buckets: [
+        { mv: 0, constraint: { kind: "exact", value: 2 } },
+        { mv: 2, constraint: { kind: "range", min: 20, max: 30, unit: "percent" } },
+      ] },
+      filter: null,
+      constraint: null,
+    });
+    expect(parseRule("curve(t:creature)").measure).toEqual({ kind: "curve", buckets: [] });
+  });
+  it("keeps parentheses and quotes inside the filter", () => {
+    const r = parseRule('curve(t:creature -(kw:flying or o:"a (b)")) 2:5..7');
+    expect(r.filter?.items).toHaveLength(2);
+    expect(r.measure).toEqual({ kind: "curve", buckets: [{ mv: 2, constraint: { kind: "range", min: 5, max: 7 } }] });
+  });
+  it("sorts buckets by mana value", () => {
+    expect(ruleToText(parseRule("curve() 3:1..2 1:0..1"))).toBe("curve() 1:0..1 3:1..2");
+  });
+  it.each([
+    ["curve() 2:1..2 2:3..4", /MV 2 twice/],
+    ["curve() 5+:1..2 6:0..1", /"5\+".*highest/],
+    ["curve() 2:20%..7", /"2:20%\.\.7".*percent/],
+    ["curve() 2:a..b", /"2:a\.\.b"/],
+    ["curve() 5..7", /"5\.\.7".*mana value/],
+    ["curve(t:creature 2:1..2", /closing parenthesis/],
+  ])("explains what is wrong in %s", (src, msg) => {
+    expect(() => parseRule(src)).toThrowError(msg);
+  });
+  it("points at the bucket it cannot read", () => {
+    try { parseRule("curve(t:creature) 2:5..7 x:1"); expect.unreachable(); }
+    catch (e) { expect((e as { at?: number }).at).toBe(25); }
   });
 });

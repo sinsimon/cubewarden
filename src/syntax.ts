@@ -7,9 +7,11 @@
  *          space = and, "or", ( ), "-" = not.
  * Rules:   count(F) >= 6 · count(F) in 13..14 · count(t:creature) >= 50% · count(c=scope -is:hybrid) = 3 fixed
  *          avg(wr, member:any) in 55%..60% · every(s:fdn,trk) · every(mv, t:creature) <= 5 · shorthand "F >= 6"
+ *          curve(t:creature) 1:1..3 2:5..7 6+:0..2 · curve(t:creature) 2:20%..30% · curve() 2:4 fixed
  */
-import type { Condition, Constraint, Filter, Measure, Metric, RuleBody } from "./model.ts";
+import type { Condition, Constraint, CurveBucket, Filter, Measure, Metric, RuleBody } from "./model.ts";
 import { colorSet } from "./colors.ts";
+import { bucketLabel } from "./constraint.ts";
 import { isSupportedScryfallTerm } from "./scryfall-subset.ts";
 import { slug } from "./slug.ts";
 
@@ -184,8 +186,71 @@ const METRIC_TEXT: Record<Metric, string> = {
   wrAdj: "wr", wrRaw: "wrraw", mv: "mv", power: "pow", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", colorCount: "ncolors",
 };
 
+const CURVE_HELP = "write mana value:target, e.g. 2:5..7, 6+:0..2 or 2:20%..30%";
+
+/** One curve bucket: "2:5..7", "6+:0..2", "2:20%..30%", "0:1", "3:>=2", "5+:<=3". `at` = its offset in the rule text. */
+function curveBucket(tok: string, at: number): CurveBucket {
+  const m = tok.match(/^(\d+)(\+?):(.+)$/);
+  if (!m) {
+    if (/^[\d.]+%?\.\./.test(tok)) throw new SyntaxError(`Curve bucket "${tok}" needs a mana value first (${CURVE_HELP})`, at);
+    throw new SyntaxError(`Cannot read curve bucket "${tok}" (${CURVE_HELP})`, at);
+  }
+  const t = m[3];
+  const num = (x: string) => {
+    if (!/^\d+(\.\d+)?%?$/.test(x)) throw new SyntaxError(`Cannot read curve bucket "${tok}": "${x}" is not a number (${CURVE_HELP})`, at);
+    return Number(x.replace(/%$/, ""));
+  };
+  let c: Constraint, ends: string[];
+  let r: RegExpMatchArray | null;
+  if ((r = t.match(/^(.*?)\.\.(.*)$/))) { ends = [r[1], r[2]]; c = { kind: "range", min: num(r[1]), max: num(r[2]) }; }
+  else if ((r = t.match(/^>=(.*)$/))) { ends = [r[1]]; c = { kind: "min", min: num(r[1]) }; }
+  else if ((r = t.match(/^<=(.*)$/))) { ends = [r[1]]; c = { kind: "max", max: num(r[1]) }; }
+  else { ends = [t]; c = { kind: "exact", value: num(t) }; }
+  const pct = ends.map((x) => x.endsWith("%"));
+  if (pct.some((x) => x !== pct[0])) throw new SyntaxError(`Curve bucket "${tok}" mixes percent and cards: write both ends in percent or both in cards`, at);
+  if (pct[0]) c.unit = "percent";
+  return { mv: Number(m[1]), ...(m[2] ? { plus: true } : {}), constraint: c };
+}
+
+/** "curve(F) 1:1..3 2:5..7 6+:0..2 [fixed]" → RuleBody, or null when the text is not a curve. */
+function parseCurve(src: string): RuleBody | null {
+  const lead = src.match(/^\s*curve\s*\(/i);
+  if (!lead) return null;
+  let i = lead[0].length, depth = 1, quoted = false;
+  for (; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && ch === "(") depth++;
+    else if (!quoted && ch === ")" && --depth === 0) break;
+  }
+  if (depth) throw new SyntaxError("Missing closing parenthesis after curve(", src.length);
+  const filter = parseFilter(src.slice(lead[0].length, i));
+  const buckets: CurveBucket[] = [];
+  let absolute = false;
+  const re = /\S+/g;
+  re.lastIndex = i + 1;
+  let m: RegExpExecArray | null;
+  const end = src.trimEnd().length;
+  while ((m = re.exec(src))) {
+    if (/^fixed$/i.test(m[0]) && re.lastIndex === end) { absolute = true; break; }
+    const b = curveBucket(m[0], m.index);
+    const label = bucketLabel(b);
+    const same = buckets.find((x) => x.mv === b.mv);
+    if (same) throw new SyntaxError(`MV ${b.mv} twice in the curve ("${bucketLabel(same)}" and "${label}")`, m.index);
+    buckets.push(b);
+  }
+  buckets.sort((a, b) => a.mv - b.mv);
+  const open = buckets.find((b) => b.plus);
+  const above = open && buckets.find((b) => b.mv > open.mv);
+  if (open && above) throw new SyntaxError(`"${bucketLabel(open)}" must be the highest curve bucket: cards in "${bucketLabel(above)}" would count twice`);
+  const measure: Measure = { kind: "curve", buckets, ...(absolute ? { absolute: true } : {}) };
+  return { measure, filter: filter.items.length ? filter : null, constraint: null };
+}
+
 /** Text → { measure, filter, constraint } for a rule or a mechanic. */
 export function parseRule(src: string): RuleBody {
+  const curve = parseCurve(String(src || ""));
+  if (curve) return curve;
   const { head, target, absolute } = splitTarget(String(src || ""));
   let inner: string | null;
   let measure: Measure;
@@ -274,10 +339,23 @@ function targetText(c: Constraint | null | undefined, metric?: Metric): string {
   }
 }
 
+function bucketTarget(c: Constraint): string {
+  const f = (x: number) => x + (c.unit === "percent" ? "%" : "");
+  switch (c.kind) {
+    case "min": return ">=" + f(c.min);
+    case "max": return "<=" + f(c.max);
+    case "exact": return f(c.value);
+    case "range": return `${f(c.min)}..${f(c.max)}`;
+  }
+}
+
 /** Rule or mechanic → text. */
 export function ruleToText(r: { measure?: Measure; filter?: Filter | null; constraint?: Constraint | null }): string {
   const m: Measure = r.measure || { kind: "count" };
   const ft = filterToText(r.filter);
+  if (m.kind === "curve") {
+    return `curve(${ft})` + m.buckets.map((b) => ` ${bucketLabel(b)}:${bucketTarget(b.constraint)}`).join("") + (m.absolute ? " fixed" : "");
+  }
   let head: string;
   if (m.kind === "avg") head = `avg(${METRIC_TEXT[m.metric]}${ft ? ", " + ft : ""})`;
   else if (m.kind === "every") head = m.metric ? `every(${METRIC_TEXT[m.metric]}${ft ? ", " + ft : ""})` : `every(${ft})`;

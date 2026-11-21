@@ -217,6 +217,7 @@ select.unitsel{width:auto}
 .cg .tag{font:700 10.5px/1 var(--sans);padding:3px 6px;border-radius:8px;color:#fff;flex:none}
 .cg.pass .tag{background:var(--ok)} .cg.cut .tag{background:var(--fail)}
 .curve svg{display:block}
+.cbuckets svg{display:block;margin-bottom:2px}
 .legend{display:flex;gap:10px;font-size:11px;color:var(--ink-2)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 
@@ -806,12 +807,40 @@ function fmtValue(res) {
   const m = res.measure || { kind: "count" };
   if (m.kind === "avg") return res.value == null ? "no data" : fmtMetric(m.metric, res.value);
   if (m.kind === "every") return res.value === 0 ? "all pass" : `${res.value} break${res.value === 1 ? "s" : ""}`;
+  if (m.kind === "curve") return !m.buckets.length ? `${res.raw ?? 0} cards` : res.value === 0 ? "on curve" : `${res.value} MV off`;
   return String(res.value);
 }
 function fmtTarget(res) {
   const m = res.measure || {};
   if (m.kind === "every") return m.metric && res.constraint ? "each " + E.formatConstraint(res.constraint, m.metric) : "every card";
+  if (m.kind === "curve") return m.buckets.map((b) => `MV${b.mv}${b.plus ? "+" : ""} ${E.formatConstraint(b.constraint)}`).join(" · ");
   return E.formatConstraint(res.constraint, m.kind === "avg" ? m.metric : null);
+}
+/** A rule or mechanic with something to check: a target, an "every card" rule, or a curve with buckets. */
+function hasGoal(res) {
+  const m = res.measure || {};
+  return !!res.constraint || m.kind === "every" || (m.kind === "curve" && m.buckets.length > 0);
+}
+/** Curve rules: one bar per mana value bucket, the target range shaded behind it, coloured by the bucket's status. */
+function bucketsSvg(res) {
+  const bs = res.buckets || [];
+  if (!bs.length) return "";
+  const top = (c) => c.kind === "min" ? c.min : c.kind === "max" ? c.max : c.kind === "exact" ? c.value : c.max;
+  const max = Math.max(1, ...bs.map((b) => Math.max(b.value, top(b.constraint)))) * 1.1, W = 24, G = 8, Hh = 46, T = 12;
+  const y = (v) => T + Hh - (v / max) * Hh;
+  let s = `<svg width="${bs.length * (W + G)}" height="${T + Hh + 26}" role="img" aria-label="Curve by mana value">`;
+  bs.forEach((b, i) => {
+    const x = i * (W + G), c = b.constraint, pct = c.unit === "percent" ? "%" : "", col = LIGHT[b.status] || LIGHT.none;
+    const lo = c.kind === "min" ? c.min : c.kind === "max" ? 0 : c.kind === "exact" ? c.value : c.min;
+    const hi = c.kind === "min" ? max : top(c);
+    const tip = `MV ${b.label}: ${b.value}${pct}, target ${E.formatConstraint(c)} (${ST_LABEL[b.status] || b.status})`;
+    s += `<g><title>${esc(tip)}</title><rect x="${x - 2}" y="${y(hi)}" width="${W + 4}" height="${Math.max(2, y(lo) - y(hi))}" fill="#E2E5EA" rx="2"/>`;
+    s += `<rect x="${x + 4}" y="${y(b.value)}" width="${W - 8}" height="${T + Hh - y(b.value)}" fill="${col}" rx="1.5"/>`;
+    s += `<text x="${x + W / 2}" y="${y(b.value) - 2}" font-size="9.5" text-anchor="middle" fill="#1A2130">${b.value}${pct}</text>`;
+    s += `<text x="${x + W / 2}" y="${T + Hh + 11}" font-size="10" font-weight="600" text-anchor="middle" fill="#1A2130">${esc(b.label)}</text>`;
+    s += `<text x="${x + W / 2}" y="${T + Hh + 22}" font-size="8.5" text-anchor="middle" fill="#8790A0">${esc(E.formatConstraint(c).replace(/%/g, ""))}</text></g>`;
+  });
+  return s + "</svg>";
 }
 function isScaledCount(res, scope) {
   if (res.summary || isShared(scope) || (res.constraint && res.constraint.unit === "percent")) return false;
@@ -924,7 +953,7 @@ function cleanObj(obj, type) {
   if (type === "rule" && o.filter && !(o.filter.items || []).length && !o.filter.not) delete o.filter;
   if (!o.constraint) delete o.constraint;
   if (type === "rule" && o.measure && o.measure.kind === "every" && !o.measure.metric) delete o.constraint;
-  if (type === "rule" && o.measure && o.measure.kind !== "count") delete o.measure.absolute;
+  if (type === "rule" && o.measure && o.measure.kind !== "count" && o.measure.kind !== "curve") delete o.measure.absolute;
   return o;
 }
 function diffNow() { return E.diff(S.original, S.current); }
@@ -1016,7 +1045,7 @@ function kids(sc) {
     const tip = res.error || [ST_LABEL[ds] + (res.priority === "secondary" ? " (secondary)" : ""), res.inherited ? `Shared rule from ${SHARED_NAME[res.from]}: edit it once, it applies everywhere` : "", cfgR && cfgR.description ? cfgR.description : "", txt].filter(Boolean).join("\n");
     return `<div class="item ${on ? "on" : ""} ${drafting ? "drafting" : ""}" tabindex="0" role="button" data-sel="${kind}:${esc(res.id)}" title="${esc(tip)}">
       ${stGlyph(ds)}<span class="nm">${esc(res.name)}${res.inherited ? '<span class="shr">shared</span>' : ""}${res.priority === "secondary" ? '<span class="sec">secondary</span>' : ""}</span>
-      <span class="v" ${scaled ? `title="${res.raw} in the cube, scaled to ${res.value}"` : ""}><b>${esc(fmtValue(res))}</b> ${res.constraint || (res.measure && res.measure.kind === "every") ? "target " + esc(fmtTarget(res)) : "no target"}${scaled ? ` <small>(${res.raw} now)</small>` : ""}${refsInline(sc, { kind, id: res.id })}</span>
+      <span class="v" ${scaled ? `title="${res.raw} in the cube, scaled to ${res.value}"` : ""}><b>${esc(fmtValue(res))}</b> ${hasGoal(res) ? "target " + esc((res.measure || {}).kind === "curve" ? res.measure.buckets.length + " MVs" : fmtTarget(res)) : "no target"}${scaled ? ` <small>(${res.raw} now)</small>` : ""}${refsInline(sc, { kind, id: res.id })}</span>
       <button class="ed" data-edit="${kind}:${esc(res.id)}" title="Edit" aria-label="Edit ${esc(res.name)}">✎</button></div>`;
   };
   if (sc.kind !== "cube" && !isShared(sc)) {
@@ -1061,6 +1090,7 @@ function progressOf(res, poolSize) {
   if (res.status === "error" || res.value == null) return 0;
   const m = res.measure || { kind: "count" };
   if (m.kind === "every") { const n = m.metric ? Object.keys(res.perCard || {}).length : poolSize; return n ? Math.max(0, 1 - res.value / n) : 1; }
+  if (m.kind === "curve") { const n = (res.buckets || []).length; return n ? 1 - res.value / n : 0; }
   const c = res.constraint; if (!c) return 0;
   if (res.status === "ok") return 1;
   const lo = c.kind === "min" ? c.min : c.kind === "exact" ? c.value : c.kind === "range" ? c.min : null;
@@ -1076,7 +1106,7 @@ function scopeLights(r, sc) {
   return `<div class="lights" role="group" aria-label="Rules and mechanics in this scope">${items.map(([kind, x]) => {
     const ds = dstat(x), col = LIGHT[ds] || LIGHT.none, p = ds === "none" ? 0 : progressOf(x, sr.cards.length);
     const on = U.sel && U.sel.kind === kind && U.sel.id === x.id;
-    const tip = `${x.name}: ${fmtValue(x)}${x.constraint || (x.measure && x.measure.kind === "every") ? ", target " + fmtTarget(x) : ", no target"} (${ST_LABEL[ds]})`;
+    const tip = `${x.name}: ${fmtValue(x)}${hasGoal(x) ? ", target " + fmtTarget(x) : ", no target"} (${ST_LABEL[ds]})`;
     return `<button class="light ${on ? "on" : ""}" data-sel="${kind}:${esc(x.id)}" title="${esc(tip)}" aria-label="${esc(tip)}"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="#E2E5EA" stroke-width="2.6"/>${ds === "none" ? `<circle cx="8" cy="8" r="2" fill="${col}"/>` : `<circle cx="8" cy="8" r="5.5" fill="none" stroke="${col}" stroke-width="2.6" stroke-dasharray="${(p * C).toFixed(2)} ${C.toFixed(2)}" transform="rotate(-90 8 8)" stroke-linecap="${p > 0 && p < 1 ? "round" : "butt"}"/>`}</svg></button>`;
   }).join("")}</div>`;
 }
@@ -1154,7 +1184,7 @@ function renderHead() {
     const m = res.measure || { kind: "count" };
     const cfgObj = configObj(U.sel) || (draft && draft.obj);
     const sharedFrom = res.summary ? sc.kind : res.inherited ? res.from : null;
-    const kindTxt = (U.sel.kind === "mechanic" ? "Mechanic, counts cards" : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${E.METRICS[m.metric].label}` : `Rule, every card${m.metric ? " " + E.METRICS[m.metric].label : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
+    const kindTxt = (U.sel.kind === "mechanic" ? "Mechanic, counts cards" : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${E.METRICS[m.metric].label}` : m.kind === "curve" ? `Rule, mana curve${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : `Rule, every card${m.metric ? " " + E.METRICS[m.metric].label : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
     const ids = res.cards || [];
     const metric = m.kind === "avg" || (m.kind === "every" && m.metric) ? m.metric : "wrAdj";
     const s = statsFor(m.kind === "every" ? scopeRes(r, sc).cards : ids, metric);
@@ -1171,13 +1201,14 @@ function renderHead() {
       ${res.summary ? `<div class="rcut" style="color:var(--ink-2)">${countsTxt(res.summary)}. Click a chip to open that scope.</div><div style="grid-column:1/-1">${sharedChips(res.summary, sc.kind)}</div>` : ""}
       <div class="stats">
         ${scopeBlock}<div class="vsep"></div>
-        <div class="stat"><b>${esc(fmtValue(res))}</b><span>${res.summary ? "scopes, target " + esc(fmtTarget(res)) : res.constraint || m.kind === "every" ? "target " + esc(fmtTarget(res)) : "no target, info only"}</span></div>
+        <div class="stat"><b>${esc(fmtValue(res))}</b><span>${res.summary ? "scopes, target " + esc(fmtTarget(res)) : m.kind === "curve" ? (m.buckets.length ? `${m.buckets.length} mana values checked` : "no target, info only") : hasGoal(res) ? "target " + esc(fmtTarget(res)) : "no target, info only"}</span></div>
+        ${m.kind === "curve" && !res.summary && res.buckets && res.buckets.length ? `<div class="stat cbuckets">${bucketsSvg(res)}<span>${res.raw ?? 0} cards by mana value, target shaded</span></div>` : ""}
         ${m.kind === "count" && !res.summary ? `<div class="stat"><b>${res.raw ?? "–"}</b><span>${scaled ? `cards now, ×${R.factor.toFixed(2)} → ${res.value}` : "cards in the cube"}</span></div>` : ""}
         ${m.kind === "avg" && !res.summary ? `<div class="stat"><b>${res.n ?? 0}</b><span>cards averaged</span></div>` : ""}
         ${m.kind !== "avg" || res.summary ? `<div class="stat"><b>${s.avg == null ? "no data" : fmtMetric(metric, s.avg)}</b><span>avg ${E.METRICS[metric] ? E.METRICS[metric].label : metric}${m.kind === "every" ? " of the scope" : " of these"}</span></div>` : ""}
         <div class="stat hide-sm"><b>${(m.kind === "avg" && !res.summary ? res.noData : s.noData) || 0}</b><span>no 17Lands data</span></div>
         <div class="stat"><b>${s.cre} / ${s.non}</b><span>creatures / non</span></div>
-        <div class="curve">${curveSvg(s.curve)}<div class="legend" style="flex-direction:column;gap:2px"><span><i style="background:#1A2130"></i>creature</span><span><i style="background:#B9C3D6"></i>noncreature</span></div></div>
+        ${m.kind === "curve" && !res.summary && res.buckets && res.buckets.length ? "" : `<div class="curve">${curveSvg(s.curve)}<div class="legend" style="flex-direction:column;gap:2px"><span><i style="background:#1A2130"></i>creature</span><span><i style="background:#B9C3D6"></i>noncreature</span></div></div>`}
       </div></div>`;
   } else if (isShared(sc)) {
     html += `<div class="rulebox"><div class="stats">${scopeBlock}<div class="vsep"></div><div style="flex:1;min-width:280px">${sharedTable(R, sc)}</div></div></div>`;
@@ -1222,6 +1253,7 @@ function valueCell(res, id) {
   if (res.status === "error" || !res.perCard) return `<span class="v-err">error</span>`;
   const m = res.measure || { kind: "count" }, pc = res.perCard;
   if (m.kind === "count") return pc[id] ? `<span class="v-yes">✓ counts</span>` : `<span class="v-no">–</span>`;
+  if (m.kind === "curve") return id in pc ? `<span class="v-yes">MV ${Math.floor(pc[id])}</span>` : `<span class="v-no">–</span>`;
   if (m.kind === "avg") { if (!(id in pc)) return `<span class="v-no">not in filter</span>`; return pc[id] == null ? `<span class="nd">no data</span>` : fmtMetric(m.metric, pc[id]); }
   if (m.metric) { if (!(id in pc)) return `<span class="v-no">not checked</span>`; const v = pc[id]; if (v == null) return `<span class="nd">no data</span>`; const ok = E.inConstraint(v, res.constraint); return `<span class="${ok ? "v-yes" : "v-bad"}">${fmtMetric(m.metric, v)} ${ok ? "✓" : "✗"}</span>`; }
   return pc[id] ? `<span class="v-yes">✓ passes</span>` : `<span class="v-bad">✗ breaks</span>`;
@@ -1296,9 +1328,9 @@ function renderCards(ids, hit, res) {
   cardsKey = key;
   g.innerHTML = ids.map((id) => {
     const c = byId[id], mk = res ? cardMark(res, id, hit) : "";
-    const tag = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : "counts") : "";
+    const tag = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
     const img = c.image ? c.image.replace("/normal/", "/small/") : "";
-    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" title="${esc(c.name)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrAdj == null ? "no data" : E.pct(c.wrAdj)}${res && m.kind !== "count" && m.metric !== "wrAdj" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
+    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" title="${esc(c.name)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrAdj == null ? "no data" : E.pct(c.wrAdj)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrAdj" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
   }).join("");
 }
 function renderTable() {
@@ -1878,7 +1910,7 @@ function renderMatches() {
 }
 function safeRuleText(o, isRule) { try { return E.ruleToText(cleanObj(o, isRule ? "rule" : "mechanic")); } catch (e) { return ""; } }
 function cheatSheet() {
-  const ex = [["count(otag:counterspell) >= 6", "count cards; or just otag:counterspell >= 6"], ["count(t:creature) >= 50%", "share of the scope"], ["count(c=scope -is:hybrid) = 3 fixed", "gold cards, never scaled"], ["count(kw:flying mv<=3) in 5..7", "a range"], ["avg(wr, member:any) in 55%..60%", "average adjusted WR"], ["avg(mv, t:creature) <= 3", "average mana value"], ["every(s:fdn,trk)", "every card must match"], ["every(mv, t:creature) <= 5", "every creature, MV at most 5"]];
+  const ex = [["count(otag:counterspell) >= 6", "count cards; or just otag:counterspell >= 6"], ["count(t:creature) >= 50%", "share of the scope"], ["count(c=scope -is:hybrid) = 3 fixed", "gold cards, never scaled"], ["count(kw:flying mv<=3) in 5..7", "a range"], ["avg(wr, member:any) in 55%..60%", "average adjusted WR"], ["avg(mv, t:creature) <= 3", "average mana value"], ["every(s:fdn,trk)", "every card must match"], ["every(mv, t:creature) <= 5", "every creature, MV at most 5"], ["curve(t:creature) 1:1..3 2:5..7 6+:0..2", "creatures per mana value, 6+ = six and up"], ["curve(t:creature) 2:20%..30% 3:15%..25%", "curve in % of the filtered cards"]];
   const keys = "otag: t: o: kw: m: mv pow tou c=wu c>=u c<=wu c=scope c:c is:hybrid r: s:fdn,trk !\"Name\" name: wr>=55% wrraw games elo cubes picks member:any ncolors";
   return h("details", { class: "cheat" }, h("summary", null, "Syntax"), h("div", { html: `<p>Same as CubeCobra and Scryfall filters. A space means and; use <code>or</code>, parentheses, and <code>-</code> for not.</p><p class="mono">${esc(keys)}</p><table>${ex.map(([a, b]) => `<tr><td><code>${esc(a)}</code></td><td>${esc(b)}</td></tr>`).join("")}</table>` }));
 }
@@ -1894,6 +1926,7 @@ function updateLive() {
   if (res.summary) line += ` (${countsTxt(res.summary)})`;
   else if (m.kind === "count") line += pctu ? `% of the scope (${res.raw} cards)` : scaled ? ` (${res.raw} cards in the cube, scaled)` : ` card${res.value === 1 ? "" : "s"}`;
   if (m.kind === "avg" && !res.summary) line += ` over ${res.n} cards${res.noData ? `, ${res.noData} with no data left out` : ""}`;
+  if (m.kind === "curve" && !res.summary) line += ` (${res.raw ?? 0} cards)${(res.buckets || []).length ? ": " + res.buckets.map((b) => `MV${b.label} ${b.value}${b.constraint.unit === "percent" ? "%" : ""}`).join(", ") : ""}`;
   line += `, target ${esc(fmtTarget(res))} ${pill(dstat(res))}`;
   const refs = refsBlock(U.scope, U.sel, true, fmtValue(res));
   el.innerHTML = line + (refs ? `<div style="margin-top:4px">${refs}</div>` : "") + `<div class="muted" style="font-size:12px;margin-top:3px">The list shows this ${draft.type} live as you edit.</div>`;
@@ -1920,9 +1953,11 @@ function renderEditor() {
   const rebuild = () => { renderDrawer(); scheduleDraft(); };
   const first = h("div", { class: "sl" });
   if (isRule) {
-    first.append(selEl([["count", "Count"], ["avg", "Average"], ["every", "Every card"]], m.kind, (k) => {
-      o.measure = k === "count" ? { kind: "count" } : k === "avg" ? { kind: "avg", metric: m.metric || "wrAdj" } : { kind: "every" };
-      o.constraint = null; rebuild();
+    first.append(selEl([["count", "Count"], ["avg", "Average"], ["every", "Every card"], ["curve", "Mana curve"]], m.kind, (k) => {
+      o.measure = k === "count" ? { kind: "count" } : k === "avg" ? { kind: "avg", metric: m.metric || "wrAdj" } : k === "curve" ? { kind: "curve", buckets: [] } : { kind: "every" };
+      o.constraint = null;
+      if (k === "curve") U.editMode = "text";
+      rebuild();
     }, "txt sel-strong"));
     if (m.kind === "avg") first.append(selEl(metricOpts, m.metric, (v) => { m.metric = v; o.constraint = null; rebuild(); }, "txt sel-strong"));
     if (m.kind === "every") {
@@ -1939,7 +1974,7 @@ function renderEditor() {
   } else if (m.kind === "every") {
     last.append(h("span", null, "must have"), selEl(metricOpts, m.metric, (v) => { m.metric = v; o.constraint = { kind: "max", max: v.startsWith("wr") ? 0.6 : 3 }; rebuild(); }, "txt sel-strong"),
       constraintEditor(o, m.metric, scheduleDraft, "anything (no check)"));
-  } else {
+  } else if (m.kind !== "curve") {
     last.append(h("span", null, "should be"), constraintEditor(o, m.kind === "avg" ? m.metric : null, scheduleDraft, null, m.kind === "count"));
   }
   U.editMode = U.editMode || "builder";
@@ -1963,6 +1998,10 @@ function renderEditor() {
     };
     ta.addEventListener("input", debounce(apply, 150));
     sentence = h("div", { class: "sentence" }, ta, errEl, cheatSheet());
+  } else if (m.kind === "curve") {
+    sentence = h("div", { class: "sentence" }, h("div", { class: "sl" }, h("span", { class: "muted" }, "Curve rules are edited as text."),
+      h("button", { class: "btn sm", type: "button", onclick: () => { U.editMode = "text"; save(); renderDrawer(); } }, "Edit as text")),
+      h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
   } else {
     sentence = h("div", { class: "sentence" }, first, builder.el, last, h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
   }
@@ -2453,7 +2492,7 @@ function renderOverview() {
   svg += "</svg>";
   const hiddenN = S.config.archetypes.length - named.length;
   const cubeSt = scopeStat(r.cube);
-  const ruleRows = (rules) => rules.map((x) => `<div class="ov-row" data-ovsel="${esc(x.id)}">${stGlyph(dstat(x))}<span class="nm"><span>${esc(x.name)}</span></span><span class="r">${esc(fmtValue(x))}${x.constraint || x.measure.kind === "every" ? " / " + esc(fmtTarget(x)) : ""}</span></div>`).join("");
+  const ruleRows = (rules) => rules.map((x) => `<div class="ov-row" data-ovsel="${esc(x.id)}">${stGlyph(dstat(x))}<span class="nm"><span>${esc(x.name)}</span></span><span class="r">${esc(fmtValue(x))}${hasGoal(x) && x.measure.kind !== "curve" ? " / " + esc(fmtTarget(x)) : ""}</span></div>`).join("");
   const html = `<div class="ov">
     <div class="ov-star"><h2>${esc(S.config.cube.name || "Cube")}</h2>
       <p>Colours sit on the pentagon and two-colour archetypes are the chords between them. Three- and four-colour archetypes sit on the outer ring, five-colour ones in the centre. Ring colour is the health of the primary rules; the badge shows members${scaledOn() ? ", scaled to " + S.config.cube.targetSize : ""}. Click anything to open it.</p>

@@ -2,9 +2,9 @@
  * The workspace: one cube project and the operations people and agents run on it. The CLI, the page's
  * window.cubewarden object and its WebMCP tools are thin doors onto these same functions.
  */
-import type { Card, Config, Mechanic, Rule, Scope } from "./model.ts";
+import type { Card, Config, Constraint, Measure, Mechanic, Rule, Scope } from "./model.ts";
 import { WUBRG } from "./colors.ts";
-import { formatConstraint, inConstraint, type Status } from "./constraint.ts";
+import { bucketLabel, formatConstraint, inConstraint, type Status } from "./constraint.ts";
 import { evaluate, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
 import { changelist, diff, type Diff } from "./export.ts";
 import { matches, metricOf, type MatchContext } from "./filter.ts";
@@ -34,6 +34,8 @@ export interface Finding {
   value: number | null;
   target: string;
   rule: string;
+  /** Curve rules: each mana value bucket. */
+  buckets?: { label: string; value: number; target: string; status: Status }[];
   error?: string;
 }
 
@@ -132,8 +134,10 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
 
   const finding = (scope: string, res: Result, text: string): Finding => ({
     id: res.id, kind: res.kind, scope, name: res.name, priority: res.priority, status: res.status, value: res.value,
-    target: res.measure.kind === "every" ? "0 cards breaking it" : formatConstraint(res.constraint, res.measure.kind === "avg" ? res.measure.metric : undefined),
-    rule: text, ...(res.error ? { error: res.error } : {}),
+    target: targetText(res.measure, res.constraint),
+    rule: text,
+    ...(res.buckets ? { buckets: res.buckets.map((b) => ({ label: b.label, value: b.value, target: formatConstraint(b.constraint), status: b.status })) } : {}),
+    ...(res.error ? { error: res.error } : {}),
   });
 
   function resolve(ref: string): Card {
@@ -323,7 +327,7 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
     const label = (k: string) => (rule.scope.kind === "allColors" ? COLOR_NAME[k] : project.config.archetypes.find((a) => a.id === k)?.name || k);
     return {
       id: s.id, kind: "rule", scope: scopeLabel(rule.scope), name: s.name, priority: s.priority, status: s.status, value: null,
-      target: formatConstraint(s.constraint, s.measure.kind === "avg" ? s.measure.metric : undefined), rule: ruleToText(rule), description: rule.description,
+      target: targetText(s.measure, s.constraint), rule: ruleToText(rule), description: rule.description,
       cards: [], byScope: scopes.map(([k, v]) => ({ scope: label(k), value: v.value, status: v.status })),
     };
   }
@@ -343,6 +347,13 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
 }
 
 export type Workspace = ReturnType<typeof createWorkspace>;
+
+/** A rule's target in words: "≥ 3", "0 cards breaking it", or a curve's buckets ("MV2 5–7 · MV6+ 0–2"). */
+function targetText(m: Measure, c: Constraint | null): string {
+  if (m.kind === "every") return "0 cards breaking it";
+  if (m.kind === "curve") return m.buckets.length ? m.buckets.map((b) => `MV${bucketLabel(b)} ${formatConstraint(b.constraint)}`).join(" · ") : "no target";
+  return formatConstraint(c, m.kind === "avg" ? m.metric : undefined);
+}
 
 /**
  * The cube's "every card" rules (scope cube, primary) as one card test: what the cube allows at all, such as

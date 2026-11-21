@@ -1,4 +1,4 @@
-import type { Constraint, Metric } from "./model.ts";
+import type { Constraint, CurveBucket, Metric } from "./model.ts";
 import { METRICS } from "./fields.ts";
 
 export type Status = "ok" | "near" | "fail" | "none" | "nodata" | "error";
@@ -40,4 +40,9 @@ export function formatConstraint(c: Constraint | null | undefined, metric?: Metr
     case "exact": return "= " + f(c.value);
     case "range": return f(c.min) + "–" + f(c.max);
   }
+}
+
+/** A curve bucket's name: "2", or "6+" for six and above. */
+export function bucketLabel(b: Pick<CurveBucket, "mv" | "plus">): string {
+  return b.mv + (b.plus ? "+" : "");
 }

@@ -96,6 +96,14 @@ describe("cubewarden CLI", () => {
     expect((await cli(dir, "rule", "set", "u-cre", "--scope", "color:U", "--name", "Blue creatures", "--text", "count(t:creature) >= 1")).code).toBe(0);
     expect((await cli(dir, "rules")).out).toContain("u-cre  color:U  primary  Blue creatures: count(t:creature) >= 1");
   });
+  it("check and explain print each bucket of a curve rule", async () => {
+    const dir = setup();
+    expect((await cli(dir, "rule", "set", "w-curve", "--scope", "color:W", "--text", "curve(t:creature) 2:2..3 3:1 4+:10%..20%")).code).toBe(0);
+    const r = await cli(dir, "check");
+    expect(r.out).toContain("MV2 1 (target 2–3) near");
+    expect(r.out).toContain("MV4+ 0% (target 10%–20%) fail");
+    expect((await cli(dir, "explain", "w-curve")).out).toContain("MV3 1 (target = 1) ok");
+  });
   it("explain and search answer in JSON", async () => {
     const dir = setup();
     expect(JSON.parse((await cli(dir, "explain", "fly", "--json")).out).cards.map((c: { id: string }) => c.id)).toEqual(["W2"]);

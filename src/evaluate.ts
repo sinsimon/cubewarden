@@ -1,8 +1,20 @@
 /** Evaluating a config against a cube: every rule and mechanic in every scope. */
 import type { Card, Config, Constraint, Measure, Mechanic, Priority, Rule, Scope } from "./model.ts";
-import { gap, inConstraint, statusOf, type Status } from "./constraint.ts";
+import { bucketLabel, gap, inConstraint, statusOf, type Status } from "./constraint.ts";
 import { isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 import { WUBRG } from "./colors.ts";
+
+/** One mana value of a curve rule: its count (scaled like counts) or share in %, and how it compares with its target. */
+export interface CurveBucketResult {
+  label: string;
+  mv: number;
+  plus?: boolean;
+  value: number;
+  /** Unscaled number of cards. */
+  raw: number;
+  constraint: Constraint;
+  status: Status;
+}
 
 export interface Result {
   kind: "rule" | "mechanic";
@@ -12,7 +24,8 @@ export interface Result {
   measure: Measure;
   constraint: Constraint | null;
   scope?: Scope;
-  /** The number compared with the target: a (scaled) count, a share in %, an average, or the cards breaking an "every" rule. */
+  /** The number compared with the target: a (scaled) count, a share in %, an average, the cards breaking an "every" rule,
+   *  or the curve buckets out of range. */
   value: number | null;
   /** Unscaled count, for counts. */
   raw?: number;
@@ -20,8 +33,10 @@ export interface Result {
   gap: number;
   /** Cards counted (count, avg) or breaking the rule (every). */
   cards: string[];
-  /** Per card in the scope: matched (count, every) or the card's metric (avg, every with a metric). */
+  /** Per card in the scope: matched (count, every) or the card's metric (avg, every with a metric, curve: mana value). */
   perCard: Record<string, boolean | number | null>;
+  /** Curves: one entry per written bucket. */
+  buckets?: CurveBucketResult[];
   /** Averages: cards with a value, and cards without data. */
   n?: number;
   noData?: number;
@@ -111,6 +126,19 @@ export function measureRule(rule: Rule, pool: Card[], ctx: MatchContext | undefi
         : Math.round(hit.length * (rule.scope.kind === "cube" || m.absolute ? 1 : factor));
       return { ...base, value, raw: hit.length, status: statusOf(value, constraint, "count"), gap: gap(value, constraint),
         cards: [...ids], perCard: Object.fromEntries(pool.map((c) => [c.id, ids.has(c.id)])) };
+    }
+    if (m.kind === "curve") {
+      const scale = rule.scope.kind === "cube" || m.absolute ? 1 : factor;
+      const buckets = m.buckets.map((b): CurveBucketResult => {
+        const n = hit.filter((c) => (b.plus ? Math.floor(c.mv) >= b.mv : Math.floor(c.mv) === b.mv)).length;
+        const value = b.constraint.unit === "percent" ? (hit.length ? Math.round((1000 * n) / hit.length) / 10 : 0) : Math.round(n * scale);
+        return { label: bucketLabel(b), mv: b.mv, ...(b.plus ? { plus: true } : {}), value, raw: n, constraint: b.constraint,
+          status: statusOf(value, b.constraint, "count") };
+      });
+      const misses = buckets.filter((b) => b.status !== "ok");
+      const status: Status = !buckets.length ? "none" : !misses.length ? "ok" : misses.every((b) => b.status === "near") ? "near" : "fail";
+      return { ...base, value: misses.length, raw: hit.length, status, gap: misses.length, buckets,
+        cards: hit.map((c) => c.id), perCard: Object.fromEntries(hit.map((c) => [c.id, c.mv])) };
     }
     if (m.kind === "avg") {
       const vals = hit.map((c) => [c.id, metricOf(c, m.metric)] as const);

@@ -4,8 +4,8 @@ export { slug } from "./slug.ts";
 export { colorSet, WUBRG } from "./colors.ts";
 export { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
 export { FilterError, isCreature, isLand, matches, metricOf, validateFilter, type MatchContext } from "./filter.ts";
-export { formatConstraint, gap, inConstraint, statusOf, type Status } from "./constraint.ts";
-export { archetypePool, colorPool, evaluate, scopeCards, worst, type ArchetypeReport, type EvaluateOptions, type ScopeReport, type SharedSummary, type Report, type Result, type ScopeStatus } from "./evaluate.ts";
+export { bucketLabel, formatConstraint, gap, inConstraint, statusOf, type Status } from "./constraint.ts";
+export { archetypePool, colorPool, evaluate, scopeCards, worst, type ArchetypeReport, type CurveBucketResult, type EvaluateOptions, type ScopeReport, type SharedSummary, type Report, type Result, type ScopeStatus } from "./evaluate.ts";
 export { describeFilter } from "./describe.ts";
 export { toScryfall, type ScryfallScope } from "./scryfall.ts";
 export {

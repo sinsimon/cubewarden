@@ -41,6 +41,32 @@ describe("check", () => {
   });
 });
 
+describe("curve rules", () => {
+  // White creatures in the cube: W1 (mv 2), W2 (mv 3).
+  const curve = () => {
+    const w = ws();
+    w.setRule({ id: "w-curve", name: "White curve", scope: "color:W", text: "curve(t:creature) 2:2..3 3:1 4+:10%..20%" });
+    return w;
+  };
+  it("check lists a curve with each bucket, its value, target and status", () => {
+    const f = curve().check().failing.find((x) => x.id === "w-curve");
+    expect(f).toMatchObject({ status: "fail", value: 2, target: "MV2 2–3 · MV3 = 1 · MV4+ 10%–20%", rule: "curve(t:creature) 2:2..3 3:1 4+:10%..20%" });
+    expect(f?.buckets).toEqual([
+      { label: "2", value: 1, target: "2–3", status: "near" },
+      { label: "3", value: 1, target: "= 1", status: "ok" },
+      { label: "4+", value: 0, target: "10%–20%", status: "fail" },
+    ]);
+  });
+  it("explain lists the counted cards with their mana value", () => {
+    const e = curve().explain("w-curve");
+    expect(e.cards.map((c) => [c.name, c.value]).sort()).toEqual([["W1", 2], ["W2", 3]]);
+    expect(e.buckets?.map((b) => b.label)).toEqual(["2", "3", "4+"]);
+  });
+  it("cannot turn a mechanic into a curve", () => {
+    expect(() => ws().setMechanic({ id: "fly", text: "curve(kw:flying) 2:1" })).toThrowError(/counts cards/);
+  });
+});
+
 describe("explain", () => {
   it("shows a rule's value and the cards behind it", () => {
     const e = ws().explain("w-cre");

@@ -76,7 +76,8 @@ export async function run(argv: string[], io: Io): Promise<number> {
     return createWorkspace(project, Object.fromEntries(list.map((c) => [c.id, c])));
   }
   const save = (p: Project) => writeFile(projectPath, JSON.stringify(p, null, 1) + "\n");
-  const line = (f: Finding) => `  ${f.scope} · ${f.name}: ${f.value ?? "?"} (target ${f.target}) ${f.status}${f.error ? " — " + f.error : ""}\n      ${f.rule}`;
+  const line = (f: Finding) => `  ${f.scope} · ${f.name}: ${f.value ?? "?"}${f.buckets ? " bucket(s) off" : ""} (target ${f.target}) ${f.status}${f.error ? " — " + f.error : ""}\n      ${f.rule}` +
+    (f.buckets || []).map((b) => `\n      MV${b.label} ${b.value}${b.target.includes("%") ? "%" : ""} (target ${b.target}) ${b.status}`).join("");
 
   try {
     const [cmd, ...rest] = args._;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { evaluate, parseFilter, validateFilter } from "../src/index.ts";
-import { ALL, BY_ID, config, rule } from "./fixtures/cards.ts";
+import { ALL, BY_ID, card, config, rule } from "./fixtures/cards.ts";
 
 const cube = { kind: "cube" } as const;
 const cubeRule = (text: string, over = {}) => {
@@ -157,5 +157,48 @@ describe("checking a filter built in the editor", () => {
     expect(validateFilter(parseFilter("otag:removal mv>=2"))).toEqual([]);
     expect(validateFilter({ op: "and", items: [{ field: "tag", op: ">=", value: "x" }] })).toEqual(['Operator ">=" not valid for Oracle tag']);
     expect(validateFilter({ op: "and", items: [{ field: "scryfall", op: "matches", value: "is:commander" }] })[0]).toMatch(/not supported/);
+  });
+});
+
+describe("curve rules", () => {
+  // Creatures by mana value: 2 = W1 U1 WU2, 3 = W2 WU1, 4 = G1. Every card: 0 = L1, 1 = W3, 2 = W1 U1 U2 WU2 C1, 3 = W2 WU1, 4 = G1.
+  const buckets = (r: { buckets?: { label: string; value: number | null; status: string }[] }) => r.buckets?.map((b) => [b.label, b.value, b.status]);
+  it("counts the filtered cards by mana value and checks each bucket, N+ taking N and above", () => {
+    const r = cubeRule("curve(t:creature) 2:3 3:1..2 4+:0..1");
+    expect(r).toMatchObject({ status: "ok", value: 0 });
+    expect(buckets(r)).toEqual([["2", 3, "ok"], ["3", 2, "ok"], ["4+", 1, "ok"]]);
+    expect(r.cards.sort()).toEqual(["G1", "U1", "W1", "W2", "WU1", "WU2"]);
+    expect(r.perCard).toEqual({ W1: 2, W2: 3, U1: 2, WU1: 3, WU2: 2, G1: 4 });
+    expect(buckets(cubeRule("curve() 0:1 1:1 2+:8"))).toEqual([["0", 1, "ok"], ["1", 1, "ok"], ["2+", 8, "ok"]]);
+  });
+  it("counts the buckets out of range: near when every miss is within one card, fail beyond", () => {
+    expect(cubeRule("curve(t:creature) 2:4..5 3:2")).toMatchObject({ value: 1, status: "near" });
+    const r = cubeRule("curve(t:creature) 2:5..6 3:0 4:1");
+    expect(r).toMatchObject({ value: 2, status: "fail" });
+    expect(buckets(r)).toEqual([["2", 3, "fail"], ["3", 2, "fail"], ["4", 1, "ok"]]);
+  });
+  it("reads percent targets as a share of the filtered cards, near within one point", () => {
+    expect(buckets(cubeRule("curve(t:creature) 2:50% 3:30%..40% 4:10%"))).toEqual([["2", 50, "ok"], ["3", 33.3, "ok"], ["4", 16.7, "fail"]]);
+    expect(cubeRule("curve(t:creature) 3:33% 4:16%")).toMatchObject({ value: 2, status: "near" });
+  });
+  it("rounds a fractional mana value down", () => {
+    const cards = { X: card("X", { mv: 2.5 }) };
+    const r = evaluate(config({ rules: [rule("r", cube, "curve() 2:1 3:0")] }), ["X"], cards).cube.rules[0];
+    expect(buckets(r)).toEqual([["2", 1, "ok"], ["3", 0, "ok"]]);
+  });
+  it("scales bucket counts in a colour like counts, unless fixed or in percent", () => {
+    const W = { kind: "color", color: "W" } as const;
+    const run = (text: string) => evaluate(config({ cube: { name: "t", targetSize: 20 }, rules: [rule("r", W, text)] }), ALL, BY_ID).colors.W.rules[0];
+    expect(run("curve(t:creature) 2:2 3:2").buckets).toMatchObject([{ label: "2", value: 2, raw: 1 }, { label: "3", value: 2, raw: 1 }]);
+    expect(buckets(run("curve(t:creature) 2:1 3:1 fixed"))).toEqual([["2", 1, "ok"], ["3", 1, "ok"]]);
+    expect(buckets(run("curve(t:creature) 2:50%"))).toEqual([["2", 50, "ok"]]);
+  });
+  it("has no status without buckets, and reports a filter that cannot run as an error", () => {
+    expect(cubeRule("curve(t:creature)")).toMatchObject({ status: "none", value: 0, buckets: [] });
+    expect(cubeRule("curve(member:any) 2:1")).toMatchObject({ status: "error" });
+  });
+  it("runs as a shared rule in each colour", () => {
+    const r = evaluate(config({ rules: [rule("c", { kind: "allColors" }, "curve(t:creature) 2:1")] }), ALL, BY_ID);
+    expect(r.allColors.rules[0].counts).toEqual({ ok: 2, near: 3, fail: 0, error: 0 });
   });
 });
