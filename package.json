@@ -21,6 +21,25 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@vaadin/aura": "25.3.7",
+    "@vaadin/badge": "25.3.7",
+    "@vaadin/breadcrumbs": "25.3.7",
+    "@vaadin/button": "25.3.7",
+    "@vaadin/checkbox": "25.3.7",
+    "@vaadin/combo-box": "25.3.7",
+    "@vaadin/context-menu": "25.3.7",
+    "@vaadin/details": "25.3.7",
+    "@vaadin/dialog": "25.3.7",
+    "@vaadin/grid": "25.3.7",
+    "@vaadin/icon": "25.3.7",
+    "@vaadin/icons": "25.3.7",
+    "@vaadin/notification": "25.3.7",
+    "@vaadin/popover": "25.3.7",
+    "@vaadin/select": "25.3.7",
+    "@vaadin/switch": "25.3.7",
+    "@vaadin/tabs": "25.3.7",
+    "@vaadin/text-field": "25.3.7",
+    "@vaadin/tooltip": "25.3.7",
     "esbuild": "0.28.2",
     "typescript": "7.0.2",
     "vitest": "5.1.1"
@@ -46,5 +65,8 @@
     "cubecobra",
     "scryfall",
     "17lands"
-  ]
+  ],
+  "vaadin": {
+    "disableUsageStatistics": true
+  }
 }

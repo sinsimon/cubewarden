@@ -1,5 +1,5 @@
 /**
- * Static site: site/ = the page, its bundle and llms.txt.
+ * Static site: site/ = the page (and its prototype next.html), the bundles and llms.txt.
  *   node scripts/build-site.ts                      hosted build (Vercel): card data from /data (the data branch)
  *   node scripts/build-site.ts <project folder>     one project's cube and cards baked into data.js
  */
@@ -15,8 +15,11 @@ for (const f of await readdir(out)) if (f !== ".vercel") await rm(join(out, f), 
 await mkdir(join(out, "dist"), { recursive: true });
 await cp("web/llms.txt", join(out, "llms.txt"));
 await cp("web/dist", join(out, "dist"), { recursive: true });
-let html = await readFile("web/index.html", "utf8");
 if (project) await writeFile(join(out, "data.js"), await dataJs(join(project, "cubewarden.json"), join(project, "cards.json")));
-else html = html.replace('<script src="data.js"></script>\n', "");
-await writeFile(join(out, "index.html"), html);
+// index.html is the page; next.html is the design-system prototype (Vaadin + Aura) of the same page.
+for (const page of ["index.html", "next.html"]) {
+  let html = await readFile(join("web", page), "utf8");
+  if (!project) html = html.replace('<script src="data.js"></script>\n', "");
+  await writeFile(join(out, page), html);
+}
 console.log(project ? `site/ built from ${project}` : "site/ built for hosting (card data from /data)");
