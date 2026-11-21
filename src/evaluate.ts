@@ -102,6 +102,16 @@ export function measureMechanic(mech: Mechanic, pool: Card[], ctx: MatchContext 
   return { ...r, kind: "mechanic" };
 }
 
+/** member:any, member:primary, member:secondary or member:<mechanic id>, from a scope's measured mechanics. */
+function memberOf(mechanics: Result[]): NonNullable<MatchContext["member"]> {
+  const cards = (rs: Result[]) => new Set(rs.flatMap((r) => r.cards));
+  const sets = new Map<string, Set<string>>(mechanics.map((r) => [r.id, new Set(r.cards)]));
+  sets.set("any", cards(mechanics));
+  sets.set("primary", cards(mechanics.filter((r) => r.priority === "primary")));
+  sets.set("secondary", cards(mechanics.filter((r) => r.priority === "secondary")));
+  return (id, v) => !!sets.get(v ?? "any")?.has(id);
+}
+
 const ORDER: Record<Status, number> = { error: 5, fail: 4, near: 3, nodata: 2, ok: 1, none: 0 };
 
 export function worst(results: { status: Status; priority?: Priority }[]): ScopeStatus {
@@ -187,8 +197,9 @@ export function evaluate(config: Config, cubeIds: string[], cardsById: Record<st
   const colors: Report["colors"] = {};
   for (const col of config.colors) {
     const pool = colorPool(cards, col.code);
-    const ctx: MatchContext = { scopeColors: WUBRG.includes(col.code) ? col.code : "" };
-    const mechanics = (col.mechanics || []).map((m) => measureMechanic(m, pool, ctx, factor));
+    const scopeColors = WUBRG.includes(col.code) ? col.code : "";
+    const mechanics = (col.mechanics || []).map((m) => measureMechanic(m, pool, { scopeColors }, factor));
+    const ctx: MatchContext = { scopeColors, member: memberOf(mechanics) };
     const own = config.rules.filter((r) => r.scope.kind === "color" && r.scope.color === col.code).map((r) => measureRule(r, pool, ctx, factor));
     const shared = WUBRG.includes(col.code) ? allColors.map((r) => inherit(measureRule(r, pool, ctx, factor), r)) : [];
     const rules = own.concat(shared);
@@ -198,17 +209,9 @@ export function evaluate(config: Config, cubeIds: string[], cardsById: Record<st
   const archetypes: Report["archetypes"] = {};
   for (const a of config.archetypes) {
     const pool = archetypePool(cards, a.colors);
-    const byMech: Record<string, Set<string>> = {};
-    const mechanics = a.mechanics.map((m) => {
-      const r = measureMechanic(m, pool, { scopeColors: a.colors }, factor);
-      byMech[m.id] = new Set(r.cards);
-      return r;
-    });
+    const mechanics = a.mechanics.map((m) => measureMechanic(m, pool, { scopeColors: a.colors }, factor));
     const memberIds = new Set(mechanics.flatMap((r) => r.cards));
-    const byPriority = (p: "primary" | "secondary") => new Set(mechanics.filter((r) => r.priority === p).flatMap((r) => r.cards));
-    const members: Record<string, Set<string>> = { any: memberIds, primary: byPriority("primary"), secondary: byPriority("secondary") };
-    // member:any, member:primary, member:secondary, or member:<mechanic id>
-    const ctx: MatchContext = { scopeColors: a.colors, member: (id, v) => !!(members[v ?? "any"] ?? byMech[v])?.has(id) };
+    const ctx: MatchContext = { scopeColors: a.colors, member: memberOf(mechanics) };
     const own = config.rules.filter((r) => r.scope.kind === "archetype" && r.scope.id === a.id).map((r) => measureRule(r, pool, ctx, factor));
     const rules = own.concat(allArchetypes.map((r) => inherit(measureRule(r, pool, ctx, factor), r)));
     archetypes[a.id] = { cards: pool.map((c) => c.id), members: [...memberIds], membersScaled: Math.round(memberIds.size * factor),

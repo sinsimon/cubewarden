@@ -7,7 +7,7 @@ import { slug } from "./slug.ts";
 
 export { FilterError };
 
-/** Where a filter is evaluated: the scope's colours (for "@scope") and archetype membership (for member:). */
+/** Where a filter is evaluated: the scope's colours (for "@scope") and its mechanics (for member:). */
 export interface MatchContext {
   scopeColors?: string;
   member?: (cardId: string, mechanicId: string) => boolean;
@@ -51,7 +51,7 @@ function conditionMatches(card: Card, cond: Condition, ctx?: MatchContext): bool
     case "rarity": r = cond.op === "in" ? ([] as unknown[]).concat(v).includes(card.rarity) : card.rarity === v; break;
     case "ccTag": r = (card.ccTags || []).some((t) => t.toLowerCase() === s); break;
     case "member":
-      if (!ctx?.member) throw new FilterError("'Archetype member' only works inside an archetype");
+      if (!ctx?.member) throw new FilterError("'Mechanic member' only works inside a colour or an archetype");
       r = ctx.member(card.id, String(v));
       break;
     case "scryfall": r = scryMatches(card, String(v)); break;

@@ -50,7 +50,7 @@ describe("whole-cube rules", () => {
   it("reports a rule that cannot run here as an error instead of a number", () => {
     const r = cubeRule("count(member:any) >= 1");
     expect(r.status).toBe("error");
-    expect(r.error).toMatch(/inside an archetype/);
+    expect(r.error).toMatch(/inside a colour or an archetype/);
   });
 });
 
@@ -80,6 +80,28 @@ describe("colour scopes", () => {
     expect(r.colors.L.rules).toEqual([]);
     expect(r.allColors.rules[0].counts).toEqual({ ok: 3, near: 2, fail: 0, error: 0 });
     expect(Object.keys(r.allColors.rules[0].byScope).sort()).toEqual(["B", "G", "R", "U", "W"]);
+  });
+  it("reads member: in a colour as the cards matching that colour's mechanics: by id, any, primary or secondary", () => {
+    const W = { kind: "color", color: "W" } as const;
+    const cfg = config({ rules: ["rem", "any", "primary", "secondary", "nope"].map((v) => rule(v, W, `count(member:${v})`)) });
+    cfg.colors[0].mechanics = [
+      { id: "rem", name: "Removal", filter: parseFilter("otag:removal") },
+      { id: "fly", name: "Flyers", filter: parseFilter("kw:flying"), priority: "secondary" },
+    ];
+    const w = evaluate(cfg, ALL, BY_ID).colors.W.rules;
+    expect(w.map((x) => [x.id, x.cards.sort()])).toEqual([
+      ["rem", ["W3"]], ["any", ["W2", "W3"]], ["primary", ["W3"]], ["secondary", ["W2"]], ["nope", []],
+    ]);
+  });
+  it("resolves member:<id> in an 'all colours' rule against each colour's own mechanics", () => {
+    const cfg = config({ rules: [rule("rem", { kind: "allColors" }, "count(member:rem) >= 1")] });
+    cfg.colors[0].mechanics = [{ id: "rem", name: "Removal", filter: parseFilter("otag:removal") }];
+    cfg.colors[1].mechanics = [{ id: "rem", name: "Counters", filter: parseFilter("otag:counterspell") }];
+    const r = evaluate(cfg, ALL, BY_ID);
+    expect(r.colors.W.rules[0]).toMatchObject({ cards: ["W3"], status: "ok" });
+    expect(r.colors.U.rules[0]).toMatchObject({ cards: ["U2"], status: "ok" });
+    expect(r.colors.B.rules[0]).toMatchObject({ value: 0, status: "near" });
+    expect(r.allColors.rules[0].counts).toEqual({ ok: 2, near: 3, fail: 0, error: 0 });
   });
 });
 

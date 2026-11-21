@@ -8,8 +8,8 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   wr>=55% (17Lands adjusted WR)  wrraw>=55% (GIH WR)  games>=500
   elo>=1300  cubes>=1000  picks>=100 (CubeCobra card data)
   tag:"UG Ramp"         a CubeCobra tag on the card in your cube
-  member:any            member of the archetype (matches one of its mechanics)
-  member:primary        matches one of its primary mechanics (member:secondary, member:<mechanic id>)
+  member:<mechanic id>  matches that mechanic of the colour or archetype being checked
+  member:any            matches any of its mechanics (member:primary, member:secondary by priority)
 
 Rules
   count(F) >= 6         count(F) in 13..14      count(F) = 3     count(F) <= 360
@@ -19,6 +19,7 @@ Rules
   every(s:fdn,trk)                              every card in scope must match
   every(mv, t:creature) <= 5                    every creature must have mv <= 5
   otag:counterspell >= 6                        shorthand for count(otag:counterspell) >= 6
+  count(member:removal) >= 4                    the cards of the scope's "removal" mechanic (colour or archetype)
 
 Curves: a target per mana value for the cards matching the filter (curve() = every card in scope)
   curve(t:creature) 1:1..3 2:5..7 3:4..6 4:2..4 5:1..3 6+:0..2
