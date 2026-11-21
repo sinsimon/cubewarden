@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cubewarden design-system mockups</title>
+<meta name="color-scheme" content="light dark">
+<style>
+  :root { --bg: #fff; --fg: #1d1d1f; --muted: #5f6368; --link: #0b57d0; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #161616; --fg: #ececec; --muted: #a8a8a8; --link: #8ab4f8; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; padding: 2rem 1rem; }
+  h1 { font-size: 1.4rem; margin: 0 0 .25rem; }
+  p { color: var(--muted); margin: 0 0 1.25rem; }
+  ul { padding-left: 1.1rem; }
+  li { margin: .5rem 0; }
+  a { color: var(--link); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Workbench mockups</h1>
+  <p>The same static screen (White scope, Removal selected, 25 Foundations cards) built on two open-source design systems. No engine: the data is hard-coded.</p>
+  <ul>
+    <li><a href="/proto/webawesome.html">Web Awesome 3.15.0</a>: free components from the official CDN; <code>wa-tree</code>, <code>wa-page</code> drawer, radio-button chips with <code>wa-progress-ring</code>, hand-built table (the data grid is Pro).</li>
+    <li><a href="/proto/carbon.html">IBM Carbon Web Components 2.68.0</a>: official IBM CDN; UI shell side nav, <code>cds-tree-view</code>, <code>cds-tabs</code>, <code>cds-table</code> with built-in sort, selection and search.</li>
+  </ul>
+</main>
+</body>
+</html>

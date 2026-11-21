@@ -15,6 +15,7 @@ for (const f of await readdir(out)) if (f !== ".vercel") await rm(join(out, f), 
 await mkdir(join(out, "dist"), { recursive: true });
 await cp("web/llms.txt", join(out, "llms.txt"));
 await cp("web/dist", join(out, "dist"), { recursive: true });
+await cp("web/proto", join(out, "proto"), { recursive: true });
 let html = await readFile("web/index.html", "utf8");
 if (project) await writeFile(join(out, "data.js"), await dataJs(join(project, "cubewarden.json"), join(project, "cards.json")));
 else html = html.replace('<script src="data.js"></script>\n', "");

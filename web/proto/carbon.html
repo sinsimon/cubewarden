@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en" class="cds--white">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cubewarden mockup: Carbon</title>
+<meta name="color-scheme" content="light dark">
+<script>
+  // Carbon themes are classes (.cds--white, .cds--g100), not prefers-color-scheme: follow the OS here.
+  (() => {
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.classList.toggle("cds--g100", mq.matches);
+      document.documentElement.classList.toggle("cds--white", !mq.matches);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+  })();
+</script>
+<!-- Theme tokens (white and g100) and IBM Plex. The web components below read these --cds-* tokens. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@carbon/styles@1.120.0/css/styles.min.css">
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/ui-shell.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/tree-view.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/data-table.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/breadcrumb.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/overflow-menu.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/tag.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/tabs.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/button.min.js"></script>
+<script type="module" src="https://1.www.s81c.com/common/carbon/web-components/version/v2.68.0/skip-to-content.min.js"></script>
+<style>
+  :root {
+    --nav-width: 16rem;
+    --pass: var(--cds-support-success);
+    --warn: var(--cds-support-warning);
+    --fail: var(--cds-support-error);
+    --muted: var(--cds-text-secondary);
+    --line: var(--cds-border-subtle-01);
+  }
+  body { margin: 0; background: var(--cds-background); color: var(--cds-text-primary); font-family: "IBM Plex Sans", system-ui, sans-serif; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  :not(:defined) { visibility: hidden; }
+
+  /* Side nav holds the tree */
+  cds-side-nav { border-right: 1px solid var(--line); }
+  cds-side-nav .navbody { padding: .5rem 0 2rem; overflow-y: auto; height: 100%; box-sizing: border-box; }
+  .navsection { margin: .75rem 1rem .25rem; font-size: .6875rem; letter-spacing: .32px; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  cds-tree-view { --cds-tree-node-indent: 1rem; }
+  .st { width: 10px; height: 10px; flex: none; }
+  .st.pass { fill: var(--pass); } .st.warn { fill: var(--warn); } .st.fail { fill: var(--fail); }
+
+  main.content { margin-top: 3rem; padding: 1rem 1.5rem 3rem; min-width: 0; }
+  @media (min-width: 66rem) { main.content { margin-left: var(--nav-width); } }
+
+  /* Page header */
+  .crumbs { display: flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+  cds-breadcrumb-item { display: inline-flex; width: auto; }
+  cds-table-cell, cds-table-header-cell { white-space: nowrap; }
+  .crumbs cds-overflow-menu { inline-size: 1.5rem; block-size: 1.5rem; min-block-size: 1.5rem; }
+  .titlebar { display: flex; align-items: center; gap: .75rem; margin: .5rem 0 .125rem; flex-wrap: wrap; }
+  .titlebar h1 { margin: 0; font-size: 1.75rem; font-weight: 400; line-height: 1.25; }
+  .desc { margin: 0 0 .75rem; color: var(--muted); font-size: .875rem; }
+  .pips { display: inline-flex; gap: 2px; }
+  .pip { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 600; color: #161616; border: 1px solid rgb(0 0 0 / .25); box-sizing: border-box; line-height: 1; }
+  .pip.W { background: #f8f2d4; } .pip.U { background: #b4d3ea; } .pip.B { background: #bcb4b0; } .pip.R { background: #f0a98c; } .pip.G { background: #9fd1ad; } .pip.C { background: #d6d3cf; } .pip.N { background: #d6d3cf; }
+  .titlebar .pip { width: 22px; height: 22px; font-size: 12px; }
+  cds-tabs { margin-bottom: 1rem; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ring { width: 14px; height: 14px; transform: rotate(-90deg); flex: none; }
+  .ring .track { stroke: var(--cds-border-subtle-01); }
+  .ring.pass .ind { stroke: var(--pass); } .ring.warn .ind { stroke: var(--warn); } .ring.fail .ind { stroke: var(--fail); }
+  .chip .n { color: var(--muted); }
+  .chip .g.pass { color: var(--cds-support-success); } .chip .g.warn { color: var(--cds-text-primary); } .chip .g.fail { color: var(--cds-text-error); }
+
+  /* Table */
+  cds-table-row.hit cds-table-cell { background: var(--cds-highlight); }
+  cds-table-row.hit cds-table-cell:first-of-type { box-shadow: inset 3px 0 0 var(--cds-border-interactive); }
+  cds-table-cell.num, cds-table-header-cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+  cds-table-cell.name { font-weight: 600; }
+  cds-table-cell.type { color: var(--muted); }
+  cds-table-cell.hitcell { color: var(--cds-link-primary); font-weight: 600; }
+  .tablewrap { overflow-x: auto; }
+  @media (max-width: 1100px) { .col-raw, .col-set { display: none; } }
+  @media (max-width: 600px) {
+    main.content { padding: .75rem .75rem 3rem; }
+    .col-type, .col-cost { display: none; }
+    cds-header-nav, .meta { display: none; }
+  }
+</style>
+</head>
+<body>
+<cds-header aria-label="cubewarden">
+  <cds-skip-to-content href="#main"></cds-skip-to-content>
+  <cds-header-menu-button button-label-active="Close scopes" button-label-inactive="Open scopes" collapse-mode="responsive"></cds-header-menu-button>
+  <cds-header-name href="#" prefix="">Standard Limited All Stars</cds-header-name>
+  <cds-header-nav menu-bar-label="Views">
+    <cds-header-nav-item href="#" aria-current="page" active>Workbench</cds-header-nav-item>
+    <cds-header-nav-item href="#">Overview</cds-header-nav-item>
+  </cds-header-nav>
+</cds-header>
+
+<cds-side-nav aria-label="Scopes, rules and mechanics" collapse-mode="responsive">
+  <div class="navbody" id="navbody"></div>
+</cds-side-nav>
+
+<main class="content" id="main">
+  <cds-breadcrumb size="sm" no-trailing-slash aria-label="Scope">
+    <cds-breadcrumb-item><cds-breadcrumb-link href="#" data-go="cube">Cube</cds-breadcrumb-link></cds-breadcrumb-item>
+    <cds-breadcrumb-item>
+      <cds-breadcrumb-link href="#" id="scopeCrumb" data-go="white">White</cds-breadcrumb-link>
+      <cds-overflow-menu id="scopeMenu" size="sm" breadcrumb>
+        <svg slot="icon" width="16" height="16" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 22 6 12l1.4-1.4 8.6 8.6 8.6-8.6L26 12z"/></svg>
+        <span slot="tooltip-content">Other scopes</span>
+        <cds-overflow-menu-body id="scopeMenuBody"></cds-overflow-menu-body>
+      </cds-overflow-menu>
+    </cds-breadcrumb-item>
+    <cds-breadcrumb-item id="ruleCrumbItem">
+      <cds-breadcrumb-link href="#" id="ruleCrumb" is-currentpage>Removal</cds-breadcrumb-link>
+      <cds-overflow-menu id="ruleMenu" size="sm" breadcrumb>
+        <svg slot="icon" width="16" height="16" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 22 6 12l1.4-1.4 8.6 8.6 8.6-8.6L26 12z"/></svg>
+        <span slot="tooltip-content">Other rules</span>
+        <cds-overflow-menu-body id="ruleMenuBody"></cds-overflow-menu-body>
+      </cds-overflow-menu>
+    </cds-breadcrumb-item>
+  </cds-breadcrumb>
+
+  <div class="titlebar">
+    <span class="pips" id="titlePips" aria-hidden="true"></span>
+    <h1 id="title">White</h1>
+    <cds-tag id="statusBadge" type="red" size="sm">Fail</cds-tag>
+  </div>
+  <p class="desc" id="desc">Mono-white nonland cards.</p>
+
+  <div id="rulesBox">
+    <cds-tabs id="rules" value="removal" aria-label="Rules and mechanics of this scope"></cds-tabs>
+  </div>
+
+  <div class="tablewrap">
+    <cds-table id="table" size="xs" is-sortable is-selectable>
+      <cds-table-toolbar slot="toolbar">
+        <cds-table-toolbar-content>
+          <cds-table-toolbar-search persistent placeholder="Search cards" size="sm"></cds-table-toolbar-search>
+          <cds-button kind="ghost" size="sm">Filter</cds-button>
+          <cds-button kind="ghost" size="sm">Columns</cds-button>
+        </cds-table-toolbar-content>
+      </cds-table-toolbar>
+      <cds-table-head>
+        <cds-table-header-row selection-label="Select all cards">
+          <cds-table-header-cell>Name</cds-table-header-cell>
+          <cds-table-header-cell class="col-cost">Mana cost</cds-table-header-cell>
+          <cds-table-header-cell class="col-type">Type</cds-table-header-cell>
+          <cds-table-header-cell class="num">MV</cds-table-header-cell>
+          <cds-table-header-cell class="col-set">Set</cds-table-header-cell>
+          <cds-table-header-cell class="num">Adj WR</cds-table-header-cell>
+          <cds-table-header-cell class="num col-raw">Raw WR</cds-table-header-cell>
+          <cds-table-header-cell id="ruleCol">Removal</cds-table-header-cell>
+        </cds-table-header-row>
+      </cds-table-head>
+      <cds-table-body id="rows"></cds-table-body>
+    </cds-table>
+  </div>
+  <p class="desc" id="count" role="status" style="margin-top:.5rem"></p>
+</main>
+
+<script type="application/json" id="cards">
+[{"name":"Divine Resilience","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.4992,"wrRaw":0.5079,"set":"FDN","rarity":"U","rules":["tricks","protection"]},{"name":"Fleeting Flight","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.5561,"wrRaw":0.5644,"set":"FDN","rarity":"C","rules":["tricks","protection","counters"]},{"name":"Healer's Hawk","cost":"{W}","type":"Creature — Bird","mv":1,"wrAdj":0.5671,"wrRaw":0.5751,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Joust Through","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.556,"wrRaw":0.5637,"set":"FDN","rarity":"U","rules":["removal","lifegain"]},{"name":"Cathar Commando","cost":"{1}{W}","type":"Creature — Human Soldier","mv":2,"wrAdj":0.5482,"wrRaw":0.5558,"set":"FDN","rarity":"C","rules":["removal","creatures"]},{"name":"Giada, Font of Hope","cost":"{1}{W}","type":"Legendary Creature — Angel","mv":2,"wrAdj":0.5961,"wrRaw":0.6043,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Helpful Hunter","cost":"{1}{W}","type":"Creature — Cat","mv":2,"wrAdj":0.5673,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["creatures"]},{"name":"Skyknight Squire","cost":"{1}{W}","type":"Creature — Cat Scout","mv":2,"wrAdj":0.5813,"wrRaw":0.5885,"set":"FDN","rarity":"R","rules":["counters","creatures"]},{"name":"Sun-Blessed Healer","cost":"{1}{W}","type":"Creature — Human Cleric","mv":2,"wrAdj":0.5776,"wrRaw":0.5848,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Ajani, Caller of the Pride","cost":"{1}{W}{W}","type":"Legendary Planeswalker — Ajani","mv":3,"wrAdj":0.5692,"wrRaw":0.576,"set":"FDN","rarity":"M","rules":[]},{"name":"Arahbo, the First Fang","cost":"{2}{W}","type":"Legendary Creature — Cat Avatar","mv":3,"wrAdj":0.6021,"wrRaw":0.6092,"set":"FDN","rarity":"R","rules":["creatures"]},{"name":"Banishing Light","cost":"{2}{W}","type":"Enchantment","mv":3,"wrAdj":0.568,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Cat Collector","cost":"{2}{W}","type":"Creature — Human Citizen","mv":3,"wrAdj":0.5785,"wrRaw":0.5857,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Celestial Armor","cost":"{2}{W}","type":"Artifact — Equipment","mv":3,"wrAdj":0.6144,"wrRaw":0.62,"set":"FDN","rarity":"R","rules":["tricks","protection"]},{"name":"Dazzling Angel","cost":"{2}{W}","type":"Creature — Angel","mv":3,"wrAdj":0.5702,"wrRaw":0.5778,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Make Your Move","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.5456,"wrRaw":0.5526,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Stroke of Midnight","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.505,"wrRaw":0.5114,"set":"FDN","rarity":"U","rules":["removal"]},{"name":"Twinblade Blessing","cost":"{1}{W}{W}","type":"Enchantment — Aura","mv":3,"wrAdj":0.4592,"wrRaw":0.4683,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Day of Judgment","cost":"{2}{W}{W}","type":"Sorcery","mv":4,"wrAdj":0.5852,"wrRaw":0.5911,"set":"FDN","rarity":"R","rules":["removal"]},{"name":"Exemplar of Light","cost":"{2}{W}{W}","type":"Creature — Angel","mv":4,"wrAdj":0.5836,"wrRaw":0.5899,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Felidar Savior","cost":"{3}{W}","type":"Creature — Cat Beast","mv":4,"wrAdj":0.5664,"wrRaw":0.5736,"set":"FDN","rarity":"C","rules":["lifegain","counters","creatures"]},{"name":"Claws Out","cost":"{3}{W}{W}","type":"Instant","mv":5,"wrAdj":0.526,"wrRaw":0.5359,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Luminous Rebuke","cost":"{4}{W}","type":"Instant","mv":5,"wrAdj":0.5704,"wrRaw":0.5771,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Valkyrie's Call","cost":"{3}{W}{W}","type":"Enchantment","mv":5,"wrAdj":0.5733,"wrRaw":0.579,"set":"FDN","rarity":"M","rules":["protection","counters"]},{"name":"Herald of Eternal Dawn","cost":"{4}{W}{W}{W}","type":"Creature — Angel","mv":7,"wrAdj":0.5709,"wrRaw":0.5773,"set":"FDN","rarity":"M","rules":["flying","creatures"]}]
+</script>
+<script>
+  // Classic script: it runs before the deferred Carbon modules, so the table, tree and tabs are
+  // complete when they upgrade (rows added later miss the selection and size set-up).
+  (async () => {
+  // ---- Static mockup data (no engine). Card rows: Foundations (FDN) white cards with 17Lands win rates.
+  const CARDS = JSON.parse(document.getElementById("cards").textContent);
+  const RULES = [
+    { id: "removal", name: "Removal", min: 6 },
+    { id: "tricks", name: "Combat tricks", min: 6 },
+    { id: "protection", name: "Protection", min: 4 },
+    { id: "flying", name: "Flying", min: 5 },
+    { id: "lifegain", name: "Lifegain", min: 5 },
+    { id: "counters", name: "+1/+1 counters", min: 4 },
+    { id: "creatures", name: "Creatures", min: 12, max: 15 },
+    { id: "size", name: "Cards in colour", min: 30, max: 30 },
+  ];
+  for (const r of RULES) {
+    r.count = r.id === "size" ? CARDS.length : CARDS.filter((c) => c.rules.includes(r.id)).length;
+    const max = r.max ?? Infinity;
+    const off = r.count < r.min ? r.min - r.count : r.count > max ? r.count - max : 0;
+    r.status = off === 0 ? "pass" : off === 1 ? "warn" : "fail";
+    r.target = r.max === undefined || r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`;
+  }
+  const STATUS = { pass: "Pass", warn: "Close", fail: "Fail" };
+  const GLYPH = { pass: "✓", warn: "⚠", fail: "✕" };
+  const TAG = { pass: "green", warn: "warm-gray", fail: "red" };
+  const SECTIONS = [
+    { name: "Whole cube", items: [{ id: "cube", name: "Standard Limited All Stars", status: "fail", count: 435 }] },
+    { name: "Colours", items: [
+      { id: "all-colours", name: "All colours", status: "fail", count: "3 rules" },
+      { id: "white", name: "White", status: RULES.some((r) => r.status === "fail") ? "fail" : "pass", count: CARDS.length, pips: "W", desc: "Mono-white nonland cards. This mockup shows a 25-card sample from Foundations." },
+      { id: "blue", name: "Blue", status: "pass", count: 65, pips: "U" },
+      { id: "black", name: "Black", status: "fail", count: 61, pips: "B" },
+      { id: "red", name: "Red", status: "warn", count: 62, pips: "R" },
+      { id: "green", name: "Green", status: "pass", count: 59, pips: "G" },
+      { id: "colourless", name: "Colourless", status: "pass", count: 26, pips: "C" },
+      { id: "lands", name: "Lands", status: "warn", count: 55, pips: "N" },
+    ] },
+    { name: "Archetypes", items: [
+      { id: "all-archetypes", name: "All archetypes", status: "fail", count: "3 rules" },
+      { id: "azorius", name: "Azorius Flying Tempo", status: "pass", count: 94, pips: "WU" },
+      { id: "orzhov", name: "Orzhov Aristocrats", status: "pass", count: 62, pips: "WB" },
+      { id: "boros", name: "Boros Go Wide Aggro", status: "warn", count: 50, pips: "RW" },
+      { id: "selesnya", name: "Selesnya +1/+1 Counters", status: "warn", count: 52, pips: "GW" },
+      { id: "dimir", name: "Dimir Graveyard", status: "pass", count: 63, pips: "UB" },
+      { id: "izzet", name: "Izzet Spells", status: "fail", count: 130, pips: "UR" },
+      { id: "simic", name: "Simic Ramp", status: "pass", count: 74, pips: "GU" },
+      { id: "rakdos", name: "Rakdos Sacrifice", status: "pass", count: 67, pips: "BR" },
+      { id: "golgari", name: "Golgari Graveyard", status: "pass", count: 51, pips: "BG" },
+      { id: "gruul", name: "Gruul Ramp", status: "warn", count: 74, pips: "RG" },
+    ] },
+  ];
+  const SCOPES = SECTIONS.flatMap((s) => s.items);
+  const state = { scope: "white", rule: "removal" };
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const pips = (p) => p ? [...p].map((x) => `<span class="pip ${x}">${x === "N" ? "L" : x === "C" ? "◇" : x}</span>`).join("") : "";
+  const cost = (c) => `<span class="pips" role="img" aria-label="${esc(c)}">${[...c.matchAll(/\{([^}]+)\}/g)].map((m) => `<span class="pip ${/\d/.test(m[1]) ? "C" : m[1]}" aria-hidden="true">${m[1]}</span>`).join("")}</span>`;
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+  // Status glyph for the tree's icon slot: shape plus colour (circle pass, square close, diamond fail).
+  const SHAPE = {
+    pass: '<circle cx="5" cy="5" r="4"/>',
+    warn: '<rect x="1" y="1" width="8" height="8" rx="1"/>',
+    fail: '<path d="M5 0.5 9.5 5 5 9.5 0.5 5z"/>',
+  };
+  const stIcon = (s) => `<svg slot="icon" class="st ${s}" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">${SHAPE[s]}</svg>`;
+  // Carbon has no progress ring: a hand-drawn one.
+  const ring = (r) => {
+    const p = Math.min(1, r.count / r.min), c = 2 * Math.PI * 5;
+    return `<svg class="ring ${r.status}" viewBox="0 0 14 14" aria-hidden="true"><circle class="track" cx="7" cy="7" r="5" fill="none" stroke-width="3"/><circle class="ind" cx="7" cy="7" r="5" fill="none" stroke-width="3" stroke-dasharray="${c * p} ${c}"/></svg>`;
+  };
+
+  // ---- Left tree (cds-tree-view). A node takes a text label and one icon: counts go into the label text.
+  const navbody = document.getElementById("navbody");
+  navbody.innerHTML = SECTIONS.map((s, i) => `
+    <h2 class="navsection" id="sec${i}">${esc(s.name)}</h2>
+    <cds-tree-view size="xs" label="${esc(s.name)}" hide-label>
+      ${s.items.map((it) => `
+        <cds-tree-node data-scope="${it.id}" label="${esc(it.name)} · ${it.count}" ${it.id === "white" ? "is-expanded" : ""}>${stIcon(it.status)}
+          ${it.id === "white" ? RULES.map((r) => `<cds-tree-node data-rule="${r.id}" label="${esc(r.name)} · ${r.count}/${r.target}">${stIcon(r.status)}</cds-tree-node>`).join("") : ""}
+        </cds-tree-node>`).join("")}
+    </cds-tree-view>`).join("");
+
+  navbody.addEventListener("cds-tree-node-selected", (e) => {
+    const node = e.target;
+    if (node.dataset.rule) { if (state.scope !== "white" || state.rule !== node.dataset.rule) select("white", node.dataset.rule); }
+    else if (node.dataset.scope && node.dataset.scope !== state.scope) select(node.dataset.scope, node.dataset.scope === "white" ? state.rule : null);
+  });
+  function syncTree() {
+    for (const n of navbody.querySelectorAll("cds-tree-node")) {
+      const on = state.rule ? n.dataset.rule === state.rule : n.dataset.scope === state.scope;
+      if (n.selected !== on) { n.selected = on; n.active = on; }
+    }
+  }
+
+  // ---- Header: breadcrumb with sibling menus, title, status tag, rule tabs
+  document.getElementById("scopeMenuBody").innerHTML = SECTIONS.slice(1).flatMap((s) => s.items).map((it) =>
+    `<cds-overflow-menu-item data-scope="${it.id}">${esc(it.name)}</cds-overflow-menu-item>`).join("");
+  document.getElementById("ruleMenuBody").innerHTML = RULES.map((r) =>
+    `<cds-overflow-menu-item data-rule="${r.id}">${esc(r.name)}</cds-overflow-menu-item>`).join("");
+  document.addEventListener("click", (e) => {
+    const item = e.target.closest("cds-overflow-menu-item");
+    if (item?.dataset.scope) select(item.dataset.scope, item.dataset.scope === "white" ? "removal" : null);
+    if (item?.dataset.rule) select("white", item.dataset.rule);
+    const go = e.target.closest("cds-breadcrumb-link[data-go]");
+    if (go) { e.preventDefault(); select(go.dataset.go, go.dataset.go === "white" ? state.rule : null); }
+  });
+
+  const tabs = document.getElementById("rules");
+  tabs.innerHTML = RULES.map((r) => `
+    <cds-tab value="${r.id}"><span class="chip">${ring(r)}${esc(r.name)} <span class="n">${r.count}/${r.target}</span> <span class="g ${r.status}" aria-hidden="true">${GLYPH[r.status]}</span><span class="sr-only">, ${STATUS[r.status]}</span></span></cds-tab>`).join("");
+  tabs.addEventListener("cds-tabs-selected", (e) => { const v = e.detail?.item?.value; if (v && v !== state.rule) select("white", v); });
+
+  // ---- Table: Carbon sorts, selects and filters the rows itself.
+  const rows = document.getElementById("rows");
+  rows.innerHTML = CARDS.map((c) => `
+    <cds-table-row data-name="${esc(c.name)}" selection-label="Select ${esc(c.name)}">
+      <cds-table-cell class="name">${esc(c.name)}</cds-table-cell>
+      <cds-table-cell class="col-cost">${cost(c.cost)}</cds-table-cell>
+      <cds-table-cell class="type col-type">${esc(c.type)}</cds-table-cell>
+      <cds-table-cell class="num">${c.mv}</cds-table-cell>
+      <cds-table-cell class="col-set">${c.set}</cds-table-cell>
+      <cds-table-cell class="num">${pct(c.wrAdj)}</cds-table-cell>
+      <cds-table-cell class="num col-raw">${pct(c.wrRaw)}</cds-table-cell>
+      <cds-table-cell class="hitcell"></cds-table-cell>
+    </cds-table-row>`).join("");
+  const byName = Object.fromEntries(CARDS.map((c) => [c.name, c]));
+
+  function renderTable() {
+    const rule = RULES.find((r) => r.id === state.rule);
+    document.getElementById("ruleCol").textContent = rule ? rule.name : "Rule";
+    let n = 0;
+    for (const row of rows.querySelectorAll("cds-table-row")) {
+      const c = byName[row.dataset.name];
+      const hit = !!rule && (rule.id === "size" || c.rules.includes(rule.id));
+      n += hit;
+      row.hidden = state.scope !== "white";
+      row.classList.toggle("hit", hit);
+      row.querySelector(".hitcell").innerHTML = hit ? `✓<span class="sr-only"> counted</span>` : "";
+    }
+    document.getElementById("count").textContent = state.scope === "white"
+      ? `${CARDS.length} cards${rule ? ` · ${n} counted by ${rule.name}` : ""}` : "Static mockup: only White has card data.";
+  }
+
+  function select(scope, rule) {
+    state.scope = scope;
+    state.rule = scope === "white" ? rule : null;
+    const s = SCOPES.find((x) => x.id === scope);
+    const r = RULES.find((x) => x.id === state.rule);
+    document.getElementById("title").textContent = s.name;
+    document.getElementById("titlePips").innerHTML = pips(s.pips);
+    document.getElementById("desc").textContent = s.desc || "Static mockup: only White has rules and card data.";
+    const tag = document.getElementById("statusBadge");
+    tag.type = TAG[s.status];
+    tag.textContent = STATUS[s.status];
+    const sc = document.getElementById("scopeCrumb");
+    sc.textContent = scope === "cube" ? "All scopes" : s.name;
+    sc.toggleAttribute("is-currentpage", !r);
+    document.getElementById("ruleCrumbItem").hidden = !r;
+    if (r) document.getElementById("ruleCrumb").textContent = r.name;
+    document.getElementById("rulesBox").hidden = scope !== "white";
+    if (r && tabs.value !== r.id) tabs.value = r.id;
+    syncTree();
+    renderTable();
+    if (matchMedia("(max-width: 65.999rem)").matches) document.querySelector("cds-side-nav").expanded = false;
+  }
+
+  await Promise.all(["cds-tree-view", "cds-tree-node", "cds-table", "cds-tabs", "cds-side-nav", "cds-header"].map((t) => customElements.whenDefined(t)));
+  select("white", "removal");
+  })();
+</script>
+</body>
+</html>

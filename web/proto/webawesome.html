@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en" class="wa-theme-default wa-palette-default">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cubewarden mockup: Web Awesome</title>
+<meta name="color-scheme" content="light dark">
+<script>
+  // Web Awesome themes switch on .wa-dark / .wa-light, not on prefers-color-scheme: follow the OS here.
+  (() => {
+    const mq = matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      document.documentElement.classList.toggle("wa-dark", mq.matches);
+      document.documentElement.classList.toggle("wa-light", !mq.matches);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+  })();
+</script>
+<link rel="stylesheet" href="https://ka-f.webawesome.com/webawesome@3.15.0/styles/webawesome.css">
+<script type="module" src="https://ka-f.webawesome.com/webawesome@3.15.0/webawesome.loader.js"></script>
+<style>
+  :root {
+    --wa-space-scale: 0.75;
+    --wa-font-size-scale: 0.875;
+    --wa-border-radius-scale: 0.75;
+    --nav-width: 290px;
+    --pass: var(--wa-color-success-fill-loud);
+    --warn: var(--wa-color-warning-fill-loud);
+    --fail: var(--wa-color-danger-fill-loud);
+    --hit: var(--wa-color-brand-fill-quiet);
+    --line: var(--wa-color-surface-border);
+    --muted: var(--wa-color-text-quiet);
+  }
+  body { margin: 0; background: var(--wa-color-surface-default); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  wa-page[view="desktop"] { --menu-width: var(--nav-width); }
+  wa-page { --main-width: minmax(0, 1fr); }
+  wa-page:not(:defined) { visibility: hidden; }
+
+  /* App bar */
+  .appbar { display: flex; align-items: center; gap: var(--wa-space-m); padding: var(--wa-space-xs) var(--wa-space-l); border-bottom: 1px solid var(--line); min-height: 44px; box-sizing: border-box; }
+  .appbar .brand { font-weight: var(--wa-font-weight-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .appbar .views { display: flex; gap: var(--wa-space-2xs); }
+  .appbar .spacer { flex: 1; }
+  .appbar .meta { color: var(--muted); font-size: var(--wa-font-size-s); white-space: nowrap; }
+
+  /* Left tree */
+  .nav { padding: var(--wa-space-s) var(--wa-space-xs); box-sizing: border-box; }
+  wa-tree { --indent-size: 12px; --indent-guide-width: 1px; --indent-guide-color: var(--line); }
+  wa-tree-item::part(label) { flex: 1; min-width: 0; }
+  wa-tree-item::part(item) { border-radius: var(--wa-border-radius-m); }
+  wa-tree-item.section > .node { text-transform: uppercase; letter-spacing: .04em; font-size: var(--wa-font-size-2xs); color: var(--muted); font-weight: var(--wa-font-weight-semibold); }
+  .node { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; font-size: var(--wa-font-size-s); }
+  .node .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .node .ct { color: var(--muted); font-variant-numeric: tabular-nums; font-size: var(--wa-font-size-xs); padding-right: 6px; }
+
+  /* Status glyph: shape plus colour, so it reads without colour too */
+  .st { display: inline-block; flex: none; width: 8px; height: 8px; }
+  .st.pass { background: var(--pass); border-radius: 50%; }
+  .st.warn { background: var(--warn); border-radius: 1px; }
+  .st.fail { background: var(--fail); transform: rotate(45deg) scale(.85); }
+  .pips { display: inline-flex; gap: 2px; }
+  .pip { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 700; color: #1b1b1b; border: 1px solid rgb(0 0 0 / .25); box-sizing: border-box; line-height: 1; }
+  .pip.W { background: #f8f2d4; } .pip.U { background: #b4d3ea; } .pip.B { background: #bcb4b0; } .pip.R { background: #f0a98c; } .pip.G { background: #9fd1ad; } .pip.C { background: #d6d3cf; } .pip.N { background: #d6d3cf; }
+
+  /* Page header */
+  main.content { padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-2xl); min-width: 0; }
+  .crumbs { display: flex; align-items: center; gap: var(--wa-space-xs); }
+  wa-breadcrumb-item::part(label) { font-size: var(--wa-font-size-s); }
+  .crumbs wa-button::part(base) { font-weight: var(--wa-font-weight-normal); }
+  .titlebar { display: flex; align-items: center; gap: var(--wa-space-s); margin: var(--wa-space-xs) 0 2px; flex-wrap: wrap; }
+  .titlebar h1 { margin: 0; font-size: var(--wa-font-size-2xl); line-height: 1.2; }
+  .desc { margin: 0 0 var(--wa-space-m); color: var(--muted); font-size: var(--wa-font-size-s); }
+  /* Containment keeps the scrolling chip row from widening the mobile layout viewport. */
+  .rules { overflow-x: auto; padding-bottom: 2px; margin-bottom: var(--wa-space-m); contain: inline-size layout paint; }
+  .rules wa-radio-group::part(form-control-input) { flex-wrap: wrap; gap: 6px; }
+  .rules wa-radio::part(control) { border-radius: 999px; }
+  .pillcount { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--wa-color-brand-fill-loud); color: var(--wa-color-brand-on-loud); font-size: var(--wa-font-size-2xs); line-height: 16px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .chip wa-progress-ring { --size: 16px; --track-width: 3px; --indicator-width: 3px; }
+  .chip wa-progress-ring.pass { --indicator-color: var(--pass); }
+  .chip wa-progress-ring.warn { --indicator-color: var(--warn); }
+  .chip wa-progress-ring.fail { --indicator-color: var(--fail); }
+  .chip .n { color: var(--muted); }
+  .chip .g { font-size: 12px; }
+  .chip .g.pass { color: var(--wa-color-success-on-quiet); } .chip .g.warn { color: var(--wa-color-warning-on-quiet); } .chip .g.fail { color: var(--wa-color-danger-on-quiet); }
+
+  /* Table */
+  .toolbar { display: flex; align-items: center; gap: var(--wa-space-s); margin-bottom: var(--wa-space-xs); flex-wrap: wrap; }
+  .toolbar wa-input { flex: 1 1 260px; max-width: 420px; }
+  .toolbar .count { color: var(--muted); font-size: var(--wa-font-size-s); margin-left: auto; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--wa-border-radius-m); }
+  table.cards { width: 100%; border-collapse: collapse; font-size: var(--wa-font-size-s); margin: 0; }
+  table.cards th, table.cards td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; vertical-align: middle; }
+  table.cards thead th { position: sticky; top: 0; background: var(--wa-color-surface-lowered); font-weight: var(--wa-font-weight-semibold); z-index: 1; }
+  table.cards th.num, table.cards td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.cards .sel { width: 28px; padding-right: 0; }
+  table.cards th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+  table.cards th button:focus-visible { outline: var(--wa-focus-ring); outline-offset: 2px; border-radius: 2px; }
+  table.cards th .arrow { color: var(--muted); font-size: 10px; width: 8px; }
+  table.cards tbody tr.hit td { background: var(--hit); }
+  table.cards tbody tr.hit td:first-child { box-shadow: inset 3px 0 0 var(--wa-color-brand-fill-loud); }
+  table.cards tbody tr:hover td { background: var(--wa-color-surface-lowered); }
+  table.cards td.name { font-weight: var(--wa-font-weight-semibold); max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  table.cards td.type { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  table.cards td.hitcell { color: var(--wa-color-brand-on-quiet); font-weight: 600; }
+  .empty td { text-align: center; color: var(--muted); padding: var(--wa-space-xl); }
+
+  @media (max-width: 1100px) { .col-raw, .col-set { display: none; } }
+  @media (max-width: 600px) {
+    main.content { padding: var(--wa-space-s); }
+    .appbar { padding: var(--wa-space-xs) var(--wa-space-s); }
+    .appbar .meta, .appbar .views { display: none; }
+    .col-type, .col-cost { display: none; }
+    .rules wa-radio-group::part(form-control-input) { flex-wrap: nowrap; }
+    table.cards td.name { max-width: 150px; }
+  }
+</style>
+</head>
+<body>
+<wa-page mobile-breakpoint="900">
+  <header slot="header" class="appbar">
+    <span class="brand">Standard Limited All Stars</span>
+    <nav class="views" aria-label="Views">
+      <wa-button size="s" appearance="filled" variant="neutral" aria-current="page">Workbench</wa-button>
+      <wa-button size="s" appearance="plain" variant="neutral">Overview</wa-button>
+    </nav>
+    <span class="spacer"></span>
+    <span class="meta">435 cards, target 360</span>
+    <wa-button size="s" appearance="outlined">Changes <span class="pillcount">166</span></wa-button>
+  </header>
+
+  <div slot="navigation" class="nav">
+    <wa-tree id="tree" selection="single" aria-label="Scopes, rules and mechanics"></wa-tree>
+  </div>
+
+  <main class="content" id="main">
+    <div class="crumbs">
+      <wa-breadcrumb aria-label="Scope">
+        <wa-breadcrumb-item href="#" data-go="cube">Cube</wa-breadcrumb-item>
+        <wa-breadcrumb-item>
+          <wa-dropdown id="scopeMenu">
+            <wa-button slot="trigger" size="s" appearance="plain" with-caret id="scopeCrumb">White</wa-button>
+          </wa-dropdown>
+        </wa-breadcrumb-item>
+        <wa-breadcrumb-item id="ruleCrumbItem">
+          <wa-dropdown id="ruleMenu">
+            <wa-button slot="trigger" size="s" appearance="plain" with-caret id="ruleCrumb">Removal</wa-button>
+          </wa-dropdown>
+        </wa-breadcrumb-item>
+      </wa-breadcrumb>
+    </div>
+
+    <div class="titlebar">
+      <span class="pips" id="titlePips" aria-hidden="true"></span>
+      <h1 id="title">White</h1>
+      <wa-badge id="statusBadge" variant="danger" appearance="filled-outlined">Fail</wa-badge>
+    </div>
+    <p class="desc" id="desc">Mono-white nonland cards.</p>
+
+    <div class="rules" id="rulesBox">
+      <wa-radio-group id="rules" orientation="horizontal" size="s" value="removal">
+        <span slot="label" class="sr-only">Rules and mechanics of this scope</span>
+      </wa-radio-group>
+    </div>
+
+    <div class="toolbar">
+      <wa-input id="search" size="s" placeholder="Search, or filter: otag:removal t:creature mv<=3" with-clear>
+        <span slot="label" class="sr-only">Search cards</span>
+      </wa-input>
+      <wa-button size="s" appearance="outlined">Filter</wa-button>
+      <wa-button size="s" appearance="outlined">Columns</wa-button>
+      <span class="count" id="count" role="status"></span>
+    </div>
+    <div class="tablewrap">
+      <table class="cards" id="table">
+        <caption class="sr-only" id="caption">Cards in scope</caption>
+        <thead>
+          <tr>
+            <th class="sel" scope="col"><wa-checkbox id="selAll" size="s"><span class="sr-only">Select all cards</span></wa-checkbox></th>
+            <th scope="col" data-key="name"><button type="button">Name <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" class="col-cost">Mana cost</th>
+            <th scope="col" class="col-type" data-key="type"><button type="button">Type <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" class="num" data-key="mv"><button type="button">MV <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" class="col-set" data-key="set"><button type="button">Set <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" class="num" data-key="wrAdj"><button type="button">Adj WR <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" class="num col-raw" data-key="wrRaw"><button type="button">Raw WR <span class="arrow" aria-hidden="true"></span></button></th>
+            <th scope="col" id="ruleCol">Removal</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+</wa-page>
+
+<script type="application/json" id="cards">
+[{"name":"Divine Resilience","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.4992,"wrRaw":0.5079,"set":"FDN","rarity":"U","rules":["tricks","protection"]},{"name":"Fleeting Flight","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.5561,"wrRaw":0.5644,"set":"FDN","rarity":"C","rules":["tricks","protection","counters"]},{"name":"Healer's Hawk","cost":"{W}","type":"Creature — Bird","mv":1,"wrAdj":0.5671,"wrRaw":0.5751,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Joust Through","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.556,"wrRaw":0.5637,"set":"FDN","rarity":"U","rules":["removal","lifegain"]},{"name":"Cathar Commando","cost":"{1}{W}","type":"Creature — Human Soldier","mv":2,"wrAdj":0.5482,"wrRaw":0.5558,"set":"FDN","rarity":"C","rules":["removal","creatures"]},{"name":"Giada, Font of Hope","cost":"{1}{W}","type":"Legendary Creature — Angel","mv":2,"wrAdj":0.5961,"wrRaw":0.6043,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Helpful Hunter","cost":"{1}{W}","type":"Creature — Cat","mv":2,"wrAdj":0.5673,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["creatures"]},{"name":"Skyknight Squire","cost":"{1}{W}","type":"Creature — Cat Scout","mv":2,"wrAdj":0.5813,"wrRaw":0.5885,"set":"FDN","rarity":"R","rules":["counters","creatures"]},{"name":"Sun-Blessed Healer","cost":"{1}{W}","type":"Creature — Human Cleric","mv":2,"wrAdj":0.5776,"wrRaw":0.5848,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Ajani, Caller of the Pride","cost":"{1}{W}{W}","type":"Legendary Planeswalker — Ajani","mv":3,"wrAdj":0.5692,"wrRaw":0.576,"set":"FDN","rarity":"M","rules":[]},{"name":"Arahbo, the First Fang","cost":"{2}{W}","type":"Legendary Creature — Cat Avatar","mv":3,"wrAdj":0.6021,"wrRaw":0.6092,"set":"FDN","rarity":"R","rules":["creatures"]},{"name":"Banishing Light","cost":"{2}{W}","type":"Enchantment","mv":3,"wrAdj":0.568,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Cat Collector","cost":"{2}{W}","type":"Creature — Human Citizen","mv":3,"wrAdj":0.5785,"wrRaw":0.5857,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Celestial Armor","cost":"{2}{W}","type":"Artifact — Equipment","mv":3,"wrAdj":0.6144,"wrRaw":0.62,"set":"FDN","rarity":"R","rules":["tricks","protection"]},{"name":"Dazzling Angel","cost":"{2}{W}","type":"Creature — Angel","mv":3,"wrAdj":0.5702,"wrRaw":0.5778,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Make Your Move","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.5456,"wrRaw":0.5526,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Stroke of Midnight","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.505,"wrRaw":0.5114,"set":"FDN","rarity":"U","rules":["removal"]},{"name":"Twinblade Blessing","cost":"{1}{W}{W}","type":"Enchantment — Aura","mv":3,"wrAdj":0.4592,"wrRaw":0.4683,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Day of Judgment","cost":"{2}{W}{W}","type":"Sorcery","mv":4,"wrAdj":0.5852,"wrRaw":0.5911,"set":"FDN","rarity":"R","rules":["removal"]},{"name":"Exemplar of Light","cost":"{2}{W}{W}","type":"Creature — Angel","mv":4,"wrAdj":0.5836,"wrRaw":0.5899,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Felidar Savior","cost":"{3}{W}","type":"Creature — Cat Beast","mv":4,"wrAdj":0.5664,"wrRaw":0.5736,"set":"FDN","rarity":"C","rules":["lifegain","counters","creatures"]},{"name":"Claws Out","cost":"{3}{W}{W}","type":"Instant","mv":5,"wrAdj":0.526,"wrRaw":0.5359,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Luminous Rebuke","cost":"{4}{W}","type":"Instant","mv":5,"wrAdj":0.5704,"wrRaw":0.5771,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Valkyrie's Call","cost":"{3}{W}{W}","type":"Enchantment","mv":5,"wrAdj":0.5733,"wrRaw":0.579,"set":"FDN","rarity":"M","rules":["protection","counters"]},{"name":"Herald of Eternal Dawn","cost":"{4}{W}{W}{W}","type":"Creature — Angel","mv":7,"wrAdj":0.5709,"wrRaw":0.5773,"set":"FDN","rarity":"M","rules":["flying","creatures"]}]
+</script>
+<script type="module">
+  // ---- Static mockup data (no engine). Card rows: Foundations (FDN) white cards with 17Lands win rates.
+  const CARDS = JSON.parse(document.getElementById("cards").textContent);
+  const RULES = [
+    { id: "removal", name: "Removal", min: 6 },
+    { id: "tricks", name: "Combat tricks", min: 6 },
+    { id: "protection", name: "Protection", min: 4 },
+    { id: "flying", name: "Flying", min: 5 },
+    { id: "lifegain", name: "Lifegain", min: 5 },
+    { id: "counters", name: "+1/+1 counters", min: 4 },
+    { id: "creatures", name: "Creatures", min: 12, max: 15 },
+    { id: "size", name: "Cards in colour", min: 30, max: 30 },
+  ];
+  const counts = (r) => r.id === "size" ? CARDS.length : CARDS.filter((c) => c.rules.includes(r.id)).length;
+  for (const r of RULES) {
+    r.count = counts(r);
+    const max = r.max ?? Infinity;
+    const off = r.count < r.min ? r.min - r.count : r.count > max ? r.count - max : 0;
+    r.status = off === 0 ? "pass" : off === 1 ? "warn" : "fail";
+    r.target = r.max === undefined ? `${r.min}` : r.min === r.max ? `${r.min}` : `${r.min}–${r.max}`;
+  }
+  const STATUS = { pass: "Pass", warn: "Close", fail: "Fail" };
+  const GLYPH = { pass: "✓", warn: "⚠", fail: "✕" };
+  const VARIANT = { pass: "success", warn: "warning", fail: "danger" };
+  const SECTIONS = [
+    { name: "Whole cube", items: [{ id: "cube", name: "Standard Limited All Stars", status: "fail", count: 435 }] },
+    { name: "Colours", items: [
+      { id: "all-colours", name: "All colours", status: "fail", count: "3 rules" },
+      { id: "white", name: "White", status: RULES.some((r) => r.status === "fail") ? "fail" : "pass", count: CARDS.length, pips: "W", desc: "Mono-white nonland cards. This mockup shows a 25-card sample from Foundations." },
+      { id: "blue", name: "Blue", status: "pass", count: 65, pips: "U" },
+      { id: "black", name: "Black", status: "fail", count: 61, pips: "B" },
+      { id: "red", name: "Red", status: "warn", count: 62, pips: "R" },
+      { id: "green", name: "Green", status: "pass", count: 59, pips: "G" },
+      { id: "colourless", name: "Colourless", status: "pass", count: 26, pips: "C" },
+      { id: "lands", name: "Lands", status: "warn", count: 55, pips: "N" },
+    ] },
+    { name: "Archetypes", items: [
+      { id: "all-archetypes", name: "All archetypes", status: "fail", count: "3 rules" },
+      { id: "azorius", name: "Azorius Flying Tempo", status: "pass", count: 94, pips: "WU" },
+      { id: "orzhov", name: "Orzhov Aristocrats", status: "pass", count: 62, pips: "WB" },
+      { id: "boros", name: "Boros Go Wide Aggro", status: "warn", count: 50, pips: "RW" },
+      { id: "selesnya", name: "Selesnya +1/+1 Counters", status: "warn", count: 52, pips: "GW" },
+      { id: "dimir", name: "Dimir Graveyard", status: "pass", count: 63, pips: "UB" },
+      { id: "izzet", name: "Izzet Spells", status: "fail", count: 130, pips: "UR" },
+      { id: "simic", name: "Simic Ramp", status: "pass", count: 74, pips: "GU" },
+      { id: "rakdos", name: "Rakdos Sacrifice", status: "pass", count: 67, pips: "BR" },
+      { id: "golgari", name: "Golgari Graveyard", status: "pass", count: 51, pips: "BG" },
+      { id: "gruul", name: "Gruul Ramp", status: "warn", count: 74, pips: "RG" },
+    ] },
+  ];
+  const SCOPES = SECTIONS.flatMap((s) => s.items);
+  const state = { scope: "white", rule: "removal", sort: { key: "mv", dir: 1 }, query: "", selected: new Set() };
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const pips = (p) => p ? `<span class="pips" aria-hidden="true">${[...p].map((x) => `<span class="pip ${x}">${x === "N" ? "L" : x === "C" ? "◇" : x}</span>`).join("")}</span>` : "";
+  const st = (s) => `<span class="st ${s}" aria-hidden="true"></span><span class="sr-only">${STATUS[s]}: </span>`;
+  const cost = (c) => `<span class="pips" role="img" aria-label="${esc(c)}">${[...c.matchAll(/\{([^}]+)\}/g)].map((m) => `<span class="pip ${/\d/.test(m[1]) ? "C" : m[1]}">${m[1]}</span>`).join("")}</span>`;
+  const pct = (x) => (x * 100).toFixed(1) + "%";
+
+  // ---- Left tree (wa-tree)
+  const tree = document.getElementById("tree");
+  tree.innerHTML = SECTIONS.map((s) => `
+    <wa-tree-item class="section" expanded data-section><span class="node">${esc(s.name)}</span>
+      ${s.items.map((it) => `
+        <wa-tree-item data-scope="${it.id}" ${it.id === "white" ? "expanded" : ""}>
+          <span class="node">${st(it.status)}${pips(it.pips)}<span class="nm">${esc(it.name)}</span><span class="ct">${it.count}</span></span>
+          ${it.id === "white" ? RULES.map((r) => `
+            <wa-tree-item data-rule="${r.id}" ${r.id === state.rule ? "selected" : ""}>
+              <span class="node">${st(r.status)}<span class="nm">${esc(r.name)}</span><span class="ct">${r.count}/${r.target}</span></span>
+            </wa-tree-item>`).join("") : ""}
+        </wa-tree-item>`).join("")}
+    </wa-tree-item>`).join("");
+
+  tree.addEventListener("wa-selection-change", (e) => {
+    const item = e.detail.selection[0];
+    if (!item) return;
+    if (item.dataset.rule) select("white", item.dataset.rule);
+    else if (item.dataset.scope) select(item.dataset.scope, item.dataset.scope === "white" ? state.rule : null);
+    else syncTree(); // section headings are not scopes
+    document.querySelector("wa-page").navOpen = false;
+  });
+
+  function syncTree() {
+    for (const it of tree.querySelectorAll("wa-tree-item")) {
+      const on = state.rule && state.scope === "white" ? it.dataset.rule === state.rule : it.dataset.scope === state.scope;
+      it.selected = on;
+    }
+  }
+
+  // ---- Header: breadcrumb with sibling menus, title, status, rule chips
+  const scopeMenu = document.getElementById("scopeMenu");
+  scopeMenu.insertAdjacentHTML("beforeend", SECTIONS.slice(1).map((s) =>
+    s.items.map((it) => `<wa-dropdown-item value="${it.id}">${esc(it.name)}</wa-dropdown-item>`).join("")).join('<wa-divider></wa-divider>'));
+  scopeMenu.addEventListener("wa-select", (e) => select(e.detail.item.value, e.detail.item.value === "white" ? "removal" : null));
+  const ruleMenu = document.getElementById("ruleMenu");
+  ruleMenu.insertAdjacentHTML("beforeend", RULES.map((r) => `<wa-dropdown-item value="${r.id}">${esc(r.name)}</wa-dropdown-item>`).join(""));
+  ruleMenu.addEventListener("wa-select", (e) => select("white", e.detail.item.value));
+  document.querySelector('[data-go="cube"]').addEventListener("click", (e) => { e.preventDefault(); select("cube", null); });
+
+  const group = document.getElementById("rules");
+  group.innerHTML = RULES.map((r) => `
+    <wa-radio appearance="button" value="${r.id}">
+      <span class="chip"><wa-progress-ring class="${r.status}" value="${Math.min(100, Math.round(100 * r.count / r.min))}" aria-hidden="true"></wa-progress-ring>
+      ${esc(r.name)} <span class="n">${r.count}/${r.target}</span> <span class="g ${r.status}" aria-hidden="true">${GLYPH[r.status]}</span><span class="sr-only">, ${STATUS[r.status]}</span></span>
+    </wa-radio>`).join("");
+  group.addEventListener("change", () => select("white", group.value));
+
+  // ---- Table
+  const rows = document.getElementById("rows");
+  for (const th of document.querySelectorAll("th[data-key] button")) {
+    th.addEventListener("click", () => {
+      const key = th.parentElement.dataset.key;
+      state.sort = { key, dir: state.sort.key === key ? -state.sort.dir : (key === "wrAdj" || key === "wrRaw" ? -1 : 1) };
+      renderTable();
+    });
+  }
+  document.getElementById("search").addEventListener("input", (e) => { state.query = e.target.value.toLowerCase(); renderTable(); });
+  document.getElementById("selAll").addEventListener("change", (e) => {
+    const vis = visibleCards();
+    for (const c of vis) e.target.checked ? state.selected.add(c.name) : state.selected.delete(c.name);
+    renderTable();
+  });
+  rows.addEventListener("change", (e) => {
+    const name = e.target.closest("tr")?.dataset.name;
+    if (!name) return;
+    e.target.checked ? state.selected.add(name) : state.selected.delete(name);
+    renderSelAll();
+  });
+
+  const visibleCards = () => state.scope !== "white" ? [] : CARDS.filter((c) => !state.query || (c.name + " " + c.type).toLowerCase().includes(state.query));
+  const counted = (c) => state.rule === "size" || c.rules.includes(state.rule);
+
+  function renderSelAll() {
+    const vis = visibleCards(), n = vis.filter((c) => state.selected.has(c.name)).length;
+    const all = document.getElementById("selAll");
+    all.checked = n > 0 && n === vis.length;
+    all.indeterminate = n > 0 && n < vis.length;
+  }
+
+  function renderTable() {
+    const { key, dir } = state.sort;
+    for (const th of document.querySelectorAll("th[data-key]")) {
+      const on = th.dataset.key === key;
+      th.setAttribute("aria-sort", on ? (dir > 0 ? "ascending" : "descending") : "none");
+      th.querySelector(".arrow").textContent = on ? (dir > 0 ? "▲" : "▼") : "";
+    }
+    const vis = visibleCards().sort((a, b) => (a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : a.name.localeCompare(b.name) * dir) * dir);
+    const rule = RULES.find((r) => r.id === state.rule);
+    document.getElementById("ruleCol").textContent = rule ? rule.name : "Rule";
+    if (!vis.length) {
+      rows.innerHTML = `<tr class="empty"><td colspan="9">${state.scope === "white" ? "No cards match the search." : "Static mockup: only White has card data."}</td></tr>`;
+    } else {
+      rows.innerHTML = vis.map((c) => {
+        const hit = rule && counted(c);
+        return `<tr data-name="${esc(c.name)}" class="${hit ? "hit" : ""}">
+          <td class="sel"><wa-checkbox size="s" ${state.selected.has(c.name) ? "checked" : ""}><span class="sr-only">Select ${esc(c.name)}</span></wa-checkbox></td>
+          <td class="name">${esc(c.name)}</td>
+          <td class="col-cost">${cost(c.cost)}</td>
+          <td class="type col-type">${esc(c.type)}</td>
+          <td class="num">${c.mv}</td>
+          <td class="col-set">${c.set}</td>
+          <td class="num">${pct(c.wrAdj)}</td>
+          <td class="num col-raw">${pct(c.wrRaw)}</td>
+          <td class="hitcell">${hit ? `✓<span class="sr-only"> counted</span>` : ""}</td>
+        </tr>`;
+      }).join("");
+    }
+    const n = vis.filter((c) => rule && counted(c)).length;
+    document.getElementById("count").textContent = state.scope === "white"
+      ? `${vis.length} of ${CARDS.length} cards${rule ? ` · ${n} counted by ${rule.name}` : ""}` : "";
+    renderSelAll();
+  }
+
+  function select(scope, rule) {
+    state.scope = scope;
+    state.rule = scope === "white" ? rule : null;
+    const s = SCOPES.find((x) => x.id === scope);
+    const r = RULES.find((x) => x.id === state.rule);
+    document.getElementById("title").textContent = s.name;
+    document.getElementById("titlePips").innerHTML = s.pips ? pips(s.pips) : "";
+    document.getElementById("desc").textContent = s.desc || "Static mockup: only White has rules and card data.";
+    const badge = document.getElementById("statusBadge");
+    badge.variant = VARIANT[s.status];
+    badge.textContent = STATUS[s.status];
+    document.getElementById("scopeCrumb").textContent = scope === "cube" ? "All scopes" : s.name;
+    document.getElementById("ruleCrumbItem").hidden = !r;
+    if (r) document.getElementById("ruleCrumb").textContent = r.name;
+    document.getElementById("rulesBox").hidden = scope !== "white";
+    if (r) group.value = r.id;
+    document.getElementById("caption").textContent = r ? `${s.name} cards; rows counted by ${r.name} are highlighted` : `${s.name} cards`;
+    syncTree();
+    renderTable();
+  }
+
+  await Promise.all(["wa-tree", "wa-tree-item", "wa-radio-group", "wa-radio", "wa-checkbox", "wa-page"].map((t) => customElements.whenDefined(t)));
+  select("white", "removal");
+</script>
+</body>
+</html>
