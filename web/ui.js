@@ -15,3 +15,5 @@ import '@vaadin/switch';
 import '@vaadin/tabs';
 import '@vaadin/text-field';
 import '@vaadin/tooltip';
+import '@vaadin/integer-field';
+import '@vaadin/radio-group';

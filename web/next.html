@@ -222,6 +222,12 @@ body.nav-none #btnScopes{display:inline-flex}
 .mrow-h{display:flex;align-items:center;gap:8px}
 .mrow-t{font-size:12px;color:var(--near)}
 .kempty{padding:3px 0;color:var(--ink-3);font-size:12.5px}
+.cf{display:flex;flex-direction:column;gap:8px}
+.cf-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--vaadin-radius-m);background:var(--paper)}
+.cf-row vaadin-integer-field{width:64px}
+.cf-l{font-weight:600}
+.cf-sep{margin-left:8px}
+.cf-row .fb-x{margin-left:auto}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* the selected rule */
 .rulepanel{margin:0;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--chrome);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:start}
@@ -2307,6 +2313,75 @@ function updateLive() {
   const dt = $("#draftText"); if (dt) dt.textContent = safeRuleText(draft.obj, draft.type === "rule");
   const ds = $("#draftScry"); if (ds) ds.innerHTML = scryHtml(draft.obj.filter, draft.view);
 }
+/** Curve rules in Builder mode: one row per mana value bucket. The rows are written as curve text and read back
+ *  by the engine's own parser, so the rule keeps the engine's bucket shape and the engine's error messages. */
+function curveRowsOf(m) {
+  return (m.buckets || []).map((b) => {
+    const c = b.constraint || {}, to = b.mvMax != null ? b.mvMax : b.to != null ? b.to : b.mv;
+    const lo = c.kind === "min" || c.kind === "range" ? c.min : c.kind === "exact" ? c.value : null;
+    const hi = c.kind === "max" || c.kind === "range" ? c.max : c.kind === "exact" ? c.value : null;
+    return { from: b.mv, to, plus: !!b.plus, min: lo, max: hi };
+  });
+}
+function curveText(rows, pct, absolute) {
+  const n = (v) => v + (pct ? "%" : "");
+  const parts = rows.map((r) => {
+    const label = r.plus ? `${r.from}+` : r.to != null && r.to !== "" && r.to !== r.from ? `${r.from}-${r.to}` : `${r.from}`;
+    const has = (v) => v !== null && v !== "" && v !== undefined;
+    const t = has(r.min) && has(r.max) ? (r.min === r.max ? n(r.min) : `${n(r.min)}..${n(r.max)}`) : has(r.min) ? `>=${n(r.min)}` : has(r.max) ? `<=${n(r.max)}` : "";
+    return `${label}:${t}`;
+  });
+  return `curve() ${parts.join(" ")}${absolute ? " fixed" : ""}`.trim();
+}
+function curveForm(o, onChange) {
+  const m = o.measure;
+  const st = draft.curve || (draft.curve = { rows: curveRowsOf(m), pct: (m.buckets || []).some((b) => b.constraint && b.constraint.unit === "percent") });
+  if (!st.rows.length) st.rows.push({ from: 2, to: 2, plus: false, min: null, max: null });
+  const box = h("div", { class: "cf" }), err = h("div", { class: "fb-errors", role: "alert" });
+  const apply = () => {
+    const text = curveText(st.rows, st.pct, o.measure.absolute);
+    const blank = st.rows.findIndex((r) => (r.min === null || r.min === "") && (r.max === null || r.max === ""));
+    if (blank >= 0) { err.replaceChildren(h("div", { class: "fb-err" }, `Bucket ${blank + 1}: give a minimum, a maximum or both.`)); return; }
+    try {
+      const pr = E.parseRuleText(text);
+      o.measure = Object.assign({}, pr.measure, o.measure.absolute ? { absolute: true } : {});
+      err.replaceChildren(); onChange();
+    } catch (e) { err.replaceChildren(h("div", { class: "fb-err" }, e.message)); }
+  };
+  const num = (label, v, set, extra) => {
+    const f = h("vaadin-integer-field", Object.assign({ theme: "small", "aria-label": label, placeholder: extra && extra.ph || "", min: "0", "step-buttons-visible": false }, extra && extra.attrs || {}));
+    f.value = v == null ? "" : String(v);
+    f.addEventListener("change", () => { set(f.value === "" ? null : Number(f.value)); apply(); });
+    return f;
+  };
+  const draw = () => {
+    const unit = h("vaadin-radio-group", { theme: "horizontal", label: "Targets in" },
+      h("vaadin-radio-button", { value: "cards", label: "number of cards" }), h("vaadin-radio-button", { value: "pct", label: "percent of the filtered cards" }));
+    unit.value = st.pct ? "pct" : "cards";
+    unit.addEventListener("value-changed", (e) => { const p = e.detail.value === "pct"; if (p !== st.pct) { st.pct = p; draw(); apply(); } });
+    const rows = st.rows.map((r, i) => {
+      const plus = h("vaadin-checkbox", { label: "and above" }); plus.checked = r.plus;
+      plus.addEventListener("checked-changed", (e) => { if (r.plus !== e.detail.value) { r.plus = e.detail.value; draw(); apply(); } });
+      const toF = num(`Bucket ${i + 1}: mana value to`, r.plus ? null : r.to, (v) => (r.to = v), { ph: r.plus ? "∞" : "" });
+      if (r.plus) toF.setAttribute("disabled", "");
+      return h("div", { class: "cf-row" },
+        h("span", { class: "cf-l" }, "Mana value"), h("span", { class: "muted" }, "from"), num(`Bucket ${i + 1}: mana value from`, r.from, (v) => { r.from = v; if (r.to == null || r.to < v) r.to = v; }),
+        h("span", { class: "muted" }, "to"), toF, plus,
+        h("span", { class: "cf-l cf-sep" }, st.pct ? "Share" : "Cards"), h("span", { class: "muted" }, "min"), num(`Bucket ${i + 1}: minimum`, r.min, (v) => (r.min = v), { ph: "–" }),
+        h("span", { class: "muted" }, "max"), num(`Bucket ${i + 1}: maximum`, r.max, (v) => (r.max = v), { ph: "–" }),
+        st.pct ? h("span", { class: "muted" }, "%") : null,
+        h("button", { class: "fb-x", type: "button", title: "Remove this bucket", "aria-label": `Remove bucket ${i + 1}`, onclick: () => { st.rows.splice(i, 1); draw(); apply(); } }, "×"));
+    });
+    const add = h("button", { class: "fb-add", type: "button", onclick: () => {
+      const last = st.rows[st.rows.length - 1], from = last ? (last.plus ? last.from : (last.to ?? last.from) + 1) : 1;
+      if (last && last.plus) last.plus = false;
+      st.rows.push({ from, to: from, plus: false, min: null, max: null }); draw(); apply();
+    } }, "+ Bucket");
+    box.replaceChildren(unit, ...rows, h("div", { class: "fb-foot" }, add), err);
+  };
+  draw();
+  return box;
+}
 function renderEditor() {
   const d = draft, o = d.obj, isRule = d.type === "rule";
   const arch = archOf(d.owner);
@@ -2329,8 +2404,7 @@ function renderEditor() {
   if (isRule) {
     first.append(selEl([["count", "Count"], ["avg", "Average"], ["every", "Every card"], ["curve", "Mana curve"]], m.kind, (k) => {
       o.measure = k === "count" ? { kind: "count" } : k === "avg" ? { kind: "avg", metric: m.metric || "wrAdj" } : k === "curve" ? { kind: "curve", buckets: [] } : { kind: "every" };
-      o.constraint = null;
-      if (k === "curve") U.editMode = "text";
+      o.constraint = null; draft.curve = null;
       rebuild();
     }, "txt sel-strong"));
     if (m.kind === "avg") first.append(selEl(metricOpts, m.metric, (v) => { m.metric = v; o.constraint = null; rebuild(); }, "txt sel-strong"));
@@ -2365,7 +2439,7 @@ function renderEditor() {
         const f = pr.filter ? (pr.filter.field ? { op: "and", items: [pr.filter] } : pr.filter) : { op: "and", items: [] };
         const probs = filterProblems(f, d.owner);
         if (isRule) o.measure = pr.measure;
-        o.filter = f; o.constraint = pr.constraint;
+        o.filter = f; o.constraint = pr.constraint; draft.curve = null;
         errEl.replaceChildren(...probs.map((x) => h("div", { class: "fb-err" }, x)));
         scheduleDraft();
       } catch (e) { errEl.replaceChildren(h("div", { class: "fb-err" }, e.message)); }
@@ -2373,16 +2447,14 @@ function renderEditor() {
     ta.addEventListener("input", debounce(apply, 150));
     sentence = h("div", { class: "sentence" }, ta, errEl, cheatSheet());
   } else if (m.kind === "curve") {
-    sentence = h("div", { class: "sentence" }, h("div", { class: "sl" }, h("span", { class: "muted" }, "Curve rules are edited as text."),
-      h("button", { class: "btn sm", type: "button", onclick: () => { U.editMode = "text"; save(); renderDrawer(); } }, "Edit as text")),
-      h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
+    sentence = h("div", { class: "sentence" }, first, builder.el, h("div", { class: "sl" }, h("span", null, "should spread over these mana values:")), curveForm(o, scheduleDraft), h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
   } else {
     sentence = h("div", { class: "sentence" }, first, builder.el, last, h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
   }
   body.append(h("div", { class: "row", style: "justify-content:space-between" }, h("span", { class: "lbl", style: "font-size:12px;font-weight:600;color:var(--ink-2)" }, isRule ? "Rule" : "Mechanic"), modeSeg));
-  if (isRule && m.kind === "count" && d.owner.kind !== "cube" && hasTarget()) {
+  if (isRule && (m.kind === "count" || m.kind === "curve") && d.owner.kind !== "cube" && hasTarget()) {
     const cb = h("input", { type: "checkbox" }); cb.checked = !!m.absolute;
-    cb.addEventListener("change", () => { if (cb.checked) m.absolute = true; else delete m.absolute; scheduleDraft(); });
+    cb.addEventListener("change", () => { if (cb.checked) o.measure.absolute = true; else delete o.measure.absolute; scheduleDraft(); });
     sentence.append(h("label", { class: "row help", style: "gap:6px;font-size:12px", title: "Use for fixed slots such as gold or hybrid cards" }, cb, `Fixed count: never scale it to ${S.config.cube.targetSize} cards`));
   }
   body.append(sentence);
