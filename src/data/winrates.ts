@@ -2,6 +2,10 @@
  * 17Lands win rates: GIH WR (games where the card was in the opening hand or drawn) and an adjusted WR
  * that removes the strength of the decks the card was played in. Two sources: a precomputed file, or
  * 17Lands' public Card Ratings and Color Ratings endpoints.
+ *
+ * Cards carry the WR Δ (Card.wrDelta): the adjusted WR minus the set's centre, in points. The centre of a set is the
+ * mean adjusted WR of its commons and uncommons, so an average common or uncommon is 0 in every set and cards from
+ * different sets compare (the adjusted WR alone still carries each event's overall win rate).
  */
 import { readFile } from "node:fs/promises";
 import type { Card } from "../model.ts";
@@ -9,7 +13,8 @@ import { colorSet } from "../colors.ts";
 import type { Http } from "./http.ts";
 import { searchAll } from "./scryfall-cards.ts";
 
-export interface WinRate { gihWr: number; adjWr: number | null; games: number }
+/** rarity = the card's rarity in that set, when the source gives it (17Lands Card Ratings do). */
+export interface WinRate { gihWr: number; adjWr: number | null; games: number; rarity?: string | null }
 
 /** Win rates by oracle id and set, with each set's release date and data date. */
 export interface WinRateTable {
@@ -47,17 +52,17 @@ export async function hasLiveRatings(http: Http, set: string): Promise<boolean> 
 interface WinRateFile {
   source?: string;
   sets?: Record<string, { released?: string; asOf?: string }>;
-  cards?: Record<string, Record<string, { gihWr?: number; adjWr?: number; games?: number }>>;
+  cards?: Record<string, Record<string, { gihWr?: number; adjWr?: number; games?: number; rarity?: string }>>;
 }
 
-/** Reads { sets: { <set>: { released } }, cards: { <oracle id>: { <set>: { gihWr, adjWr, games } } } }. */
+/** Reads { sets: { <set>: { released } }, cards: { <oracle id>: { <set>: { gihWr, adjWr, games, rarity? } } } }. */
 export async function readWinRateFile(path: string): Promise<WinRateTable> {
   const f: WinRateFile = JSON.parse(await readFile(path, "utf8"));
   const cards: WinRateTable["cards"] = {};
   for (const [id, bySet] of Object.entries(f.cards || {})) {
     for (const [set, w] of Object.entries(bySet)) {
       if (typeof w.gihWr !== "number") continue;
-      (cards[id] ||= {})[set] = { gihWr: w.gihWr, adjWr: w.adjWr ?? null, games: w.games ?? 0 };
+      (cards[id] ||= {})[set] = { gihWr: w.gihWr, adjWr: w.adjWr ?? null, games: w.games ?? 0, ...(w.rarity ? { rarity: w.rarity } : {}) };
     }
   }
   const sets = Object.fromEntries(Object.entries(f.sets || {}).map(([k, s]) => [k, { released: s.released ?? null, asOf: s.asOf ?? null }]));
@@ -66,7 +71,7 @@ export async function readWinRateFile(path: string): Promise<WinRateTable> {
 
 // ---- 17Lands endpoints ------------------------------------------------------------------------
 
-interface RatingRow { name: string; color?: string; ever_drawn_win_rate?: number | null; ever_drawn_game_count?: number | null }
+interface RatingRow { name: string; color?: string; rarity?: string; ever_drawn_win_rate?: number | null; ever_drawn_game_count?: number | null }
 interface ColorRow { is_summary: boolean; short_name: string | number; wins: number; games: number }
 type Tally = { games: number; wins: number };
 
@@ -158,7 +163,7 @@ export async function cardRatingsForSet(http: Http, set: string, cards: Card[]) 
     const id = match(r.name);
     if (!id) { unmatched.push(r.name); continue; }
     const adjWr = overall == null ? null : adjustedFromPairs(r.ever_drawn_win_rate, r.color ?? "", decks, overall);
-    found[id] = { gihWr: r.ever_drawn_win_rate, adjWr, games };
+    found[id] = { gihWr: r.ever_drawn_win_rate, adjWr, games, ...(r.rarity ? { rarity: r.rarity } : {}) };
   }
   const games = rows.reduce((n, r) => n + (r.ever_drawn_game_count ?? 0), 0);
   return { found, unmatched, asOf: ratings.fetchedAt.slice(0, 10), rows: rows.length, games, deckGames: all?.games ?? null };
@@ -179,6 +184,42 @@ export async function fetch17Lands(http: Http, sets: string[], cards: Card[], re
   return table;
 }
 
+// ---- WR Δ ---------------------------------------------------------------------------------------
+
+/** The rarities a set's centre is the mean of. */
+export const CENTRE_RARITIES = ["common", "uncommon"];
+const round = (x: number, digits: number) => Math.round(x * 10 ** digits) / 10 ** digits;
+
+/** A set's centre: the mean adjusted WR of its commons and uncommons (a fraction, 4 decimals), or null with none. */
+export function centreOf(cards: { rarity?: string | null; adjWr: number | null }[]): number | null {
+  const adj = cards.filter((c) => c.adjWr != null && CENTRE_RARITIES.includes(c.rarity ?? "")).map((c) => c.adjWr!);
+  return adj.length ? round(adj.reduce((s, x) => s + x, 0) / adj.length, 4) : null;
+}
+
+/** WR Δ in points (2 decimals) from an adjusted WR and its set's centre. */
+export const deltaOf = (adjWr: number | null | undefined, centre: number | null | undefined): number | null =>
+  adjWr == null || centre == null ? null : round((adjWr - centre) * 100, 2);
+
+/** The adjusted WR back from a WR Δ and its centre (exact for values made by deltaOf from 4-decimal inputs). */
+export const adjustedOf = (delta: number | null | undefined, centre: number | null | undefined): number | null =>
+  delta == null || centre == null ? null : round(centre + delta / 100, 4);
+
+/**
+ * The centre of every set of a win rate table. A card's rarity in a set comes from the table when the source gives
+ * it, else from the card when the card is shown in that set; cards with no known rarity there are left out.
+ */
+export function setCentres(table: WinRateTable, cards: Card[]): Record<string, number | null> {
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const rows: Record<string, { rarity: string | null; adjWr: number | null }[]> = Object.fromEntries(Object.keys(table.sets).map((s) => [s, []]));
+  for (const [id, bySet] of Object.entries(table.cards)) {
+    for (const [set, w] of Object.entries(bySet)) {
+      const card = byId.get(id);
+      (rows[set] ||= []).push({ rarity: w.rarity ?? (card?.set === set ? card.rarity : null), adjWr: w.adjWr });
+    }
+  }
+  return Object.fromEntries(Object.entries(rows).map(([s, r]) => [s, centreOf(r)]));
+}
+
 // ---- choosing a card's win rate ---------------------------------------------------------------
 
 /** The card's own set when it has data there, else the most recently released allowed set with data. */
@@ -191,8 +232,9 @@ export function pickWinRateSet(card: Card, table: WinRateTable, allowed: string[
   return candidates[0] ?? null;
 }
 
-export function withWinRate(card: Card, table: WinRateTable, allowed: string[]): Card {
+/** The card with its win rates from one set of the table; its WR Δ is centred on that set (centres: see setCentres). */
+export function withWinRate(card: Card, table: WinRateTable, allowed: string[], centres: Record<string, number | null>): Card {
   const set = pickWinRateSet(card, table, allowed);
   const w = set ? table.cards[card.id][set] : null;
-  return { ...card, wrSet: set, wrRaw: w?.gihWr ?? null, wrAdj: w?.adjWr ?? null, games: w?.games ?? null };
+  return { ...card, wrSet: set, wrRaw: w?.gihWr ?? null, wrDelta: set ? deltaOf(w?.adjWr, centres[set]) : null, games: w?.games ?? null };
 }

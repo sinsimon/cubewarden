@@ -4,8 +4,8 @@ Keep a Magic: The Gathering cube balanced against **rules you write yourself**: 
 and for each archetype. Import a cube from CubeCobra, write the rules, then edit the list until they pass. Changes go
 back to CubeCobra as a changelist or a CSV.
 
-cubewarden ships no rules of its own. "At most 360 cards", "3 gold cards per archetype" or "average win rate between
-54% and 62%" are rules a designer writes for their cube.
+cubewarden ships no rules of its own. "At most 360 cards", "3 gold cards per archetype" or "cards on average 1 to
+3.5 win-rate points above their set's average common" are rules a designer writes for their cube.
 
 ## Rules in one minute
 
@@ -16,7 +16,7 @@ count() <= 360                                  whole cube: at most 360 cards
 every(s:fdn,trk,dft)                            every card printed in one of these sets
 count(t:creature) >= 55%                        each colour: at least 55% creatures
 count(c=scope -is:hybrid) = 3 fixed             each archetype: exactly 3 gold cards (never scaled)
-avg(wr, member:any) in 55%..60%                 archetype members average 55–60% adjusted win rate
+avg(wr, member:any) in 1..3.5                   archetype members average 1 to 3.5 points of WR Δ (see Card data)
 otag:counterspell >= 4                          blue: at least 4 counterspells
 curve(t:creature) 1:1..3 2:5..7 3:4..6 6+:0..2  creatures per mana value (6+ = six and above)
 curve(t:creature) 2:20%..30% 3:15%..25%         the same in percent of the creatures
@@ -70,7 +70,13 @@ is a ready-made skill for agent harnesses.
 |---|---|
 | Oracle text, types, costs, images, printings | [Scryfall](https://scryfall.com/docs/api) |
 | Oracle tags (functional tags), ELO, cube count, picks | [CubeCobra](https://cubecobra.com) card details (read only) |
-| Win rates (optional) | [17Lands](https://www.17lands.com); adjusted WR = GIH WR minus the strength of the decks the card was played in |
+| Win rates (optional) | [17Lands](https://www.17lands.com): GIH WR (`wrraw`, in percent) and WR Δ (`wr`, in points, see below) |
+
+**WR Δ** (`wr`, shown signed: `+3.0`, `−1.2`) puts cards from different sets on one scale. The adjusted WR is the
+GIH WR minus the strength of the decks the card was played in; the WR Δ is the adjusted WR minus the mean adjusted WR
+of the commons and uncommons of the card's set, in percentage points. 0 is an average common or uncommon of its set.
+A card whose win rate comes from another set is measured against that set. The strength of a set as a whole is not
+in the number. The hosted data keeps each set's mean in `index.json` (`wr.centre`).
 
 `cubewarden data build` takes the pool from the sets your cube's "every card" rule allows (or `--pool "<Scryfall
 query>"`). Win rates are optional: `--winrates <file>` reads precomputed win rates, `--winrates 17lands` reads 17Lands'
@@ -82,7 +88,8 @@ and cached in `.cache/` (`--refresh` to fetch again). Nothing is written to Cube
 The public site (Vercel) is the page alone: `npm run build:site` without a project folder builds it, and
 `vercel.json` serves the card data from this repo's `data` branch at `/data`. A nightly GitHub Action
 (`.github/workflows/data.yml`) rebuilds that branch: one JSON file per released set with 17Lands Premier Draft
-data, rebuilt only when something changed. People's cubes never leave their browser.
+data, rebuilt only when something changed. Its last step (printSets and WR Δ of every set file) also runs alone,
+offline: `cubewarden data recentre --out <dir>`. People's cubes never leave their browser.
 
 ## Develop
 

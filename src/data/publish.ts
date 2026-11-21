@@ -8,12 +8,15 @@
  *   3. sets released in the last 120 days (still drafted), once a week: card ratings and CubeCobra stats move;
  *   4. shards older than 35 days (monthly refresh of CubeCobra stats), oldest first;
  *   or every set with `all`. It stops starting sets when the time budget is spent: the rest waits for the
- * next run. Whatever happens it ends with printSets and index.json, so a partial result can be published.
+ * next run. Whatever happens it ends with printSets, WR Δ and index.json, so a partial result can be published.
  * A set that fails keeps its old shard; the run goes on and reports the failure.
  *
  * Win rates of a set, in order: the Public Dataset archive (scripts/winrates.py, exact adjusted WR);
  * 17Lands Card Ratings while the set is recent (approximate adjusted WR, see adjustedFromPairs); else none.
  * Existing win rates are never replaced by nothing: when a refresh finds no data, the old values stay.
+ * Cards carry the WR Δ (wrDelta, points), centred on the set's commons and uncommons; index.json keeps each set's
+ * centre (wr.centre), from which the adjusted WR comes back as centre + wrDelta / 100. The run ends by centring every
+ * shard again (see finishShards), so shards in an older format are brought up to date even when not rebuilt.
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -25,7 +28,9 @@ import type { Card } from "../model.ts";
 import { addDetails } from "./cubecobra-details.ts";
 import { createHttp, type Http } from "./http.ts";
 import { cardFromPrintings, fetchSets, groupByOracle, isPoolPrinting, pickPrinting, searchAll, type ScryfallSet } from "./scryfall-cards.ts";
-import { adjustedFromPairs, cardRatingsForSet, deckBaselines, eventOf, hasLiveRatings, MIN_GAMES, nameMatcher, printedNames, type WinRate } from "./winrates.ts";
+import {
+  adjustedFromPairs, adjustedOf, cardRatingsForSet, centreOf, deckBaselines, deltaOf, eventOf, hasLiveRatings, MIN_GAMES, nameMatcher, printedNames, type WinRate,
+} from "./winrates.ts";
 
 /**
  * The universe: released paper sets with 17Lands Premier Draft data (plus the documented exceptions of EVENTS in
@@ -53,7 +58,9 @@ const SCRIPT_TIMEOUT_MS = 60 * 60 * 1000;
 export type WrSource = "game-data" | "card-ratings" | null;
 export interface SetEntry {
   code: string; name: string; released: string; cards: number; builtAt: string;
-  wr: { source: WrSource; asOf: string | null; games: number | null };
+  /** centre: mean adjusted WR (a fraction) of the set's commons and uncommons; a card's wrDelta is its adjusted WR
+   *  minus the centre, in points. */
+  wr: { source: WrSource; asOf: string | null; games: number | null; centre?: number | null };
 }
 export interface DataIndex { version: 1; builtAt: string; sets: SetEntry[] }
 export interface Shard { set: string; builtAt: string; cards: Card[] }
@@ -84,7 +91,8 @@ export interface PublishResult {
   universe: UniverseSet[];
   /** Shard files removed because their set left the universe. */
   removed: string[];
-  printSetsChanged: number;
+  /** Shards rewritten by the last step (printSets or WR Δ changed). */
+  shardsUpdated: number;
 }
 
 const utcToday = () => new Date().toISOString().slice(0, 10);
@@ -188,10 +196,16 @@ async function cardRatingsWinRates(http: Http, code: string, cards: Card[]): Pro
   return { byId, wr: { source: "card-ratings", asOf: r.asOf, games: r.deckGames }, unmatched: r.unmatched };
 }
 
+/** A shard card as stored: shards written before the WR Δ carry the adjusted WR itself (wrAdj). */
+type StoredCard = Card & { wrAdj?: number | null };
+const storedAdjusted = (c: StoredCard, centre: number | null | undefined) => (c.wrAdj !== undefined ? c.wrAdj : adjustedOf(c.wrDelta, centre));
+
 /** The old shard's win rates, for a set whose sources have not changed. */
 function carriedWinRates(shard: Shard | null, entry: SetEntry | undefined): SetWinRates {
   const byId: Record<string, WinRate> = {};
-  for (const c of shard?.cards || []) if (c.wrRaw != null) byId[c.id] = { gihWr: c.wrRaw, adjWr: c.wrAdj ?? null, games: c.games ?? 0 };
+  for (const c of (shard?.cards || []) as StoredCard[]) {
+    if (c.wrRaw != null) byId[c.id] = { gihWr: c.wrRaw, adjWr: storedAdjusted(c, entry?.wr.centre), games: c.games ?? 0 };
+  }
   return { byId, wr: entry?.wr ?? { source: null, asOf: null, games: null }, unmatched: [] };
 }
 
@@ -219,14 +233,15 @@ async function buildShard(http: Http, set: UniverseSet, archive: Archive, old: {
   const { cards: detailed, missing } = await addDetails(http, base, new Map([...groups].map(([id, p]) => [id, p.map((x) => x.id)])));
   const w = await winRatesFor(http, set, detailed, archive, old, o, today);
   const oldPrintSets = new Map((old.shard?.cards || []).map((c) => [c.id, c.printSets]));
+  const centre = centreOf(detailed.map((c) => ({ rarity: c.rarity, adjWr: w.byId[c.id]?.adjWr ?? null })));
   const cards = detailed
     .map((c): Card => {
       const r = w.byId[c.id];
-      return { ...c, printSets: oldPrintSets.get(c.id) ?? c.printSets, wrSet: r ? set.code : null, wrRaw: r?.gihWr ?? null, wrAdj: r?.adjWr ?? null, games: r?.games ?? null };
+      return { ...c, printSets: oldPrintSets.get(c.id) ?? c.printSets, wrSet: r ? set.code : null, wrRaw: r?.gihWr ?? null, wrDelta: deltaOf(r?.adjWr, centre), games: r?.games ?? null };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
   const shard: Shard = { set: set.code, builtAt: today, cards };
-  const entry: SetEntry = { code: set.code, name: set.name, released: set.released, cards: cards.length, builtAt: today, wr: w.wr };
+  const entry: SetEntry = { code: set.code, name: set.name, released: set.released, cards: cards.length, builtAt: today, wr: { ...w.wr, centre } };
   const withWr = cards.filter((c) => c.wrRaw != null).length;
   o.log?.(`    ${cards.length} cards, ${missing.length} unknown to CubeCobra, win rates: ${w.wr.source ?? "none"}` +
     (w.wr.source ? ` as of ${w.wr.asOf}, ${withWr} cards ≥ ${MIN_GAMES} games` : "") +
@@ -234,13 +249,17 @@ async function buildShard(http: Http, set: UniverseSet, archive: Archive, old: {
   return { shard, entry };
 }
 
-// ---- printSets across shards and the index ----------------------------------------------------
+// ---- printSets and WR Δ across shards, and the index -------------------------------------------
 
 /**
- * printSets = every set of the universe the card is printed in, from all shards. Two passes over the files so
- * memory stays at one shard. Rewrites the shards that change (builtAt kept). Returns the readable shards.
+ * Brings every shard up to date without fetching anything:
+ *   - printSets = every set of the universe the card is printed in, from all shards;
+ *   - WR Δ centred on the set's commons and uncommons, from the stored adjusted WR (an older shard's wrAdj, or
+ *     the entry's centre + wrDelta); the new centre goes into `entries`.
+ * Every card of a shard has its win rates from the shard's own set (or none). Two passes over the files so memory
+ * stays at one shard. Rewrites the shards that change (builtAt kept). Returns the readable shards.
  */
-async function recomputePrintSets(out: string, codes: string[]): Promise<{ readable: string[]; changed: number }> {
+async function finishShards(out: string, codes: string[], entries: Map<string, SetEntry>): Promise<{ readable: string[]; changed: number }> {
   const sets = new Map<string, string[]>();
   const readable: string[] = [];
   for (const code of codes) {
@@ -252,14 +271,36 @@ async function recomputePrintSets(out: string, codes: string[]): Promise<{ reada
   let changed = 0;
   for (const code of readable) {
     const s = (await readShard(out, code))!;
+    const entry = entries.get(code);
+    const cards = s.cards as StoredCard[];
+    const adjusted = cards.map((c) => storedAdjusted(c, entry?.wr.centre));
+    const centre = centreOf(cards.map((c, i) => ({ rarity: c.rarity, adjWr: adjusted[i] })));
     let dirty = false;
-    for (const c of s.cards) {
+    cards.forEach((c, i) => {
       const next = [...new Set(sets.get(c.id))].sort();
       if (next.join() !== c.printSets.join()) { c.printSets = next; dirty = true; }
-    }
+      const delta = deltaOf(adjusted[i], centre);
+      if (c.wrAdj !== undefined) { delete c.wrAdj; dirty = true; }
+      if (c.wrDelta !== delta) { c.wrDelta = delta; dirty = true; }
+    });
+    if (entry && entry.wr.centre !== centre) entries.set(code, { ...entry, wr: { ...entry.wr, centre } });
     if (dirty) { changed++; await writeAtomic(shardPath(out, code), JSON.stringify(s) + "\n"); }
   }
   return { readable, changed };
+}
+
+/**
+ * The last step of a publish on its own, offline: printSets and WR Δ of every shard listed in `<out>/index.json`,
+ * and each set's centre in the index (its builtAt dates are kept).
+ */
+export async function recentre(outDir: string): Promise<{ sets: number; changed: number }> {
+  const index = await readJson<DataIndex>(join(outDir, "index.json"));
+  if (!index?.sets) throw new Error(`No index.json in ${outDir}`);
+  const entries = new Map(index.sets.map((e) => [e.code, e]));
+  const { readable, changed } = await finishShards(outDir, index.sets.map((e) => e.code), entries);
+  const sets = index.sets.filter((e) => readable.includes(e.code)).map((e) => entries.get(e.code)!);
+  await writeAtomic(join(outDir, "index.json"), JSON.stringify({ ...index, sets }) + "\n");
+  return { sets: readable.length, changed };
 }
 
 interface Planned { set: UniverseSet; reason: string; priority: number; archive: Archive }
@@ -312,7 +353,7 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   const oldIndex = await readJson<DataIndex>(join(o.outDir, "index.json"));
   const entries = new Map((oldIndex?.sets || []).map((e) => [e.code, e]));
   const sets = await candidates(http, today);
-  const result: PublishResult = { built: [], failed: [], kept: 0, deferred: [], universe: [], printSetsChanged: 0, removed: [] };
+  const result: PublishResult = { built: [], failed: [], kept: 0, deferred: [], universe: [], shardsUpdated: 0, removed: [] };
   const { members, todo } = await plan(http, sets, entries, o, today, result);
   result.universe = members;
   log(`Universe: ${members.length} released sets with 17Lands Premier Draft data (of ${sets.length} candidates since ${CANDIDATES_SINCE}): ` +
@@ -340,8 +381,8 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
   }
 
   const listed = members.map((s) => s.code).filter((c) => entries.has(c));
-  const { readable, changed } = await recomputePrintSets(o.outDir, listed);
-  result.printSetsChanged = changed;
+  const { readable, changed } = await finishShards(o.outDir, listed, entries);
+  result.shardsUpdated = changed;
   result.removed = await removeStrayShards(o.outDir, new Set(readable));
   if (result.removed.length) log(`Removed shards of sets outside the universe: ${result.removed.join(", ")}`);
   const index: DataIndex = { version: 1, builtAt: today, sets: readable.map((c) => entries.get(c)!).sort((a, b) => b.released.localeCompare(a.released) || a.code.localeCompare(b.code)) };
@@ -351,7 +392,7 @@ export async function publish(o: PublishOptions): Promise<PublishResult> {
 
 export function publishSummary(r: PublishResult): string {
   const lines = [`${r.universe.length} sets in the universe. ${r.built.length} set(s) rebuilt, ${r.kept} current, ${r.deferred.length} left for the next run, ${r.failed.length} failed; ` +
-    `printSets changed in ${r.printSetsChanged} shard(s)`];
+    `printSets or WR Δ updated in ${r.shardsUpdated} shard(s)`];
   for (const b of r.built) lines.push(`  ${b.code}: ${b.cards} cards, ${b.wr.source ?? "no win rates"}${b.wr.asOf ? " " + b.wr.asOf : ""} (${b.reason}, ${b.seconds}s)`);
   for (const f of r.failed) lines.push(`  FAILED ${f.code} (${f.reason}): ${f.error}`);
   return lines.join("\n");

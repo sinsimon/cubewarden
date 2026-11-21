@@ -4,8 +4,8 @@ import { BY_ID, CARDS, card, config, rule } from "./fixtures/cards.ts";
 
 // The cube holds W1 W2 W3 U1 WU1 L1; the rest of CARDS plus two extra white cards are outside it.
 const OUTSIDE = [
-  card("W4", { name: "Dawn Skirmisher", colors: "W", mv: 2, wrAdj: 0.61, printSets: ["fdn"] }),
-  card("W5", { name: "Old White Flyer", colors: "W", mv: 3, keywords: ["flying"], wrAdj: 0.63, printSets: ["m10"], set: "m10" }),
+  card("W4", { name: "Dawn Skirmisher", colors: "W", mv: 2, wrDelta: 5, printSets: ["fdn"] }),
+  card("W5", { name: "Old White Flyer", colors: "W", mv: 3, keywords: ["flying"], wrDelta: 7, printSets: ["m10"], set: "m10" }),
 ];
 const cardsById = { ...BY_ID, ...Object.fromEntries(OUTSIDE.map((c) => [c.id, c])) };
 const IN = ["W1", "W2", "W3", "U1", "WU1", "L1"];
@@ -21,7 +21,7 @@ function project(): Project {
         rule("size", { kind: "cube" }, "count() <= 6"),
         rule("sets", { kind: "cube" }, "every(s:fdn,trk)"),
         rule("w-cre", { kind: "color", color: "W" }, "count(t:creature) >= 3", { name: "White creatures" }),
-        rule("wr", { kind: "cube" }, "avg(wr) >= 70%", { priority: "secondary", name: "High WR" }),
+        rule("wr", { kind: "cube" }, "avg(wr) >= 8", { priority: "secondary", name: "High WR" }),
       ],
     }),
   };
@@ -98,13 +98,13 @@ describe("search", () => {
   it("applies any 'every card' rule of the cube, letting through cards with no data for its metric", () => {
     const w = ws();
     w.setRule({ id: "sets", text: "every(r:common,uncommon)" });
-    w.setRule({ id: "wr-floor", name: "WR floor", scope: "cube", text: "every(wr) >= 60%" });
-    const pool = { ...cardsById, R1: card("R1", { name: "Rare White", colors: "W", rarity: "rare", wrAdj: 0.7 }), N1: card("N1", { name: "No Data White", colors: "W" }) };
+    w.setRule({ id: "wr-floor", name: "WR floor", scope: "cube", text: "every(wr) >= 4" });
+    const pool = { ...cardsById, R1: card("R1", { name: "Rare White", colors: "W", rarity: "rare", wrDelta: 10 }), N1: card("N1", { name: "No Data White", colors: "W" }) };
     const names = createWorkspace(w.project, pool).search("c=w", { sort: "name" }).cards.map((c) => c.name);
     expect(names).toEqual(["Dawn Skirmisher", "No Data White", "Old White Flyer"]);
   });
   it("sorts by CubeCobra popularity by default, or by any metric", () => {
-    const pool = { ...cardsById, P1: card("P1", { name: "Popular", colors: "W", ccCubes: 900, wrAdj: 0.5 }), P2: card("P2", { name: "Niche", colors: "W", ccCubes: 10, wrAdj: 0.65 }) };
+    const pool = { ...cardsById, P1: card("P1", { name: "Popular", colors: "W", ccCubes: 900, wrDelta: -5 }), P2: card("P2", { name: "Niche", colors: "W", ccCubes: 10, wrDelta: 9 }) };
     const w = createWorkspace(project(), pool);
     expect(w.search("c=w").cards.map((c) => c.name)).toEqual(["Popular", "Niche", "Dawn Skirmisher"]);
     expect(w.search("c=w", { sort: "wr" }).cards.map((c) => c.name)).toEqual(["Niche", "Dawn Skirmisher", "Popular"]);
@@ -115,6 +115,65 @@ describe("search", () => {
   });
   it("explains a filter it cannot read", () => {
     expect(() => ws().search("foo:bar")).toThrowError(/Unknown filter "foo"/);
+  });
+  it("returns each card's WR Δ in points", () => {
+    expect(ws().search("c=w").cards[0]).toMatchObject({ name: "Dawn Skirmisher", wrDelta: 5 });
+  });
+});
+
+describe("search with member:", () => {
+  // Outside the cube in WU: U2 (mv 2), WU2 (mv 2, hybrid), C1 (mv 2), W4 (mv 2), W5 (mv 3, flying).
+  function memberProject(): Project {
+    const p = project();
+    p.config.archetypes = [{ id: "wu", name: "Azorius Flyers", colors: "WU", mechanics: [
+      { id: "fly", name: "Flyers", filter: parseFilter("kw:flying") },
+      { id: "cheap", name: "Cheap", priority: "secondary", filter: parseFilter("mv<=2 -c:c") },
+      { id: "gold", name: "Gold", priority: "secondary", filter: parseFilter("c=scope") },
+    ] }];
+    p.config.colors.find((c) => c.code === "W")!.mechanics = [{ id: "w-fly", name: "White flyers", filter: parseFilter("kw:flying") }];
+    return p;
+  }
+  const find = (filter: string, scope?: string) =>
+    createWorkspace(memberProject(), cardsById).search(filter, { scope, respectCubeRules: false, sort: "name" }).cards.map((c) => c.id);
+  it("matches the cards of one mechanic of the archetype given as scope", () => {
+    expect(find("member:fly", "wu")).toEqual(["W5"]);
+    expect(find("member:gold", "archetype:wu")).toEqual(["WU2"]);
+  });
+  it("matches any, primary or secondary mechanics, as in the archetype's rules", () => {
+    expect(find("member:primary", "wu")).toEqual(["W5"]);
+    expect(find("member:secondary", "wu")).toEqual(["W4", "U2", "WU2"]);
+    expect(find("member:any", "wu")).toEqual(["W4", "W5", "U2", "WU2"]);
+    expect(find("member:nope", "wu")).toEqual([]);
+    expect(find("t:creature -member:any", "wu")).toEqual([]);
+  });
+  it("matches the mechanics of a colour given as scope", () => {
+    expect(find("member:w-fly", "W")).toEqual(["W5"]);
+    expect(find("member:any", "color:W")).toEqual(["W5"]);
+  });
+  it("asks for a colour or an archetype when there is no scope", () => {
+    expect(() => find("member:any")).toThrowError(/member:.*scope.*colour or an archetype/);
+    expect(() => find("member:any", "cube")).toThrowError(/member:.*scope.*colour or an archetype/);
+  });
+});
+
+describe("rules saved with the old adjusted WR", () => {
+  it("check, rules and explain still answer, and the rule reads as an error to rewrite", () => {
+    const p = project();
+    p.config.rules.push({ id: "old", name: "Old WR", scope: { kind: "cube" }, measure: { kind: "avg", metric: "wrAdj" as never }, constraint: { kind: "min", min: 0.55 } });
+    const w = createWorkspace(p, cardsById);
+    expect(w.check().failing.find((f) => f.id === "old")).toMatchObject({ status: "error", target: "≥ 0.55" });
+    expect(w.rules().find((r) => r.id === "old")?.text).toBe("avg(wrAdj) >= 0.55");
+    expect(w.explain("old").error).toMatch(/wrAdj/);
+  });
+});
+
+describe("WR Δ targets", () => {
+  it("reads targets in signed points", () => {
+    const w = ws();
+    w.setRule({ id: "wr-band", name: "WR band", scope: "cube", text: "avg(wr) in -1..3" });
+    w.setRule({ id: "wr", text: "avg(wr) >= 8" });
+    expect(w.explain("wr-band").target).toBe("−1.0 to +3.0");
+    expect(w.explain("wr").target).toBe("≥ +8.0");
   });
 });
 

@@ -10,6 +10,7 @@ import type { Card } from "./model.ts";
 import { aboutMarkdown } from "./about.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
 import { exportCsv, mechanicTags } from "./export.ts";
+import { points } from "./fields.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { createWorkspace, type Finding, type Project, type SortKey } from "./workspace.ts";
 
@@ -23,7 +24,8 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
   explain <rule id>             a rule's value, target and the cards behind it
   search "<filter>"             cards outside the cube that match (--scope W|wu, --limit 50,
                                 --sort cubes|elo|picks|wr|wrraw|mv|name (default cubes: most used on
-                                CubeCobra), --all-cards to ignore the cube's "every card" rules)
+                                CubeCobra; wr = WR Δ), --all-cards to ignore the cube's "every card" rules);
+                                member:<mechanic>|any|primary|secondary needs --scope
   try --add <card> --remove <card>    effect of a swap on every rule, without saving
   apply --add <card> --remove <card> [--to-maybeboard]  make the swap and save the project
   rules                         every rule as text
@@ -105,7 +107,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
       case "search": {
         if (!rest[0]) throw new UsageError('search needs a filter, e.g. cubewarden search "otag:removal c=w"');
         const r = (await load()).search(rest[0], { scope: flag("scope"), limit: flag("limit") ? Number(flag("limit")) : undefined, respectCubeRules: !args.bool.has("all-cards"), sort: flag("sort") as SortKey | undefined });
-        out(r, [`${r.total} card(s)`, ...r.cards.map((c) => `  ${c.name} (${c.colors || "C"}, mv ${c.mv}${c.wrAdj != null ? `, wr ${(c.wrAdj * 100).toFixed(1)}%` : ""})`)].join("\n"));
+        out(r, [`${r.total} card(s)`, ...r.cards.map((c) => `  ${c.name} (${c.colors || "C"}, mv ${c.mv}${c.wrDelta != null ? `, WR Δ ${points(c.wrDelta)}` : ""})`)].join("\n"));
         return 0;
       }
       case "try": case "apply": {

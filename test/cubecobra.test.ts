@@ -33,9 +33,9 @@ describe("reading a CubeCobra cube", () => {
   });
   it("prefers the card data we already have, but keeps the cube's tags", async () => {
     const spiderId = SAMPLE.cards.mainboard[1].details.oracle_id;
-    const known = { [spiderId]: { ...BY_ID.W1, id: spiderId, name: "Known Spider", wrAdj: 0.61 } };
+    const known = { [spiderId]: { ...BY_ID.W1, id: spiderId, name: "Known Spider", wrDelta: 2.5 } };
     const cube = await readCubeCobra(SAMPLE, known);
-    expect(cube.cards[spiderId]).toMatchObject({ name: "Known Spider", wrAdj: 0.61 });
+    expect(cube.cards[spiderId]).toMatchObject({ name: "Known Spider", wrDelta: 2.5 });
   });
 });
 

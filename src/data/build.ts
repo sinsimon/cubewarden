@@ -11,7 +11,7 @@ import { createHttp, type Http, type HostStats } from "./http.ts";
 import {
   allowedSets, cardFromPrintings, fetchSetDates, groupByOracle, isPoolPrinting, pickPrinting, searchAll, setsQuery, type ScryfallCard,
 } from "./scryfall-cards.ts";
-import { fetch17Lands, readWinRateFile, withWinRate, type WinRateTable } from "./winrates.ts";
+import { fetch17Lands, readWinRateFile, setCentres, withWinRate, type WinRateTable } from "./winrates.ts";
 
 export interface BuildOptions {
   /** The project, for its set rule and its cube; null builds from --pool alone. */
@@ -31,7 +31,7 @@ export interface Provenance {
   pool: { query: string; cards: number; printings: number };
   cube: { cards: number; outsidePool: number; source: string | null; notFound: string[] };
   tags: { cards: number; missing: number };
-  winrates: { source: string | null; cards: number; adjusted: number; sets: Record<string, string | null>; unmatched: number };
+  winrates: { source: string | null; cards: number; delta: number; sets: Record<string, string | null>; unmatched: number };
   http: Record<string, HostStats>;
 }
 
@@ -122,7 +122,10 @@ export async function buildCards(o: BuildOptions): Promise<BuildResult> {
   const sets = ruleSets ?? [...new Set(pool.cards.flatMap((c) => c.printSets))].sort();
   if (o.winrates) log(`Win rates: ${o.winrates === "17lands" ? "17Lands" : o.winrates}`);
   const table = await loadWinRates(o, http, sets, cards);
-  if (table) cards = cards.map((c) => withWinRate(c, table, sets));
+  if (table) {
+    const centres = setCentres(table, cards);
+    cards = cards.map((c) => withWinRate(c, table, sets, centres));
+  }
   cards.sort((a, b) => a.name.localeCompare(b.name));
 
   const provenance: Provenance = {
@@ -133,7 +136,7 @@ export async function buildCards(o: BuildOptions): Promise<BuildResult> {
     winrates: {
       source: table?.source ?? null,
       cards: cards.filter((c) => c.wrRaw != null).length,
-      adjusted: cards.filter((c) => c.wrAdj != null).length,
+      delta: cards.filter((c) => c.wrDelta != null).length,
       sets: table ? Object.fromEntries(sets.map((s) => [s, table.sets[s]?.asOf ?? null])) : {},
       unmatched: Object.values(table?.unmatched || {}).reduce((n, l) => n + l.length, 0),
     },
@@ -159,7 +162,7 @@ export function provenanceText(p: Provenance): string {
       (p.cube.notFound.length ? `; not found anywhere: ${p.cube.notFound.join(", ")}` : ""),
     `  Oracle tags and CubeCobra stats: ${pc(p.tags.cards)} with tags, ${p.tags.missing} unknown to CubeCobra`,
     p.winrates.source
-      ? `  Win rates: ${pc(p.winrates.cards)} with GIH WR, ${pc(p.winrates.adjusted)} adjusted — ${p.winrates.source}` +
+      ? `  Win rates: ${pc(p.winrates.cards)} with GIH WR, ${pc(p.winrates.delta)} with WR Δ — ${p.winrates.source}` +
         (p.http["www.17lands.com"] ? dates("www.17lands.com") : "") + `\n    as of: ${wrSets}` +
         (p.winrates.unmatched ? `\n    ${p.winrates.unmatched} 17Lands names matched no card printed in their set` : "")
       : "  Win rates: none (pass --winrates <file> or --winrates 17lands)",

@@ -1,7 +1,7 @@
 /** Filter fields, the operators each one accepts, and the metrics rules can average. */
 import type { FieldId, Metric, Op } from "./model.ts";
 
-export type DataSource = "cards" | "tags" | "wrAdj" | "wrRaw" | "cubecobra" | "cube" | "config";
+export type DataSource = "cards" | "tags" | "wrDelta" | "wrRaw" | "cubecobra" | "cube" | "config";
 
 export interface FieldInfo {
   id: FieldId;
@@ -29,7 +29,7 @@ export const FIELDS: FieldInfo[] = [
   { id: "hybrid", label: "Hybrid", type: "bool", ops: ["is"], source: "cards" },
   { id: "set", label: "Printed in set", type: "set", ops: ["is", "in"], source: "cards" },
   { id: "rarity", label: "Rarity", type: "rarity", ops: ["is", "in"], source: "cards" },
-  { id: "wrAdj", label: "Adjusted WR", type: "percent", ops: NUM_OPS, source: "wrAdj" },
+  { id: "wrDelta", label: "WR Δ", type: "number", ops: NUM_OPS, source: "wrDelta", hint: "points above (+) or below (−) the average common or uncommon of the card's set, e.g. 1.5 or -1" },
   { id: "wrRaw", label: "Raw WR (GIH)", type: "percent", ops: NUM_OPS, source: "wrRaw" },
   { id: "games", label: "17Lands games", type: "number", ops: NUM_OPS, source: "wrRaw" },
   { id: "ccElo", label: "CubeCobra ELO", type: "number", ops: NUM_OPS, source: "cubecobra" },
@@ -43,8 +43,20 @@ export const FIELD = Object.fromEntries(FIELDS.map((f) => [f.id, f])) as Record<
 
 export const pct = (v: number | null | undefined) => (v == null ? "n/a" : (v * 100).toFixed(1) + "%");
 
+/** A WR Δ in points, signed with one decimal: "+3.0", "−1.2", "0.0". */
+export const points = (v: number | null | undefined) => {
+  if (v == null) return "n/a";
+  const t = Math.abs(v).toFixed(1);
+  return t === "0.0" ? t : (v > 0 ? "+" : "\u2212") + t;
+};
+
+/** Fields and metrics that no longer exist, with what to write instead (rules saved before the change name them). */
+export const RETIRED: Record<string, string> = {
+  wrAdj: "The adjusted WR (wrAdj) was replaced by wr, the WR Δ in points above the average common or uncommon of the card's set: rewrite this rule with wr (e.g. avg(wr) in 1..3.5) or wrraw for the raw GIH WR in percent",
+};
+
 export const METRICS: Record<Metric, { label: string; format: (v: number) => string; source: DataSource }> = {
-  wrAdj: { label: "Adjusted WR", format: pct, source: "wrAdj" },
+  wrDelta: { label: "WR Δ", format: points, source: "wrDelta" },
   wrRaw: { label: "Raw WR (GIH)", format: pct, source: "wrRaw" },
   mv: { label: "Mana value", format: (v) => v.toFixed(2), source: "cards" },
   power: { label: "Power", format: (v) => v.toFixed(1), source: "cards" },

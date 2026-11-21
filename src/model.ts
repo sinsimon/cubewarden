@@ -16,7 +16,7 @@ export type ScopeCode = Color | "C" | "L";
 
 export type FieldId =
   | "name" | "tag" | "type" | "text" | "keyword" | "manaCost" | "mv" | "power" | "toughness"
-  | "colors" | "colorCount" | "hybrid" | "set" | "rarity" | "wrAdj" | "wrRaw" | "games"
+  | "colors" | "colorCount" | "hybrid" | "set" | "rarity" | "wrDelta" | "wrRaw" | "games"
   | "ccElo" | "ccCubes" | "ccPicks" | "ccTag" | "member" | "scryfall";
 
 export type Op = "is" | "contains" | "in" | "includes" | "within" | "matches" | "=" | "<" | "<=" | ">" | ">=";
@@ -41,7 +41,7 @@ export type Constraint = (
   | { kind: "range"; min: number; max: number }
 ) & { unit?: "percent" };
 
-export type Metric = "wrAdj" | "wrRaw" | "mv" | "power" | "ccElo" | "ccCubes" | "ccPicks" | "colorCount";
+export type Metric = "wrDelta" | "wrRaw" | "mv" | "power" | "ccElo" | "ccCubes" | "ccPicks" | "colorCount";
 
 /**
  * One bucket of a curve: cards whose mana value (rounded down) is `mv`, from `mv` to `mvMax` when set, or `mv` and
@@ -139,7 +139,12 @@ export interface Card {
   printSets: string[];
   image: string | null;
   scryfallId?: string | null;
-  wrAdj?: number | null;
+  /**
+   * WR Δ, in percentage points: the 17Lands adjusted WR minus the mean adjusted WR of the commons and uncommons of
+   * the set the win rate comes from (wrSet). Comparable across sets; 0 = an average common or uncommon of its set.
+   */
+  wrDelta?: number | null;
+  /** 17Lands GIH WR, a fraction (0.55). */
   wrRaw?: number | null;
   games?: number | null;
   wrSet?: string | null;

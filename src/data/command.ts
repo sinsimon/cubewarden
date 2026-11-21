@@ -6,7 +6,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Project } from "../workspace.ts";
 import { BuildError, buildCards, provenanceText } from "./build.ts";
-import { publish, publishSummary } from "./publish.ts";
+import { publish, publishSummary, recentre } from "./publish.ts";
 
 export const DATA_HELP = `  data build                    write cards.json: the cube's cards plus every card that may be added
                                 (Scryfall, CubeCobra tags and stats). Pool = the sets of the cube's
@@ -20,6 +20,8 @@ export const PUBLISH_HELP = `  data publish --out <dir>      generic card data f
                                 --all  rebuild every set   --sets fdn,tla  only consider these sets
                                 --budget <minutes>  stop starting sets after this (default 300)
                                 --cache <dir>  HTTP cache (default .cache)   exit 1 only if a set failed
+  data recentre --out <dir>     the last step of publish alone, offline: printSets and WR Δ of every set
+                                file from its stored win rates, each set's centre in index.json
 `;
 
 interface DataArgs { _: string[]; flags: Record<string, string>; bool: Set<string> }
@@ -49,9 +51,11 @@ async function readProject(path: string): Promise<Project | null> {
 export async function runDataCommand(args: string[], io: { cwd: string; write: (s: string) => void }): Promise<number> {
   const a = parse(args);
   if (a._[0] === "publish") return runPublish(a, io);
+  if (a._[0] === "recentre") return runRecentre(a, io);
   if (a._[0] !== "build") {
     io.write("use: cubewarden data build [--pool \"<Scryfall query>\"] [--winrates <file>|17lands] [--refresh]\n" +
-      "     cubewarden data publish --out <dir> [--all] [--sets a,b]\n");
+      "     cubewarden data publish --out <dir> [--all] [--sets a,b]\n" +
+      "     cubewarden data recentre --out <dir>\n");
     return 2;
   }
   const projectPath = resolve(io.cwd, a.flags.project || "cubewarden.json");
@@ -84,6 +88,18 @@ async function runPublish(a: DataArgs, io: { cwd: string; write: (s: string) => 
     });
     io.write((a.bool.has("json") ? JSON.stringify({ ...r, universe: r.universe.length }, null, 2) : publishSummary(r)) + "\n");
     return r.failed.length ? 1 : 0;
+  } catch (e) {
+    io.write((e instanceof Error ? e.message : String(e)) + "\n");
+    return 2;
+  }
+}
+
+/** `data recentre`: 0 = done, 2 = no data folder. */
+async function runRecentre(a: DataArgs, io: { cwd: string; write: (s: string) => void }): Promise<number> {
+  try {
+    const r = await recentre(resolve(io.cwd, a.flags.out || "data-out"));
+    io.write(`${r.sets} set file(s), ${r.changed} rewritten\n`);
+    return 0;
   } catch (e) {
     io.write((e instanceof Error ? e.message : String(e)) + "\n");
     return 2;

@@ -3,10 +3,10 @@
  *
  * Filters: otag:counterspell t:creature o:"draw a card" kw:flying m:{X} mv>=4 pow>=4 tou<=2
  *          c=wu c>=u c<=wu c=scope c:c is:hybrid r:common s:fdn,trk !"Exact Name" name:bolt
- *          wr>=55% wrraw>=55% games>=500 elo>=1300 cubes>=1000 picks>=100 member:any ncolors>=2 tag:"CubeCobra tag"
+ *          wr>=1.5 wr<0 wrraw>=55% games>=500 elo>=1300 cubes>=1000 picks>=100 member:any ncolors>=2 tag:"CubeCobra tag"
  *          space = and, "or", ( ), "-" = not.
  * Rules:   count(F) >= 6 · count(F) in 13..14 · count(t:creature) >= 50% · count(c=scope -is:hybrid) = 3 fixed
- *          avg(wr, member:any) in 55%..60% · every(s:fdn,trk) · every(mv, t:creature) <= 5 · shorthand "F >= 6"
+ *          avg(wr, member:any) in 1..3.5 · every(s:fdn,trk) · every(mv, t:creature) <= 5 · shorthand "F >= 6"
  *          curve(t:creature) 1:1..3 2:5..7 6+:0..2 · curve(t:creature) 1-3:20%..30% · curve() 2:4 fixed
  */
 import type { Condition, Constraint, CurveBucket, Filter, Measure, Metric, RuleBody } from "./model.ts";
@@ -29,7 +29,7 @@ const TERM_KEYS: Record<string, Condition["field"] | "is"> = {
   t: "type", type: "type", o: "text", oracle: "text", text: "text", m: "manaCost", mana: "manaCost", name: "name",
   mv: "mv", cmc: "mv", manavalue: "mv", pow: "power", power: "power", tou: "toughness", toughness: "toughness",
   c: "colors", color: "colors", colors: "colors", ncolors: "colorCount", is: "is", r: "rarity", rarity: "rarity",
-  s: "set", set: "set", e: "set", edition: "set", wr: "wrAdj", wradj: "wrAdj", adj: "wrAdj", wrraw: "wrRaw", gih: "wrRaw",
+  s: "set", set: "set", e: "set", edition: "set", wr: "wrDelta", wrraw: "wrRaw", gih: "wrRaw",
   games: "games", elo: "ccElo", cubes: "ccCubes", picks: "ccPicks", member: "member", tag: "ccTag",
 };
 const RARITY: Record<string, string> = { c: "common", u: "uncommon", r: "rare", m: "mythic" };
@@ -149,10 +149,13 @@ function number(v: string): number {
   return n;
 }
 
-/** Win rates are fractions inside the model (0.55) and percentages in text (55%). */
+/** The raw WR is a fraction inside the model (0.55) and a percentage in text (55%); the WR Δ is in points both ways. */
 function metricValue(v: string, metric?: Metric): number {
   const n = number(v);
-  if (metric === "wrAdj" || metric === "wrRaw") return /%$/.test(v) || n > 1 ? n / 100 : n;
+  if (metric === "wrRaw") return /%$/.test(v) || n > 1 ? n / 100 : n;
+  if (metric === "wrDelta" && /%$/.test(v)) {
+    throw new SyntaxError(`wr is the WR Δ in points above the average common or uncommon of the card's set, not a percent: write wr>=1.5 or avg(wr) in 1..3.5 (wrraw takes the raw GIH WR in percent, e.g. wrraw>=${v})`);
+  }
   return n;
 }
 
@@ -178,11 +181,11 @@ function insideParens(s: string, name: string): string | null {
 }
 
 const MEASURE_METRIC: Record<string, Metric> = {
-  wr: "wrAdj", wradj: "wrAdj", adj: "wrAdj", wrraw: "wrRaw", gih: "wrRaw", mv: "mv", pow: "power", power: "power",
+  wr: "wrDelta", wrraw: "wrRaw", gih: "wrRaw", mv: "mv", pow: "power", power: "power",
   elo: "ccElo", cubes: "ccCubes", picks: "ccPicks",
 };
 const METRIC_TEXT: Record<Metric, string> = {
-  wrAdj: "wr", wrRaw: "wrraw", mv: "mv", power: "pow", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", colorCount: "ncolors",
+  wrDelta: "wr", wrRaw: "wrraw", mv: "mv", power: "pow", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", colorCount: "ncolors",
 };
 
 const CURVE_HELP = "write mana value:target, e.g. 2:5..7, 1-3:8..10, 6+:0..2 or 2:20%..30%";
@@ -303,7 +306,7 @@ export function parseRule(src: string): RuleBody {
 // ---------- writing ----------
 const TEXT_KEY: Partial<Record<Condition["field"], string>> = {
   tag: "otag", keyword: "kw", type: "t", text: "o", manaCost: "m", mv: "mv", power: "pow", toughness: "tou",
-  colorCount: "ncolors", rarity: "r", set: "s", wrAdj: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo",
+  colorCount: "ncolors", rarity: "r", set: "s", wrDelta: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo",
   ccCubes: "cubes", ccPicks: "picks", member: "member", ccTag: "tag",
 };
 const RARITY_LETTER: Record<string, string> = { common: "common", uncommon: "uncommon", rare: "rare", mythic: "mythic" };
@@ -324,7 +327,7 @@ export function conditionToText(c: Condition): string {
     }
     case "set": return `${neg}s:${([] as unknown[]).concat(v).join(",")}`;
     case "rarity": return `${neg}r:${([] as unknown[]).concat(v).map((x) => RARITY_LETTER[String(x)] || x).join(",")}`;
-    case "wrAdj": case "wrRaw": return `${neg}${TEXT_KEY[c.field]}${c.op}${pctText(Number(v))}`;
+    case "wrRaw": return `${neg}${TEXT_KEY[c.field]}${c.op}${pctText(Number(v))}`;
     case "scryfall": return /\s/.test(String(v)) ? `${neg}(${v})` : `${neg}${v}`;
     case "tag": case "keyword": case "type": case "text": case "manaCost": case "member": case "ccTag":
       return `${neg}${TEXT_KEY[c.field]}:${quote(String(v))}`;
@@ -346,7 +349,7 @@ export function filterToText(f: Filter | Condition | null | undefined, nested = 
 
 function targetText(c: Constraint | null | undefined, metric?: Metric): string {
   if (!c) return "";
-  const f = c.unit === "percent" ? (x: number) => x + "%" : metric === "wrAdj" || metric === "wrRaw" ? pctText : (x: number) => String(x);
+  const f = c.unit === "percent" ? (x: number) => x + "%" : metric === "wrRaw" ? pctText : (x: number) => String(x);
   switch (c.kind) {
     case "min": return ` >= ${f(c.min)}`;
     case "max": return ` <= ${f(c.max)}`;
@@ -373,8 +376,9 @@ export function ruleToText(r: { measure?: Measure; filter?: Filter | null; const
     return `curve(${ft})` + m.buckets.map((b) => ` ${bucketText(b)}:${bucketTarget(b.constraint)}`).join("") + (m.absolute ? " fixed" : "");
   }
   let head: string;
-  if (m.kind === "avg") head = `avg(${METRIC_TEXT[m.metric]}${ft ? ", " + ft : ""})`;
-  else if (m.kind === "every") head = m.metric ? `every(${METRIC_TEXT[m.metric]}${ft ? ", " + ft : ""})` : `every(${ft})`;
+  // A metric saved under a name that no longer exists (see RETIRED in fields.ts) is written as it was saved.
+  if (m.kind === "avg") head = `avg(${METRIC_TEXT[m.metric] ?? m.metric}${ft ? ", " + ft : ""})`;
+  else if (m.kind === "every") head = m.metric ? `every(${METRIC_TEXT[m.metric] ?? m.metric}${ft ? ", " + ft : ""})` : `every(${ft})`;
   else head = `count(${ft})`;
   const metric = m.kind === "count" ? undefined : m.metric;
   return head + targetText(r.constraint, metric) + (m.kind === "count" && m.absolute ? " fixed" : "");

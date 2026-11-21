@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluate, parseFilter, validateFilter } from "../src/index.ts";
+import { evaluate, formatConstraint, parseFilter, ruleToText, validateFilter, type Rule } from "../src/index.ts";
 import { ALL, BY_ID, card, config, rule } from "./fixtures/cards.ts";
 
 const cube = { kind: "cube" } as const;
@@ -21,15 +21,25 @@ describe("whole-cube rules", () => {
     expect(r.cards.sort()).toEqual(["G1", "U1", "W1", "W2", "WU1", "WU2"]);
   });
   it("averages a metric over the cards that have it, and counts the ones without data", () => {
-    const r = cubeRule("avg(wr) in 54%..62%");
-    expect(r.value).toBeCloseTo(0.57125, 5);
+    const r = cubeRule("avg(wr) in -1..2");
+    expect(r.value).toBeCloseTo(0.625, 5);
     expect(r.n).toBe(8);
     expect(r.noData).toBe(2);
     expect(r.status).toBe("ok");
   });
   it("is 'near' when an average misses by at most one win-rate point", () => {
-    expect(cubeRule("avg(wr) >= 58%").status).toBe("near");
-    expect(cubeRule("avg(wr) >= 59%").status).toBe("fail");
+    expect(cubeRule("avg(wr) >= 1.5").status).toBe("near");
+    expect(cubeRule("avg(wr) >= 2").status).toBe("fail");
+    expect(cubeRule("avg(wrraw) >= 58%").status).toBe("nodata");
+  });
+  it("reports a rule saved with the old adjusted WR (wrAdj) as an error that says how to rewrite it", () => {
+    const legacy = { id: "old", name: "Old WR", scope: cube, measure: { kind: "avg", metric: "wrAdj" }, constraint: { kind: "min", min: 0.55 } } as unknown as Rule;
+    const oldFilter = { id: "old2", name: "Old filter", scope: cube, measure: { kind: "count" }, filter: { op: "and", items: [{ field: "wrAdj", op: ">=", value: 0.55 }] } } as unknown as Rule;
+    const r = evaluate(config({ rules: [legacy, oldFilter] }), ALL, BY_ID).cube.rules;
+    expect(r.map((x) => x.status)).toEqual(["error", "error"]);
+    for (const x of r) expect(x.error).toMatch(/wrAdj.*wr.*WR Δ/);
+    expect(formatConstraint(legacy.constraint, (legacy.measure as unknown as { metric: never }).metric)).toBe("≥ 0.55");
+    expect(ruleToText(legacy)).toBe("avg(wrAdj) >= 0.55");
   });
   it("has no status when there is no target", () => {
     expect(cubeRule("count(t:creature)").status).toBe("none");
@@ -125,8 +135,8 @@ describe("archetypes", () => {
     expect(a.rules.map((x) => [x.id, x.cards])).toEqual([["gold", ["WU1"]], ["hyb", ["WU2"]]]);
   });
   it("averages a metric over the archetype's members", () => {
-    const cfg = config({ archetypes: [WU], rules: [rule("wr", { kind: "archetype", id: "wu" }, "avg(wr, member:any) >= 55%")] });
-    expect(evaluate(cfg, ALL, BY_ID).archetypes.wu.rules[0].value).toBeCloseTo(0.575, 5);
+    const cfg = config({ archetypes: [WU], rules: [rule("wr", { kind: "archetype", id: "wu" }, "avg(wr, member:any) >= 0.5")] });
+    expect(evaluate(cfg, ALL, BY_ID).archetypes.wu.rules[0].value).toBeCloseTo(1, 5);
   });
   it("counts members of the primary mechanics apart from the secondary ones", () => {
     const arch = { ...WU, mechanics: [WU.mechanics[0], { ...WU.mechanics[1], priority: "secondary" as const }] };

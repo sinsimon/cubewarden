@@ -2,10 +2,10 @@
  * The workspace: one cube project and the operations people and agents run on it. The CLI, the page's
  * window.cubewarden object and its WebMCP tools are thin doors onto these same functions.
  */
-import type { Card, Config, Constraint, Measure, Mechanic, Rule, Scope } from "./model.ts";
+import type { Card, Condition, Config, Constraint, Filter, Measure, Mechanic, Rule, Scope } from "./model.ts";
 import { WUBRG } from "./colors.ts";
 import { bucketLabel, formatConstraint, inConstraint, type Status } from "./constraint.ts";
-import { evaluate, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
+import { evaluate, measureMechanic, memberOf, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
 import { changelist, diff, type Diff } from "./export.ts";
 import { matches, metricOf, type MatchContext } from "./filter.ts";
 import { parseFilter, parseRule, ruleToText } from "./syntax.ts";
@@ -49,7 +49,8 @@ export interface CheckResult {
   warnings: Finding[];
 }
 
-export interface CardSummary { id: string; name: string; colors: string; type: string; mv: number; wrAdj: number | null; set: string | null }
+/** wrDelta = WR Δ in points (see Card.wrDelta). */
+export interface CardSummary { id: string; name: string; colors: string; type: string; mv: number; wrDelta: number | null; set: string | null }
 
 export interface Explanation extends Finding {
   description?: string;
@@ -71,7 +72,7 @@ const COLOR_NAME: Record<string, string> = { W: "White", U: "Blue", B: "Black", 
 const NOT_MET: Status[] = ["near", "fail", "error"];
 
 export function summarizeCard(c: Card): CardSummary {
-  return { id: c.id, name: c.name, colors: c.colors, type: c.type, mv: c.mv, wrAdj: c.wrAdj ?? null, set: c.set };
+  return { id: c.id, name: c.name, colors: c.colors, type: c.type, mv: c.mv, wrDelta: c.wrDelta ?? null, set: c.set };
 }
 
 /** "cube" | "color:W" | "archetype:wu" | "allColors" | "allArchetypes" ↔ Scope. */
@@ -196,11 +197,16 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       if (o.respectCubeRules !== false) pool = pool.filter(cubeAllows(project.config));
       let ctx: MatchContext | undefined;
       if (o.scope) {
-        const s = o.scope.includes(":") ? parseScope(o.scope)
+        const s = o.scope.includes(":") || o.scope === "cube" ? parseScope(o.scope)
           : project.config.archetypes.some((a) => a.id === o.scope) ? parseScope("archetype:" + o.scope) : parseScope("color:" + o.scope);
         pool = scopeCards(s, pool, project.config);
-        ctx = { scopeColors: s.kind === "archetype" ? project.config.archetypes.find((a) => a.id === s.id)!.colors : s.kind === "color" && WUBRG.includes(s.color) ? s.color : "" };
+        // member: reads the scope's mechanics as in its rules: a candidate is a member when it matches one of them.
+        const archetype = s.kind === "archetype" ? project.config.archetypes.find((a) => a.id === s.id) : undefined;
+        const owner = archetype ?? (s.kind === "color" ? project.config.colors.find((c) => c.code === s.color) : undefined);
+        const scopeColors = archetype ? archetype.colors : s.kind === "color" && WUBRG.includes(s.color) ? s.color : "";
+        ctx = { scopeColors, ...(owner ? { member: memberOf((owner.mechanics || []).map((m) => measureMechanic(m, pool, { scopeColors }, 1))) } : {}) };
       }
+      if (!ctx?.member && usesMember(filter)) throw new Error("member: needs a scope: search in a colour or an archetype (scope W or wu, --scope on the command line)");
       const hits = pool.filter((c) => matches(c, filter, ctx));
       sortCards(hits, o.sort ?? "cubes");
       return { total: hits.length, cards: hits.slice(0, o.limit ?? 50).map(summarizeCard) };
@@ -372,7 +378,7 @@ export function cubeAllows(config: Config): (c: Card) => boolean {
 }
 
 /** Sort keys for search results; numbers sort high to low (mv low to high), missing values last, then by name. */
-export const SORT_KEYS = { cubes: "ccCubes", elo: "ccElo", picks: "ccPicks", wr: "wrAdj", wrraw: "wrRaw", mv: "mv", name: "name" } as const;
+export const SORT_KEYS = { cubes: "ccCubes", elo: "ccElo", picks: "ccPicks", wr: "wrDelta", wrraw: "wrRaw", mv: "mv", name: "name" } as const;
 export type SortKey = keyof typeof SORT_KEYS;
 
 export function sortCards<T extends Card>(cards: T[], key: SortKey): T[] {
@@ -387,6 +393,10 @@ export function sortCards<T extends Card>(cards: T[], key: SortKey): T[] {
     }
     return a.name.localeCompare(b.name);
   });
+}
+
+function usesMember(f: Filter | Condition): boolean {
+  return "field" in f ? f.field === "member" : f.items.some(usesMember);
 }
 
 /** Edit distance ≤ 2, for "did you mean". */

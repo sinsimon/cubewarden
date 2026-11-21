@@ -85,7 +85,7 @@ export function cardFromCubeCobra(d: CubeCobraDetails): Card {
     text: d.oracle_text || "", keywords: (d.keywords || []).map((x) => x.toLowerCase()), tags: (d.oracle_tags || []).map(slug),
     set: d.set ?? null, number: d.collector_number ?? null, rarity: d.rarity ?? null, printSets: d.set ? [d.set] : [],
     image: d.image_normal || null, scryfallId: d.scryfall_id ?? null,
-    wrAdj: null, wrRaw: null, games: null, ccElo: d.elo ?? null, ccCubes: d.cubeCount ?? null, ccPicks: d.pickCount ?? null,
+    wrDelta: null, wrRaw: null, games: null, ccElo: d.elo ?? null, ccCubes: d.cubeCount ?? null, ccPicks: d.pickCount ?? null,
   };
 }
 

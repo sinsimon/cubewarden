@@ -4,7 +4,7 @@ import type { Report, Result } from "./evaluate.ts";
 import { WUBRG } from "./colors.ts";
 import { formatConstraint } from "./constraint.ts";
 import { encodeRules, cubeCobraListUrl } from "./cubecobra.ts";
-import { pct } from "./fields.ts";
+import { pct, points } from "./fields.ts";
 import { toScryfall, type ScryfallScope } from "./scryfall.ts";
 
 export const REPO_URL = "https://github.com/sinsimon/cubewarden";
@@ -35,7 +35,7 @@ const oneLine = (s: string) => s.trim().replace(/\s*\n\s*/g, " ");
 function valueText(x: Result, report: Report): string {
   if (x.status === "error" || x.value == null) return "error";
   if (x.constraint?.unit === "percent") return `${x.value}%`;
-  if (x.measure.kind === "avg") return x.measure.metric.startsWith("wr") ? pct(x.value) : x.value.toFixed(2);
+  if (x.measure.kind === "avg") return x.measure.metric === "wrRaw" ? pct(x.value) : x.measure.metric === "wrDelta" ? points(x.value) : x.value.toFixed(2);
   const scaled = x.measure.kind === "count" && !x.measure.absolute && report.factor !== 1;
   return `${x.value} cards${scaled ? ` at ${report.targetSize}` : ""}`;
 }

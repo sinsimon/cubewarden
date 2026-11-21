@@ -5,17 +5,19 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   mv>=4  pow>=3  tou<=2  ncolors>=2
   c=wu (exactly)  c>=u (includes)  c<=wu (within)  c:c (colourless)  c=scope (the colour/archetype being checked)
   is:hybrid  r:common  r:u,r  s:fdn,trk (printed in any of these sets)
-  wr>=55% (17Lands adjusted WR)  wrraw>=55% (GIH WR)  games>=500
+  wr>=1.5  wr<0 (17Lands WR Δ: points above or below the average common/uncommon of the card's set)
+  wrraw>=55% (raw GIH WR, in percent)  games>=500
   elo>=1300  cubes>=1000  picks>=100 (CubeCobra card data)
   tag:"UG Ramp"         a CubeCobra tag on the card in your cube
   member:<mechanic id>  matches that mechanic of the colour or archetype being checked
   member:any            matches any of its mechanics (member:primary, member:secondary by priority)
+                        in a search: the mechanics of the colour or archetype given as scope
 
 Rules
   count(F) >= 6         count(F) in 13..14      count(F) = 3     count(F) <= 360
   count(t:creature) >= 50%                      share of the scope instead of a number of cards
   count(c=scope -is:hybrid) = 3 fixed           "fixed": never scaled to the target cube size
-  avg(wr, member:any) in 55%..60%               average of wr, wrraw, mv, pow, elo, cubes, picks
+  avg(wr, member:any) in 1..3.5                 average of wr, wrraw, mv, pow, elo, cubes, picks
   every(s:fdn,trk)                              every card in scope must match
   every(mv, t:creature) <= 5                    every creature must have mv <= 5
   otag:counterspell >= 6                        shorthand for count(otag:counterspell) >= 6

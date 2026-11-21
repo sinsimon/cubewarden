@@ -10,7 +10,7 @@ import { fetchCubeCobra } from "./cubecobra.ts";
 import { cardFromPrintings, type ScryfallCard } from "./data/scryfall-cards.ts";
 import { SOURCES } from "./sources.ts";
 
-export interface SetInfo { code: string; name: string; released: string; cards: number; wr?: { source: string | null; asOf: string | null } }
+export interface SetInfo { code: string; name: string; released: string; cards: number; wr?: { source: string | null; asOf: string | null; centre?: number | null } }
 export interface DataIndex { version: 1; builtAt: string; sets: SetInfo[] }
 interface Shard { set: string; cards: Card[] }
 interface SavedState { config?: Config; current?: string[]; original?: string[]; maybeboard?: string[]; source?: { id?: string } | null }
@@ -20,7 +20,8 @@ export const EMPTY_CONFIG: Config = { version: 1, cube: { name: "My cube" }, col
 
 /**
  * One card per oracle id from several set files. Win rates: the set the cube shows the card in when that set is
- * loaded, else the most recently released loaded set that has them. printSets: union.
+ * loaded, else the most recently released loaded set that has them. printSets: union. The WR Δ travels with its
+ * wrSet: each set file has it centred on that set already.
  */
 export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<string, Card> = {}): Card[] {
   const released = Object.fromEntries(index.sets.map((s) => [s.code, s.released]));
@@ -29,15 +30,15 @@ export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<
   const wrBySet = new Map<string, Map<string, Card>>();
   for (const sh of ordered) {
     for (const c of sh.cards) {
-      if (c.wrAdj != null || c.wrRaw != null) {
+      if (c.wrDelta != null || c.wrRaw != null) {
         if (!wrBySet.has(c.id)) wrBySet.set(c.id, new Map());
         wrBySet.get(c.id)!.set(sh.set, c);
       }
       const seen = out.get(c.id);
       if (!seen) { out.set(c.id, { ...c }); continue; }
       seen.printSets = [...new Set([...seen.printSets, ...c.printSets])].sort();
-      if (seen.wrAdj == null && seen.wrRaw == null && (c.wrAdj != null || c.wrRaw != null)) {
-        Object.assign(seen, { wrAdj: c.wrAdj, wrRaw: c.wrRaw, games: c.games, wrSet: c.wrSet });
+      if (seen.wrDelta == null && seen.wrRaw == null && (c.wrDelta != null || c.wrRaw != null)) {
+        Object.assign(seen, { wrDelta: c.wrDelta, wrRaw: c.wrRaw, games: c.games, wrSet: c.wrSet });
       }
     }
   }
@@ -51,7 +52,7 @@ export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<
       image: cc.image ?? base.image, scryfallId: cc.scryfallId ?? base.scryfallId,
       printSets: [...new Set([...base.printSets, ...(cc.set ? [cc.set] : [])])].sort(),
       ...(cc.ccTags?.length ? { ccTags: cc.ccTags } : {}),
-      ...(own ? { wrAdj: own.wrAdj, wrRaw: own.wrRaw, games: own.games, wrSet: own.wrSet } : {}),
+      ...(own ? { wrDelta: own.wrDelta, wrRaw: own.wrRaw, games: own.games, wrSet: own.wrSet } : {}),
     });
   }
   return [...out.values()];

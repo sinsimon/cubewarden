@@ -49,9 +49,16 @@ describe("filter terms", () => {
   it("reads numbers and win rates", () => {
     expect(one("mv>=4")).toEqual({ field: "mv", op: ">=", value: 4 });
     expect(one("pow:3")).toEqual({ field: "power", op: "=", value: 3 });
-    expect(one("wr>=55%")).toEqual({ field: "wrAdj", op: ">=", value: 0.55 });
+    expect(one("wr>=1.5")).toEqual({ field: "wrDelta", op: ">=", value: 1.5 });
+    expect(one("wr<0")).toEqual({ field: "wrDelta", op: "<", value: 0 });
+    expect(one("wr>=-2")).toEqual({ field: "wrDelta", op: ">=", value: -2 });
     expect(one("wrraw<60")).toEqual({ field: "wrRaw", op: "<", value: 0.6 });
+    expect(one("wrraw>=55%")).toEqual({ field: "wrRaw", op: ">=", value: 0.55 });
     expect(one("elo>=1300")).toEqual({ field: "ccElo", op: ">=", value: 1300 });
+  });
+  it("reads wr as the WR Δ in points and refuses a percent, which belongs to wrraw", () => {
+    expect(() => parseFilter("wr>=55%")).toThrowError(/WR Δ.*points.*wrraw/);
+    expect(() => parseRule("avg(wr) in 55%..60%")).toThrowError(/WR Δ.*points.*wrraw/);
   });
   it("reads colours: exact, at least, at most, colourless and the scope's own colours", () => {
     expect(one("c=wu")).toEqual({ field: "colors", op: "is", value: "WU" });
@@ -113,11 +120,12 @@ describe("unreadable text", () => {
 
 describe("measures", () => {
   it("reads an average of a metric over a filter, with a win-rate range", () => {
-    expect(parseRule("avg(wr, member:any) in 55%..60%")).toEqual({
-      measure: { kind: "avg", metric: "wrAdj" },
+    expect(parseRule("avg(wr, member:any) in -1..3")).toEqual({
+      measure: { kind: "avg", metric: "wrDelta" },
       filter: { op: "and", items: [{ field: "member", op: "is", value: "any" }] },
-      constraint: { kind: "range", min: 0.55, max: 0.6 },
+      constraint: { kind: "range", min: -1, max: 3 },
     });
+    expect(parseRule("avg(wrraw) in 55%..60%").constraint).toEqual({ kind: "range", min: 0.55, max: 0.6 });
     expect(parseRule("avg(mv, t:creature) <= 3").constraint).toEqual({ kind: "max", max: 3 });
   });
   it("reads 'every card must match' and 'every card's metric must be inside the target'", () => {
@@ -148,7 +156,10 @@ describe("writing rules back as text", () => {
     "count(c=scope -is:hybrid) = 3 fixed",
     "count(c=scope is:hybrid) = 2 fixed",
     "count() <= 360",
-    "avg(wr, member:any) in 55%..60%",
+    "avg(wr, member:any) in 1..3.5",
+    "avg(wr, member:any) in -1..3",
+    "every(wr) >= -2",
+    "count(wr>=1.5 wr<-0.5)",
     "avg(wrraw) in 54%..62%",
     "avg(mv, t:creature) <= 3",
     "every(s:fdn,trk)",

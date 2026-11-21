@@ -87,7 +87,7 @@ export function cardFromPrintings(prints: ScryfallCard[], shown: ScryfallCard = 
     text: textOf(shown), keywords: (shown.keywords || []).map((k) => k.toLowerCase()), tags: [],
     set: shown.set, number: shown.collector_number, rarity: shown.rarity,
     printSets: [...new Set(prints.map((p) => p.set))].sort(), image: imageOf(shown), scryfallId: shown.id,
-    wrAdj: null, wrRaw: null, games: null, wrSet: null, ccElo: null, ccCubes: null, ccPicks: null,
+    wrDelta: null, wrRaw: null, games: null, wrSet: null, ccElo: null, ccCubes: null, ccPicks: null,
   };
 }
 

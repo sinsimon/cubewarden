@@ -1,7 +1,7 @@
 /** Matching cards against filters. */
 import type { Card, Condition, Filter, Metric } from "./model.ts";
 import { colorSet } from "./colors.ts";
-import { FIELD } from "./fields.ts";
+import { FIELD, RETIRED } from "./fields.ts";
 import { cmp, FilterError, num, scryMatches } from "./scryfall-subset.ts";
 import { slug } from "./slug.ts";
 
@@ -22,7 +22,7 @@ export function metricOf(card: Card, metric: Metric | Condition["field"]): numbe
 }
 
 function conditionMatches(card: Card, cond: Condition, ctx?: MatchContext): boolean {
-  if (!FIELD[cond.field]) throw new FilterError("Unknown field " + cond.field);
+  if (!FIELD[cond.field]) throw new FilterError(RETIRED[cond.field] ?? "Unknown field " + cond.field);
   const v = cond.value;
   const s = String(v).toLowerCase();
   let r: boolean;
@@ -80,7 +80,7 @@ export function validateFilter(filter: Filter | Condition | null | undefined): s
     if (!f) return;
     if ("field" in f) {
       const info = FIELD[f.field];
-      if (!info) errors.push("Unknown field " + f.field);
+      if (!info) errors.push(RETIRED[f.field] ?? "Unknown field " + f.field);
       else if (!info.ops.includes(f.op)) errors.push(`Operator "${f.op}" not valid for ${info.label}`);
       if (f.field === "scryfall") {
         try { scryMatches(probe, String(f.value)); } catch (e) { errors.push((e as Error).message); }

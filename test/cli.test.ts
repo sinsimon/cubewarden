@@ -8,7 +8,8 @@ import { CARDS, card, config, rule } from "./fixtures/cards.ts";
 
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), "cubewarden-"));
-  const cards = [...CARDS, card("W4", { name: "Dawn Skirmisher", colors: "W", wrAdj: 0.61 })];
+  const cards = [...CARDS, card("W4", { name: "Dawn Skirmisher", colors: "W", wrDelta: 5 }),
+    card("U3", { name: "Sky Spy", colors: "U", keywords: ["flying"], wrDelta: -1.2 })];
   const project: Project = {
     version: 1, original: ["W1", "W2", "W3", "U1"], current: ["W1", "W2", "W3", "U1"],
     config: config({
@@ -110,6 +111,19 @@ describe("cubewarden CLI", () => {
     const dir = setup();
     expect(JSON.parse((await cli(dir, "explain", "fly", "--json")).out).cards.map((c: { id: string }) => c.id)).toEqual(["W2"]);
     expect(JSON.parse((await cli(dir, "search", "c=w t:creature", "--json")).out).cards.map((c: { name: string }) => c.name)).toEqual(["Dawn Skirmisher"]);
+  });
+  it("search prints each card's WR Δ in signed points", async () => {
+    const dir = setup();
+    const r = await cli(dir, "search", "t:creature", "--sort", "wr", "--all-cards");
+    expect(r.out).toContain("Dawn Skirmisher (W, mv 2, WR Δ +5.0)");
+    expect(r.out).toContain("Sky Spy (U, mv 2, WR Δ −1.2)");
+  });
+  it("search reads member: in the colour or archetype given with --scope", async () => {
+    const dir = setup();
+    expect((await cli(dir, "search", "member:fly", "--scope", "wu", "--all-cards")).out).toContain("Sky Spy");
+    const r = await cli(dir, "search", "member:fly", "--all-cards");
+    expect(r.code).toBe(2);
+    expect(r.out).toMatch(/member:.*--scope/);
   });
   it("exits 2 with a readable message on bad input", async () => {
     const dir = setup();

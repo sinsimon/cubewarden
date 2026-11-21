@@ -1,6 +1,7 @@
 /** Evaluating a config against a cube: every rule and mechanic in every scope. */
 import type { Card, Config, Constraint, Measure, Mechanic, Priority, Rule, Scope } from "./model.ts";
 import { bucketLabel, gap, inBucket, inConstraint, statusOf, type Status } from "./constraint.ts";
+import { METRICS, RETIRED } from "./fields.ts";
 import { isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 import { WUBRG } from "./colors.ts";
 
@@ -105,7 +106,7 @@ export function measureMechanic(mech: Mechanic, pool: Card[], ctx: MatchContext 
 }
 
 /** member:any, member:primary, member:secondary or member:<mechanic id>, from a scope's measured mechanics. */
-function memberOf(mechanics: Result[]): NonNullable<MatchContext["member"]> {
+export function memberOf(mechanics: Result[]): NonNullable<MatchContext["member"]> {
   const cards = (rs: Result[]) => new Set(rs.flatMap((r) => r.cards));
   const sets = new Map<string, Set<string>>(mechanics.map((r) => [r.id, new Set(r.cards)]));
   sets.set("any", cards(mechanics));
@@ -130,6 +131,7 @@ export function measureRule(rule: Rule, pool: Card[], ctx: MatchContext | undefi
   const constraint = rule.constraint || null;
   const base = { kind: "rule" as const, id: rule.id, name: rule.name, priority: rule.priority || "primary", constraint, measure: m, scope: rule.scope };
   try {
+    if ((m.kind === "avg" || m.kind === "every") && m.metric && !METRICS[m.metric]) throw new Error(RETIRED[m.metric] ?? `Unknown metric "${m.metric}"`);
     const hit = pool.filter((c) => matches(c, rule.filter, ctx));
     if (m.kind === "count") {
       const ids = new Set(hit.map((c) => c.id));

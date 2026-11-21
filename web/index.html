@@ -880,6 +880,10 @@ function scopeStat(s) {
   const p = s.status.primary, a = s.status.all;
   return { main: p, warn: ORD[a] > ORD[p] && (a === "fail" || a === "near" || a === "error") };
 }
+/** WR Δ in signed points: "+3.0", "−1.2". */
+function wrd(v) { return E.METRICS.wrDelta.format(v); }
+/** A metric's label; a metric saved under a retired name (wrAdj) shows that name. */
+function metricLabel(metric) { return E.METRICS[metric] ? E.METRICS[metric].label : metric; }
 function fmtMetric(metric, v) { return v == null ? "no data" : E.METRICS[metric] ? E.METRICS[metric].format(v) : String(v); }
 function sumTotal(sum) { return Object.keys(sum.byScope).length; }
 function fmtValue(res) {
@@ -1324,7 +1328,7 @@ $("#backdrop").addEventListener("click", () => { if (document.body.classList.con
 function statsFor(ids, metric) {
   const cards = ids.map((id) => byId[id]).filter(Boolean);
   const cre = cards.filter(E.isCreature).length;
-  const vals = cards.map((c) => c[metric || "wrAdj"]);
+  const vals = cards.map((c) => c[metric || "wrDelta"]);
   const known = vals.filter((v) => v != null);
   const curve = Array.from({ length: 7 }, () => [0, 0]);
   for (const c of cards) { if (E.isLand(c)) continue; const b = Math.min(6, Math.max(0, Math.round(c.mv) - 1 < 0 ? 0 : Math.round(c.mv) - 1)); curve[b][E.isCreature(c) ? 0 : 1]++; }
@@ -1502,18 +1506,18 @@ function renderHead() {
   const hint = tm ? `<button type="button" class="mhint" data-act="open-mechs" title="Mechanics are now plain filters: their targets belong in rules, count(member:&lt;mechanic&gt;)">⚠ ${tm} mechanic${tm > 1 ? "s" : ""} with targets — convert to rules</button>` : "";
   $("#titleRow").innerHTML = `<h1>${title}</h1>${countsBadge(sc)}${hint}<span class="acts">${acts}</span>`;
   $("#descBox").innerHTML = descHtml(sc);
-  const s = statsFor(sr.cards, "wrAdj");
-  $("#metaRow").innerHTML = `<span>${meta}</span><span><b>${sr.cards.length}</b> cards</span>${isShared(sc) ? "" : `<span>avg adj. WR <b>${s.avg == null ? "no data" : E.pct(s.avg)}</b></span><span class="hide-sm"><b>${s.noData}</b> without 17Lands data</span><span><b>${s.cre} / ${s.non}</b> creatures / non</span>${curveBlock(s)}`}`;
+  const s = statsFor(sr.cards, "wrDelta");
+  $("#metaRow").innerHTML = `<span>${meta}</span><span><b>${sr.cards.length}</b> cards</span>${isShared(sc) ? "" : `<span>avg WR Δ <b>${s.avg == null ? "no data" : wrd(s.avg)}</b></span><span class="hide-sm"><b>${s.noData}</b> without 17Lands data</span><span><b>${s.cre} / ${s.non}</b> creatures / non</span>${curveBlock(s)}`}`;
   renderTabs(sc);
   renderRulePanel(r, sc, sr, res);
 }
-/** Short "value/target" for the tabs and the navigator: 3/7, 6/3, 428/≤360, 13/13–14, 57.5%/54.0%–62.0%; just the value without a target. */
+/** Short "value/target" for the tabs and the navigator: 3/7, 6/3, 428/≤360, 13/13–14, +2.1/+1.0…+3.5; just the value without a target. */
 function valueTarget(res) {
   if (!res) return "";
   const m = res.measure || { kind: "count" }, c = res.constraint;
   if (res.summary) return `${res.summary.counts.ok}/${sumTotal(res.summary)}`;
   if (res.status === "error" || m.kind === "every" || m.kind === "curve" || !c) return fmtValue(res);
-  let t = fmtTarget(res).replace(/\s+/g, "");
+  let t = fmtTarget(res).replace(" to ", "…").replace(/\s+/g, "");
   if (c.kind === "min" || c.kind === "exact") t = t.replace(/^[≥=]/, "");
   return `${fmtValue(res)}/${t}`;
 }
@@ -1548,9 +1552,9 @@ function renderRulePanel(r, sc, sr, res) {
   const m = res.measure || { kind: "count" };
   const cfgObj = configObj(U.sel) || (draft && draft.obj);
   const sharedFrom = res.summary ? sc.kind : res.inherited ? res.from : null;
-  const kindTxt = (U.sel.kind === "mechanic" ? "Mechanic, counts cards" : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${E.METRICS[m.metric].label}` : m.kind === "curve" ? `Rule, mana curve${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : `Rule, every card${m.metric ? " " + E.METRICS[m.metric].label : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
+  const kindTxt = (U.sel.kind === "mechanic" ? "Mechanic, counts cards" : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${metricLabel(m.metric)}` : m.kind === "curve" ? `Rule, mana curve${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : `Rule, every card${m.metric ? " " + metricLabel(m.metric) : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
   const ids = res.cards || [];
-  const metric = m.kind === "avg" || (m.kind === "every" && m.metric) ? m.metric : "wrAdj";
+  const metric = m.kind === "avg" || (m.kind === "every" && m.metric) ? m.metric : "wrDelta";
   const s = statsFor(m.kind === "every" ? sr.cards : ids, metric);
   const scaled = isScaledCount(res, sc);
   const isDraft = draft && draft.obj.id === res.id;
@@ -1603,7 +1607,7 @@ const COLS = [
   { key: "mv", label: "MV", num: true, w: 58, hide: "xs", get: (c) => c.mv, cell: (c) => c.mv },
   { key: "colors", label: "Colours", w: 84, hide: "m", get: (c) => (c.colors.length ? c.colors.length * 10 + "WUBRG".indexOf(c.colors[0]) : 99), cell: (c) => colorPips(c.colors) },
   { key: "set", label: "Set", w: 64, hide: "m", get: (c) => c.set, cell: (c) => `<span class="setc" title="Printed in: ${esc((c.printSets || [c.set]).join(", ").toUpperCase())}">${esc(c.set)}</span>` },
-  { key: "wrAdj", label: "Adj WR", num: true, w: 92, src: "wrAdj", get: (c) => c.wrAdj, cell: (c) => (c.wrAdj == null ? '<span class="nd">no data</span>' : E.pct(c.wrAdj)) },
+  { key: "wrDelta", label: "WR Δ", num: true, w: 92, src: "wrDelta", get: (c) => c.wrDelta, cell: (c) => (c.wrDelta == null ? '<span class="nd">no data</span>' : wrd(c.wrDelta)) },
   { key: "wrRaw", label: "Raw WR", num: true, w: 92, hide: "s", src: "wrRaw", get: (c) => c.wrRaw, cell: (c) => (c.wrRaw == null ? '<span class="nd">no data</span>' : E.pct(c.wrRaw)) },
   { key: "ccElo", label: "ELO", num: true, w: 76, hide: "m", src: "cubecobra", opt: true, get: (c) => c.ccElo, cell: (c) => (c.ccElo == null ? '<span class="nd">no data</span>' : Math.round(c.ccElo).toLocaleString("en")) },
   { key: "ccCubes", label: "Cubes", num: true, w: 80, hide: "m", src: "cubecobra", opt: true, get: (c) => c.ccCubes, cell: (c) => (c.ccCubes == null ? '<span class="nd">no data</span>' : Math.round(c.ccCubes).toLocaleString("en")) },
@@ -1706,7 +1710,7 @@ grid.addEventListener("click", (e) => {
   syncGridSelection(); renderSelectionBits(); grid.generateCellPartNames();
 });
 /** Hide columns by priority until the visible ones fit the list's own width (name and the value column always stay). */
-const HIDE_ORDER = ["ccTags", "ccPicks", "ccCubes", "ccElo", "set", "colors", "wrRaw", "type", "mv", "cost", "wrAdj"];
+const HIDE_ORDER = ["ccTags", "ccPicks", "ccCubes", "ccElo", "set", "colors", "wrRaw", "type", "mv", "cost", "wrDelta"];
 function sizeTable() {
   const w = ($("#tablewrap").clientWidth || innerWidth) - 4;
   U.cols = U.cols || {};
@@ -1765,7 +1769,7 @@ function renderCards(ids, hit, res) {
     const c = byId[id], mk = res ? cardMark(res, id, hit) : "";
     const tag = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
     const img = c.image ? c.image.replace("/normal/", "/small/") : "";
-    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}" title="${esc(c.name)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrAdj == null ? "no data" : E.pct(c.wrAdj)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrAdj" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
+    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}" title="${esc(c.name)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
   }).join("");
 }
 function renderTable() {
@@ -1817,10 +1821,10 @@ function renderActionBar() {
   const bar = $("#actionbar");
   if (!selected.size) { bar.classList.remove("on"); bar.innerHTML = ""; document.body.classList.remove("has-actionbar"); return; }
   const ids = [...selected].filter((id) => byId[id]);
-  const known = ids.map((id) => byId[id].wrAdj).filter((v) => v != null);
+  const known = ids.map((id) => byId[id].wrDelta).filter((v) => v != null);
   const avg = known.length ? known.reduce((s, v) => s + v, 0) / known.length : null;
   bar.classList.add("on");
-  bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">avg adjusted WR ${avg == null ? "no data" : E.pct(avg)}${known.length < ids.length ? `, ${ids.length - known.length} no data` : ""}</span>
+  bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">avg WR Δ ${avg == null ? "no data" : wrd(avg)}${known.length < ids.length ? `, ${ids.length - known.length} no data` : ""}</span>
     <vaadin-button theme="small" data-act="remove">Remove <kbd>⌫</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="remove-mb" aria-label="Remove to maybeboard"><span class="xl">Remove to maybeboard</span><span class="xs">To maybeboard</span> <kbd>⇧⌫</kbd></vaadin-button>
     <vaadin-button theme="small primary" data-act="replace">Replace… <kbd>R</kbd></vaadin-button>
@@ -2073,7 +2077,7 @@ const FIELD_GROUPS = [
   ["Numbers", ["mv", "power", "toughness", "colorCount"]],
   ["Colour", ["colors", "hybrid"]],
   ["Printing", ["set", "rarity"]],
-  ["17Lands", ["wrAdj", "wrRaw", "games"]],
+  ["17Lands", ["wrDelta", "wrRaw", "games"]],
   ["CubeCobra", ["ccElo", "ccCubes", "ccPicks", "ccTag"]],
   ["Advanced", ["member", "scryfall"]],
 ];
@@ -2081,7 +2085,7 @@ const OP_LABEL = { "=": "=", "<": "<", "<=": "≤", ">": ">", ">=": "≥", is: "
 const NEG_LABEL = { is: "is not", contains: "does not contain", includes: "does not include", within: "is not within", in: "is none of", matches: "does not match", "=": "≠" };
 const SETS = (() => { const m = {}; D.cards.forEach((c) => (c.printSets || [c.set]).forEach((s) => (m[s] = (m[s] || 0) + 1))); return Object.keys(m).sort((a, b) => m[b] - m[a]); })();
 const RARITIES = ["common", "uncommon", "rare", "mythic"];
-const SYNTAX = { ccTag: 'tag:', name: 'name:', tag: "otag:", type: "t:", text: "o:", keyword: "kw:", manaCost: "m:", mv: "mv", power: "pow", toughness: "tou", colors: "c", colorCount: "ncolors", hybrid: "is:hybrid", set: "s:", rarity: "r:", wrAdj: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", member: "member:", scryfall: "raw" };
+const SYNTAX = { ccTag: 'tag:', name: 'name:', tag: "otag:", type: "t:", text: "o:", keyword: "kw:", manaCost: "m:", mv: "mv", power: "pow", toughness: "tou", colors: "c", colorCount: "ncolors", hybrid: "is:hybrid", set: "s:", rarity: "r:", wrDelta: "wr", wrRaw: "wrraw", games: "games", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", member: "member:", scryfall: "raw" };
 function fieldOptions() {
   return FIELD_GROUPS.map(([g, ids]) => ({ group: g, items: ids.filter((id) => E.FIELD[id]).map((id) => [id, E.FIELD[id].label]) }));
 }
@@ -2095,7 +2099,7 @@ function opOptions(f) {
 }
 function defaultValue(f, op) {
   switch (f.type) {
-    case "number": return f.id === "mv" ? 3 : f.id === "games" ? 500 : f.id === "ccElo" ? 1300 : f.id === "ccCubes" ? 1000 : f.id === "ccPicks" ? 100 : 2;
+    case "number": return f.id === "mv" ? 3 : f.id === "wrDelta" ? 1 : f.id === "games" ? 500 : f.id === "ccElo" ? 1300 : f.id === "ccCubes" ? 1000 : f.id === "ccPicks" ? 100 : 2;
     case "percent": return 0.55;
     case "colors": return "W";
     case "bool": return true;
@@ -2174,7 +2178,9 @@ function makeBuilder(root, opts) {
       case "query": return inp("text", c.value, set, "t:creature o:draw");
       case "tag": return inp("text", c.value, set, "removal-creature", "dl-tags");
       case "keyword": return inp("text", c.value, set, "flying", "dl-kw");
-      case "number": return inp("number", c.value, (v) => set(v === "" ? "" : Number(v)), "", null, "1");
+      case "number": return f.id === "wrDelta"
+        ? h("div", { class: "pct" }, inp("number", c.value, (v) => set(v === "" ? "" : Number(v)), "", null, "0.1"), h("span", { class: "muted" }, "points"))
+        : inp("number", c.value, (v) => set(v === "" ? "" : Number(v)), "", null, "1");
       case "percent": return h("div", { class: "pct" }, inp("number", c.value === "" || c.value == null ? "" : +(c.value * 100).toFixed(2), (v) => set(v === "" ? "" : Math.round(Number(v) * 100) / 10000), "", null, "0.1"), h("span", { class: "muted" }, "%"));
       case "colors": {
         const isScope = c.value === "@scope";
@@ -2216,23 +2222,24 @@ function makeBuilder(root, opts) {
   return { el: wrap, render };
 }
 function constraintEditor(holder, metric, onChange, noneLabel, allowPercent) {
-  const pctMode = !!(metric && metric.startsWith("wr"));
+  const pctMode = metric === "wrRaw", pointsMode = metric === "wrDelta";
   const toUI = (v) => (v == null || v === "" ? "" : pctMode ? +(v * 100).toFixed(2) : v);
   const fromUI = (s) => (s === "" ? null : pctMode ? Math.round(Number(s) * 100) / 10000 : Number(s));
   const box = h("div", { class: "ce" });
   function render() {
     const c = holder.constraint, kind = c ? c.kind : "";
     const parts = [selEl([["", noneLabel || "anything (no target)"], ["min", "at least"], ["max", "at most"], ["exact", "exactly"], ["range", "between"]], kind, (v) => {
-      const prev = c ? c.min ?? c.value ?? c.max : pctMode ? 0.55 : 0;
+      const prev = c ? c.min ?? c.value ?? c.max : pctMode ? 0.55 : pointsMode ? 1 : 0;
       holder.constraint = !v ? null : v === "min" ? { kind: v, min: prev } : v === "max" ? { kind: v, max: prev } : v === "exact" ? { kind: v, value: prev } : { kind: v, min: prev, max: prev };
       render(); onChange();
     })];
-    const num = (key) => inp("number", toUI(c[key]), (v) => { c[key] = fromUI(v); onChange(); }, "", null, pctMode ? "0.1" : metric === "mv" ? "0.1" : "1");
+    const num = (key) => inp("number", toUI(c[key]), (v) => { c[key] = fromUI(v); onChange(); }, "", null, pctMode || pointsMode || metric === "mv" ? "0.1" : "1");
     if (kind === "min") parts.push(num("min"));
     if (kind === "max") parts.push(num("max"));
     if (kind === "exact") parts.push(num("value"));
     if (kind === "range") parts.push(num("min"), h("span", { class: "muted" }, "and"), num("max"));
     if (pctMode && kind) parts.push(h("span", { class: "muted" }, "%"));
+    if (pointsMode && kind) parts.push(h("span", { class: "muted" }, "points"));
     if (allowPercent && kind) parts.push(selEl([["", "cards"], ["percent", "% of the scope"]], c.unit || "", (v) => { if (v) c.unit = v; else delete c.unit; onChange(); }, "txt unitsel"));
     box.replaceChildren(...parts);
   }
@@ -2338,8 +2345,8 @@ function matchList(ids, layout) {
   const LIM = 240, shown = ids.slice(0, LIM);
   if (!ids.length) return `<div class="kempty" style="padding:8px 0">None.</div>`;
   const more = ids.length > LIM ? `<div class="muted" style="font-size:12px;padding:6px 0">Showing the first ${LIM} of ${ids.length}, sorted like Add cards (${esc(sortLabel())}).</div>` : "";
-  if (layout === "images") return `<div class="mgrid">${shown.map((id) => { const c = byId[id]; return `<figure title="${esc(c.name)}"><img loading="lazy" src="${esc((c.image || "").replace("/normal/", "/small/"))}" alt="${esc(c.name)}"><figcaption>${c.wrAdj == null ? "no data" : E.pct(c.wrAdj)}</figcaption></figure>`; }).join("")}</div>${more}`;
-  return `<table class="mlist">${shown.map((id) => { const c = byId[id]; return `<tr><td><span class="nm" data-card="${id}">${esc(c.name)}</span></td><td>${pips(c.manaCost)}</td><td class="muted">${esc(c.type)}</td><td class="num">${c.wrAdj == null ? '<span class="nd">no data</span>' : E.pct(c.wrAdj)}</td></tr>`; }).join("")}</table>${more}`;
+  if (layout === "images") return `<div class="mgrid">${shown.map((id) => { const c = byId[id]; return `<figure title="${esc(c.name)}"><img loading="lazy" src="${esc((c.image || "").replace("/normal/", "/small/"))}" alt="${esc(c.name)}"><figcaption>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}</figcaption></figure>`; }).join("")}</div>${more}`;
+  return `<table class="mlist">${shown.map((id) => { const c = byId[id]; return `<tr><td><span class="nm" data-card="${id}">${esc(c.name)}</span></td><td>${pips(c.manaCost)}</td><td class="muted">${esc(c.type)}</td><td class="num">${c.wrDelta == null ? '<span class="nd">no data</span>' : wrd(c.wrDelta)}</td></tr>`; }).join("")}</table>${more}`;
 }
 function renderMatches() {
   const st = matchesState, m = computeMatches(), gate = gateRules().length;
@@ -2356,8 +2363,8 @@ function renderMatches() {
 }
 function safeRuleText(o, isRule) { try { return E.ruleToText(cleanObj(o, isRule ? "rule" : "mechanic")); } catch (e) { return ""; } }
 function cheatSheet() {
-  const ex = [["count(otag:counterspell) >= 6", "count cards; or just otag:counterspell >= 6"], ["count(t:creature) >= 50%", "share of the scope"], ["count(c=scope -is:hybrid) = 3 fixed", "gold cards, never scaled"], ["count(kw:flying mv<=3) in 5..7", "a range"], ["avg(wr, member:any) in 55%..60%", "average adjusted WR"], ["avg(mv, t:creature) <= 3", "average mana value"], ["every(s:fdn,trk)", "every card must match"], ["every(mv, t:creature) <= 5", "every creature, MV at most 5"], ["curve(t:creature) 1:1..3 2:5..7 6+:0..2", "creatures per mana value, 6+ = six and up"], ["curve(t:creature) 2:20%..30% 3:15%..25%", "curve in % of the filtered cards"]];
-  const keys = "otag: t: o: kw: m: mv pow tou c=wu c>=u c<=wu c=scope c:c is:hybrid r: s:fdn,trk !\"Name\" name: wr>=55% wrraw games elo cubes picks member:any ncolors";
+  const ex = [["count(otag:counterspell) >= 6", "count cards; or just otag:counterspell >= 6"], ["count(t:creature) >= 50%", "share of the scope"], ["count(c=scope -is:hybrid) = 3 fixed", "gold cards, never scaled"], ["count(kw:flying mv<=3) in 5..7", "a range"], ["avg(wr, member:any) in 1..3.5", "average WR Δ, points above the set's average common"], ["avg(mv, t:creature) <= 3", "average mana value"], ["every(s:fdn,trk)", "every card must match"], ["every(mv, t:creature) <= 5", "every creature, MV at most 5"], ["curve(t:creature) 1:1..3 2:5..7 6+:0..2", "creatures per mana value, 6+ = six and up"], ["curve(t:creature) 2:20%..30% 3:15%..25%", "curve in % of the filtered cards"]];
+  const keys = "otag: t: o: kw: m: mv pow tou c=wu c>=u c<=wu c=scope c:c is:hybrid r: s:fdn,trk !\"Name\" name: wr>=1.5 wrraw>=55% games elo cubes picks member:any ncolors";
   return h("details", { class: "cheat" }, h("summary", null, "Syntax"), h("div", { html: `<p>Same as CubeCobra and Scryfall filters. A space means and; use <code>or</code>, parentheses, and <code>-</code> for not.</p><p class="mono">${esc(keys)}</p><table>${ex.map(([a, b]) => `<tr><td><code>${esc(a)}</code></td><td>${esc(b)}</td></tr>`).join("")}</table>` }));
 }
 function updateLive() {
@@ -2469,7 +2476,7 @@ function renderEditor() {
   const first = h("div", { class: "sl" });
   if (isRule) {
     first.append(selEl([["count", "Count"], ["avg", "Average"], ["every", "Every card"], ["curve", "Mana curve"]], m.kind, (k) => {
-      o.measure = k === "count" ? { kind: "count" } : k === "avg" ? { kind: "avg", metric: m.metric || "wrAdj" } : k === "curve" ? { kind: "curve", buckets: [] } : { kind: "every" };
+      o.measure = k === "count" ? { kind: "count" } : k === "avg" ? { kind: "avg", metric: m.metric || "wrDelta" } : k === "curve" ? { kind: "curve", buckets: [] } : { kind: "every" };
       o.constraint = null; draft.curve = null;
       rebuild();
     }, "txt sel-strong"));
@@ -2486,7 +2493,7 @@ function renderEditor() {
   if (m.kind === "every" && !m.metric) {
     last.append(h("span", { class: "muted" }, "Cards in the scope that don't match break the rule."));
   } else if (m.kind === "every") {
-    last.append(h("span", null, "must have"), selEl(metricOpts, m.metric, (v) => { m.metric = v; o.constraint = { kind: "max", max: v.startsWith("wr") ? 0.6 : 3 }; rebuild(); }, "txt sel-strong"),
+    last.append(h("span", null, "must have"), selEl(metricOpts, m.metric, (v) => { m.metric = v; o.constraint = v === "wrRaw" ? { kind: "max", max: 0.6 } : v === "wrDelta" ? { kind: "min", min: -2 } : { kind: "max", max: 3 }; rebuild(); }, "txt sel-strong"),
       constraintEditor(o, m.metric, scheduleDraft, "anything (no check)"));
   } else if (m.kind !== "curve") {
     last.append(h("span", null, "should be"), constraintEditor(o, m.kind === "avg" ? m.metric : null, scheduleDraft, null, m.kind === "count"));
@@ -2628,7 +2635,7 @@ const FIND_COLS = [
   { k: "cubes", label: "Cubes", long: "CubeCobra cubes", w: 54, sort: "cubes", cell: (c) => num0(c.ccCubes), title: "How many CubeCobra cubes include the card" },
   { k: "elo", label: "ELO", long: "CubeCobra ELO", w: 52, sort: "elo", cell: (c) => num0(c.ccElo), title: "CubeCobra ELO from draft picks" },
   { k: "picks", label: "Picks", long: "CubeCobra picks", w: 54, sort: "picks", cell: (c) => num0(c.ccPicks), title: "How many times the card was picked in CubeCobra drafts" },
-  { k: "wr", label: "Adj WR", long: "Adjusted WR (17Lands)", w: 62, sort: "wr", cell: (c) => (c.wrAdj == null ? nd : E.pct(c.wrAdj)) },
+  { k: "wr", label: "WR Δ", long: "WR Δ (17Lands, points vs the set's average common/uncommon)", w: 62, sort: "wr", cell: (c) => (c.wrDelta == null ? nd : wrd(c.wrDelta)) },
   { k: "wrraw", label: "Raw WR", long: "Raw WR (17Lands GIH)", w: 62, sort: "wrraw", cell: (c) => (c.wrRaw == null ? nd : E.pct(c.wrRaw)) },
   { k: "type", label: "Type", w: 110, cell: (c) => `<span class="muted" style="font-size:12px">${esc(c.type.split(" — ")[0])}</span>` },
   { k: "set", label: "Set", w: 42, cell: (c) => `<span style="text-transform:uppercase;font-size:11.5px;color:var(--ink-2)">${esc(c.set)}</span>` },
@@ -2677,7 +2684,7 @@ function renderFindFoot() {
     const s1 = scopeStat(scopeRes(R, U.scope)).main, s2 = scopeStat(sr2).main;
     lines.push([scopeName(U.scope) + " status", ST_LABEL[s1], ST_LABEL[s2], s2]);
     lines.push(["Cube size", String(R.size), String(R2.size), null]);
-    const wr = R2.cube.rules.find((r) => r.measure.kind === "avg" && r.measure.metric === "wrAdj"), wr1 = R.cube.rules.find((r) => wr && r.id === wr.id);
+    const wr = R2.cube.rules.find((r) => r.measure.kind === "avg" && r.measure.metric === "wrDelta"), wr1 = R.cube.rules.find((r) => wr && r.id === wr.id);
     if (wr && wr1) lines.push(["Cube " + wr.name.toLowerCase(), fmtValue(wr1), fmtValue(wr), dstat(wr)]);
     parts.push(h("div", { style: "width:100%" },
       n ? h("div", { class: "outchips inchips", style: "margin-bottom:6px" }, h("span", { class: "muted", style: "font-size:12px" }, "Putting in:"), ...f.picked.map((id) => h("span", { class: "chip", "data-card": id }, byId[id].name, h("button", { type: "button", "data-unpick": id, "aria-label": "Unpick" }, "×")))) : null,
@@ -2806,12 +2813,12 @@ function demoState() { return { version: 1, config: clone(D.seed), original: D.c
 /* ================= data sources / shortcuts / view filter ================= */
 function renderData() {
   const cubeCards = S.current.map((id) => byId[id]);
-  const noAdj = cubeCards.filter((c) => c.wrAdj == null).length, noRaw = cubeCards.filter((c) => c.wrRaw == null).length;
-  const labels = { cards: "Card data", tags: "Oracle tags", wrRaw: "Raw WR", wrAdj: "Adjusted WR", cube: "Cube list", cubecobra: "CubeCobra data" };
+  const noDelta = cubeCards.filter((c) => c.wrDelta == null).length, noRaw = cubeCards.filter((c) => c.wrRaw == null).length;
+  const labels = { cards: "Card data", tags: "Oracle tags", wrRaw: "Raw WR", wrDelta: "WR Δ", cube: "Cube list", cubecobra: "CubeCobra data" };
   const body = h("div", { class: "dr-b" });
   body.append(h("dl", { class: "src", html: Object.entries(D.sources).map(([k, v]) => `<dt>${esc(labels[k] || k)}</dt><dd>${esc(v)}</dd>`).join("") }));
   body.append(h("div", { class: "live neutral" },
-    h("div", null, `${noAdj} cards in the cube have no adjusted WR and ${noRaw} no raw WR (no 17Lands data for their set). They show as "no data", are left out of every average, and are never counted as 0.`)));
+    h("div", null, `${noDelta} cards in the cube have no WR Δ and ${noRaw} no raw WR (no 17Lands data for their set). They show as "no data", are left out of every average, and are never counted as 0.`)));
   body.append(h("dl", { class: "src", html: `<dt>Data built</dt><dd>${esc(D.builtAt)}</dd><dt>Imported from</dt><dd style="overflow-wrap:anywhere">${esc(S.source ? `CubeCobra cube ${S.source.id}${S.source.name ? ` (${S.source.name})` : ""}, read ${S.source.at.slice(0, 10)}` : D.cube.source)}</dd><dt>Card pool</dt><dd>${D.cards.length} cards: the cube plus every legal card outside it, used by Add and Replace.</dd>${hasTarget() ? `<dt>Scaled counts</dt><dd>Colour and archetype counts are multiplied by ${S.config.cube.targetSize || "target"} ÷ ${R.size} = ${R.factor.toFixed(3)} so targets written for the final cube can be read now. Fixed counts (gold, hybrid) and whole-cube counts are never scaled.</dd>` : ""}` }));
   body.append(h("div", { class: "live neutral", html: `<b>cubewarden</b> is open source: <a href="${E.REPO_URL}" target="_blank" rel="noopener">${esc(E.REPO_URL.replace("https://", ""))}</a>. Your work stays in this browser. To let an AI agent work on the same cube, run it on your computer (<code>npx cubewarden serve</code> in your project folder): agents can use this page through <code>window.cubewarden</code> or WebMCP, or the <code>cubewarden</code> command line on the project file. Details for agents: <a href="llms.txt">llms.txt</a>.` }));
   return [drawerHead("Where the numbers come from"), body];

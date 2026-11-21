@@ -4,7 +4,7 @@ import { WUBRG } from "./colors.ts";
 import { describeFilter } from "./describe.ts";
 import { conditionToText } from "./syntax.ts";
 
-const SKIP: FieldId[] = ["wrAdj", "wrRaw", "games", "member", "ccElo", "ccCubes", "ccPicks", "ccTag", "colorCount"];
+const SKIP: FieldId[] = ["wrDelta", "wrRaw", "games", "member", "ccElo", "ccCubes", "ccPicks", "ccTag", "colorCount"];
 
 export type ScryfallScope = { kind: "cube" } | { kind: "color"; color: string } | { kind: "archetype"; colors: string };
 

@@ -21,24 +21,25 @@ export function gap(v: number | null, c: Constraint | null | undefined): number 
   return v < lo ? v - lo : v > hi ? v - hi : 0;
 }
 
-/** ok | near | fail | none | nodata. near = outside by at most 1 card (counts), 1 WR point or 0.25 of another metric (averages). */
+/** ok | near | fail | none | nodata. near = outside by at most 1 card (counts), 1 WR point (wr, wrraw) or 0.25 of another metric (averages). */
 export function statusOf(v: number | null, c: Constraint | null | undefined, kind: "count" | "avg", metric?: Metric): Status {
   if (!c) return "none";
   if (v == null) return "nodata";
   const g = Math.abs(gap(v, c));
   if (g === 0) return "ok";
-  const tol = kind === "avg" ? (metric === "wrAdj" || metric === "wrRaw" ? 0.01 : 0.25) : 1;
+  const tol = kind === "avg" ? (metric === "wrRaw" ? 0.01 : metric === "wrDelta" ? 1 : 0.25) : 1;
   return g <= tol + 1e-9 ? "near" : "fail";
 }
 
 export function formatConstraint(c: Constraint | null | undefined, metric?: Metric): string {
   if (!c) return "no target";
-  const f = c.unit === "percent" ? (x: number) => x + "%" : metric ? METRICS[metric].format : (x: number) => String(x);
+  const f = c.unit === "percent" ? (x: number) => x + "%" : (metric && METRICS[metric]?.format) || ((x: number) => String(x));
   switch (c.kind) {
     case "min": return "≥ " + f(c.min);
     case "max": return "≤ " + f(c.max);
     case "exact": return "= " + f(c.value);
-    case "range": return f(c.min) + "–" + f(c.max);
+    // Signed ends ("−1.0", "+3.0") read badly around a dash.
+    case "range": return f(c.min) + (metric === "wrDelta" ? " to " : "–") + f(c.max);
   }
 }
 
