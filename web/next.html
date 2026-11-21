@@ -955,19 +955,23 @@ function allowedSets() {
   }
   return out.size ? [...out] : null;
 }
-/** Member context from evaluated results (cards in the cube). */
-function memberCtxFromResult(archId, r) {
-  const a = r.archetypes[archId]; if (!a) return null;
-  const members = new Set(a.members), by = {};
-  a.mechanics.forEach((m) => (by[m.id] = new Set(m.cards)));
-  return { scopeColors: archOf({ kind: "archetype", id: archId }).colors, member: (id, v) => (v === "any" || v == null ? members.has(id) : !!(by[v] && by[v].has(id))) };
+/** The mechanics member:<v> stands for: any, primary, secondary or one mechanic id. */
+function memberMechs(ms, v) {
+  if (v === "any" || v == null) return ms;
+  if (v === "primary" || v === "secondary") return ms.filter((m) => (m.priority || "primary") === v);
+  return ms.filter((m) => m.id === v);
 }
-/** Member context computed from the archetype's mechanic filters (works for cards outside the cube). */
-function memberCtxByFilters(arch) {
-  return { scopeColors: arch.colors, member: (id, v) => {
+/** Member context of a colour or archetype from evaluated results (cards in the cube). */
+function memberCtxFromResult(sc, r) {
+  const sr = scopeRes(r, sc); if (!sr) return null;
+  return { scopeColors: scopeColorsOf(sc), member: (id, v) => memberMechs(sr.mechanics, v).some((m) => m.cards.includes(id)) };
+}
+/** Member context of a colour or archetype computed from its mechanic filters (works for cards outside the cube). */
+function memberCtxByFilters(sc) {
+  const ms = mechList(S.config, sc) || [], scopeColors = scopeColorsOf(sc);
+  return { scopeColors, member: (id, v) => {
     const c = byId[id]; if (!c) return false;
-    const ms = v === "any" || v == null ? arch.mechanics : arch.mechanics.filter((m) => m.id === v);
-    return ms.some((m) => { try { return E.matches(c, m.filter); } catch (e) { return false; } });
+    return memberMechs(ms, v).some((m) => { try { return E.matches(c, m.filter, { scopeColors }); } catch (e) { return false; } });
   } };
 }
 function draftConfig() {
@@ -1665,7 +1669,7 @@ function computeRows() {
   let ids = sr.cards.slice();
   const qRaw = String($("#q").value || "").trim(), q = qRaw.toLowerCase();
   vfError = null;
-  const ctxQ = U.scope.kind === "archetype" ? memberCtxFromResult(U.scope.id, r) : U.scope.kind === "color" ? { scopeColors: scopeColorsOf(U.scope) } : null;
+  const ctxQ = ctxForScope(U.scope, r);
   if (q && /[:<>=!]|^-|\(/.test(qRaw)) {
     try { const f = E.parseFilterText(qRaw); ids = ids.filter((id) => E.matches(byId[id], f, ctxQ)); } catch (e) { vfError = e.message; ids = []; }
   } else if (q) ids = ids.filter((id) => matchQ(byId[id], q));
@@ -2043,7 +2047,7 @@ function newCond() { return { field: "tag", op: "is", value: "" }; }
 function filterProblems(root, sc, findMode) {
   const sample = byId[S.current[0]] || D.cards[0];
   const errs = E.validateFilter(root, sample);
-  if (hasMember(root) && !(sc && (sc.kind === "archetype" || sc.kind === "allArchetypes"))) errs.push("member: (archetype member) works only in an archetype or in All archetypes.");
+  if (hasMember(root) && !(sc && sc.kind !== "cube")) errs.push("member: (mechanic member) works only in a colour, an archetype, All colours or All archetypes.");
   if (hasScopeColors(root) && !(sc && (sc.kind === "archetype" || isShared(sc) || (sc.kind === "color" && WUBRG.includes(sc.color))))) errs.push(findMode ? "c=scope (this scope's colours) needs a colour or an archetype: pick one in Search in." : "c=scope (this scope's colours) works only in a colour, an archetype, All colours or All archetypes.");
   return errs;
 }
@@ -2127,10 +2131,11 @@ function makeBuilder(root, opts) {
         return RARITIES.map((r) => h("button", { type: "button", class: "chip off" + (vals.includes(r) ? " on" : ""), onclick: () => { c.value = vals.includes(r) ? vals.filter((x) => x !== r) : vals.concat(r); changed(true); } }, r));
       }
       case "member": {
-        const a = archOf(opts.scope);
-        if (opts.scope && opts.scope.kind === "allArchetypes") return selEl([["any", "any mechanic of the archetype"]], "any", set);
-        if (!a) return h("span", { class: "muted" }, "archetype only");
-        return selEl([["any", "any mechanic"], ...a.mechanics.map((m) => [m.id, m.name])], c.value || "any", set);
+        const ms = opts.scope && mechList(S.config, opts.scope);
+        const any = [["any", "any mechanic"], ["primary", "a primary mechanic"], ["secondary", "a secondary mechanic"]];
+        if (isShared(opts.scope)) return selEl(any.concat(c.value && !any.some((x) => x[0] === c.value) ? [[c.value, c.value]] : []), c.value || "any", set);
+        if (!ms) return h("span", { class: "muted" }, "colour or archetype only");
+        return selEl(any.concat(ms.map((m) => [m.id, m.name])), c.value || "any", set);
       }
       default: return inp("text", c.value, set);
     }
@@ -2233,9 +2238,7 @@ function scryHtml(filter, sc) {
   return `<span class="scry"><a href="${esc(x.url)}" target="_blank" rel="noopener" title="${esc(x.query)}">Open in Scryfall ↗</a>${x.skipped.length ? `<span class="skip">Scryfall can't filter: ${esc(x.skipped.join(", "))}</span>` : ""}</span>`;
 }
 function ctxForScope(sc, r) {
-  if (sc.kind === "archetype") return memberCtxFromResult(sc.id, r);
-  if (sc.kind === "color") return { scopeColors: scopeColorsOf(sc) };
-  return null;
+  return sc.kind === "archetype" || sc.kind === "color" ? memberCtxFromResult(sc, r) : null;
 }
 /** Every card matching a filter in a scope: in the cube, and outside it (legal pool, via candidates()). */
 let matchesState = null;
@@ -2252,7 +2255,7 @@ function computeMatches() {
   catch (e) { res.err = e.message; }
   if (isShared(sc)) res.outNote = "Open a single colour or archetype to search outside the cube.";
   else {
-    const arch = archOf(sc), ctx = arch ? memberCtxByFilters(arch) : sc.kind === "color" ? { scopeColors: scopeColorsOf(sc) } : undefined;
+    const ctx = archOf(sc) || sc.kind === "color" ? memberCtxByFilters(sc) : undefined;
     const c = E.candidates(filter, sc, S.config, byId, S.current, { ctx, respectCubeRules: onlySets, sort: U.findSort || "cubes" });
     if (c.error) res.err = res.err || c.error; else res.out = c.cards.map((x) => x.id);
   }
@@ -2450,8 +2453,8 @@ function findCompute() {
   const items = [find.filter];
   const q = find.q.trim();
   if (q) items.push({ field: "name", op: "contains", value: q });
-  const sc = find.scope, arch = archOf(sc);
-  const ctx = arch ? memberCtxByFilters(arch) : sc.kind === "color" ? { scopeColors: scopeColorsOf(sc) } : undefined;
+  const sc = find.scope;
+  const ctx = archOf(sc) || sc.kind === "color" ? memberCtxByFilters(sc) : undefined;
   return E.candidates({ op: "and", items }, sc, S.config, byId, S.current, { ctx, respectCubeRules: find.onlySets, sort: U.findSort || "cubes" });
 }
 function renderFind() {
