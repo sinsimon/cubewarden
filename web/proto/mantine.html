@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cubewarden mockup: Mantine</title>
+<meta name="color-scheme" content="light dark">
+<script>
+  // Same as Mantine's ColorSchemeScript with defaultColorScheme="auto": no flash before React mounts.
+  document.documentElement.setAttribute("data-mantine-color-scheme", matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+</script>
+<link rel="stylesheet" href="mantine.css">
+<style>
+  /* Only what Mantine has no prop for: status glyphs, mana pips, tree rows, highlighted rows, dense table. */
+  :root { --hit: var(--mantine-color-blue-light); --hit-edge: var(--mantine-color-blue-filled); --line: var(--mantine-color-default-border); --muted: var(--mantine-color-dimmed); }
+  /* Mantine's default "dimmed" grey is below 4.5:1 on its own backgrounds; one shade stronger in each scheme. */
+  :root[data-mantine-color-scheme="light"] { --mantine-color-dimmed: var(--mantine-color-gray-7); }
+  :root[data-mantine-color-scheme="dark"] { --mantine-color-dimmed: var(--mantine-color-dark-1); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .side { background: var(--mantine-color-body); }
+  [data-mantine-color-scheme="light"] .side { background: var(--mantine-color-gray-0); }
+  .tnode { min-height: 26px; padding-right: 8px; border-radius: var(--mantine-radius-sm); cursor: default; font-size: 13px; }
+  .tnode:hover { background: var(--mantine-color-default-hover); }
+  .tnode.on { background: var(--mantine-color-blue-light); box-shadow: inset 3px 0 0 var(--mantine-color-blue-filled); }
+  .tnode.section { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
+  .tnode .chev { width: 12px; flex: none; color: var(--muted); transition: transform .12s; }
+  .tnode .chev.open { transform: rotate(90deg); }
+  .tnode .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tnode .ct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .st { width: 8px; height: 8px; flex: none; display: inline-block; }
+  .st.pass { background: var(--mantine-color-green-filled); border-radius: 50%; }
+  .st.warn { background: var(--mantine-color-orange-filled); border-radius: 1px; }
+  .st.fail { background: var(--mantine-color-red-filled); transform: rotate(45deg) scale(.85); }
+  .pips { display: inline-flex; gap: 2px; }
+  .pip { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; font-size: 9px; font-weight: 700; color: #1b1b1b; border: 1px solid rgb(0 0 0 / .25); box-sizing: border-box; line-height: 1; }
+  .pip.W { background: #f8f2d4; } .pip.U { background: #b4d3ea; } .pip.B { background: #bcb4b0; } .pip.R { background: #f0a98c; } .pip.G { background: #9fd1ad; } .pip.C, .pip.N { background: #d6d3cf; }
+  .pips.big .pip { width: 22px; height: 22px; font-size: 12px; }
+
+  .content { padding: 14px 20px 40px; min-width: 0; }
+  .crumbs { font-size: 13px; }
+  .crumb { color: var(--muted); padding: 2px 4px; border-radius: 4px; font-size: 13px; }
+  .crumb:hover { color: var(--mantine-color-text); background: var(--mantine-color-default-hover); }
+  .crumb.current { color: var(--mantine-color-text); font-weight: 500; }
+  .sib { color: var(--muted); padding: 2px 4px; border-radius: 4px; display: inline-grid; place-items: center; }
+  .sib:hover { background: var(--mantine-color-default-hover); }
+  .rules { margin-bottom: 12px; }
+  .chip-label { display: inline-flex !important; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; padding-inline: 6px 10px !important; }
+  .chip-label > span:last-child { display: inline-flex; align-items: center; gap: 5px; }
+  .chip-label .ring { display: inline-flex; flex: none; }
+  .chip-icon { display: none; }
+  .chip-label .n { color: var(--muted); }
+  .chip-label .g.pass { color: var(--mantine-color-green-text); } .chip-label .g.warn { color: var(--mantine-color-orange-text); } .chip-label .g.fail { color: var(--mantine-color-red-text); }
+  .search { flex: 1 1 260px; max-width: 420px; }
+  .tablewrap { overflow-x: auto; contain: inline-size; }
+  .cards { font-size: 13px; }
+  .cards th { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cards td { white-space: nowrap; }
+  .cards .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cards .num .sortbtn { justify-content: flex-end; }
+  .cards .sel { width: 30px; padding-right: 0; }
+  .sortbtn { display: inline-flex; gap: 4px; align-items: center; font: inherit; color: inherit; font-weight: 600; }
+  .sortbtn .arrow { font-size: 9px; width: 8px; }
+  .cards td.name { font-weight: 500; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+  .cards td.type { color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  .cards td.hitcell { color: var(--mantine-color-blue-text); font-weight: 600; }
+  .cards tr.hit td { background: var(--hit); }
+  .cards tr.hit td:first-child { box-shadow: inset 3px 0 0 var(--hit-edge); }
+  .cards td.empty { text-align: center; color: var(--muted); padding: 24px; }
+  @media (max-width: 1100px) { .col-raw, .col-set { display: none; } }
+  @media (max-width: 600px) {
+    .content { padding: 10px 12px 32px; }
+    .col-type, .col-cost { display: none; }
+    .cards td.name { max-width: 150px; }
+    .rules { overflow-x: auto; contain: inline-size layout paint; }
+    .chips { flex-wrap: nowrap; padding: 2px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="application/json" id="cards">
+[{"name":"Divine Resilience","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.4992,"wrRaw":0.5079,"set":"FDN","rarity":"U","rules":["tricks","protection"]},{"name":"Fleeting Flight","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.5561,"wrRaw":0.5644,"set":"FDN","rarity":"C","rules":["tricks","protection","counters"]},{"name":"Healer's Hawk","cost":"{W}","type":"Creature — Bird","mv":1,"wrAdj":0.5671,"wrRaw":0.5751,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Joust Through","cost":"{W}","type":"Instant","mv":1,"wrAdj":0.556,"wrRaw":0.5637,"set":"FDN","rarity":"U","rules":["removal","lifegain"]},{"name":"Cathar Commando","cost":"{1}{W}","type":"Creature — Human Soldier","mv":2,"wrAdj":0.5482,"wrRaw":0.5558,"set":"FDN","rarity":"C","rules":["removal","creatures"]},{"name":"Giada, Font of Hope","cost":"{1}{W}","type":"Legendary Creature — Angel","mv":2,"wrAdj":0.5961,"wrRaw":0.6043,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Helpful Hunter","cost":"{1}{W}","type":"Creature — Cat","mv":2,"wrAdj":0.5673,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["creatures"]},{"name":"Skyknight Squire","cost":"{1}{W}","type":"Creature — Cat Scout","mv":2,"wrAdj":0.5813,"wrRaw":0.5885,"set":"FDN","rarity":"R","rules":["counters","creatures"]},{"name":"Sun-Blessed Healer","cost":"{1}{W}","type":"Creature — Human Cleric","mv":2,"wrAdj":0.5776,"wrRaw":0.5848,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Ajani, Caller of the Pride","cost":"{1}{W}{W}","type":"Legendary Planeswalker — Ajani","mv":3,"wrAdj":0.5692,"wrRaw":0.576,"set":"FDN","rarity":"M","rules":[]},{"name":"Arahbo, the First Fang","cost":"{2}{W}","type":"Legendary Creature — Cat Avatar","mv":3,"wrAdj":0.6021,"wrRaw":0.6092,"set":"FDN","rarity":"R","rules":["creatures"]},{"name":"Banishing Light","cost":"{2}{W}","type":"Enchantment","mv":3,"wrAdj":0.568,"wrRaw":0.5745,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Cat Collector","cost":"{2}{W}","type":"Creature — Human Citizen","mv":3,"wrAdj":0.5785,"wrRaw":0.5857,"set":"FDN","rarity":"U","rules":["lifegain","creatures"]},{"name":"Celestial Armor","cost":"{2}{W}","type":"Artifact — Equipment","mv":3,"wrAdj":0.6144,"wrRaw":0.62,"set":"FDN","rarity":"R","rules":["tricks","protection"]},{"name":"Dazzling Angel","cost":"{2}{W}","type":"Creature — Angel","mv":3,"wrAdj":0.5702,"wrRaw":0.5778,"set":"FDN","rarity":"C","rules":["flying","lifegain","creatures"]},{"name":"Make Your Move","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.5456,"wrRaw":0.5526,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Stroke of Midnight","cost":"{2}{W}","type":"Instant","mv":3,"wrAdj":0.505,"wrRaw":0.5114,"set":"FDN","rarity":"U","rules":["removal"]},{"name":"Twinblade Blessing","cost":"{1}{W}{W}","type":"Enchantment — Aura","mv":3,"wrAdj":0.4592,"wrRaw":0.4683,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Day of Judgment","cost":"{2}{W}{W}","type":"Sorcery","mv":4,"wrAdj":0.5852,"wrRaw":0.5911,"set":"FDN","rarity":"R","rules":["removal"]},{"name":"Exemplar of Light","cost":"{2}{W}{W}","type":"Creature — Angel","mv":4,"wrAdj":0.5836,"wrRaw":0.5899,"set":"FDN","rarity":"R","rules":["flying","counters","creatures"]},{"name":"Felidar Savior","cost":"{3}{W}","type":"Creature — Cat Beast","mv":4,"wrAdj":0.5664,"wrRaw":0.5736,"set":"FDN","rarity":"C","rules":["lifegain","counters","creatures"]},{"name":"Claws Out","cost":"{3}{W}{W}","type":"Instant","mv":5,"wrAdj":0.526,"wrRaw":0.5359,"set":"FDN","rarity":"U","rules":["tricks"]},{"name":"Luminous Rebuke","cost":"{4}{W}","type":"Instant","mv":5,"wrAdj":0.5704,"wrRaw":0.5771,"set":"FDN","rarity":"C","rules":["removal"]},{"name":"Valkyrie's Call","cost":"{3}{W}{W}","type":"Enchantment","mv":5,"wrAdj":0.5733,"wrRaw":0.579,"set":"FDN","rarity":"M","rules":["protection","counters"]},{"name":"Herald of Eternal Dawn","cost":"{4}{W}{W}{W}","type":"Creature — Angel","mv":7,"wrAdj":0.5709,"wrRaw":0.5773,"set":"FDN","rarity":"M","rules":["flying","creatures"]}]
+</script>
+<script type="module" src="mantine.js"></script>
+</body>
+</html>
