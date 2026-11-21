@@ -6,6 +6,15 @@
 <title>cubewarden (design prototype)</title>
 <link rel="help" type="text/plain" href="llms.txt" title="For agents: how to use this page">
 <link rel="stylesheet" href="dist/aura/aura.css">
+<script>
+/* Palette before the first paint: ?palette=<name> wins, then the last one picked (prototype). */
+(function () {
+  var p = null;
+  try { p = new URLSearchParams(location.search).get("palette"); if (p) localStorage.setItem("cubewarden:palette", p); else p = localStorage.getItem("cubewarden:palette"); } catch (e) { /* storage blocked */ }
+  if (p && /^(hazel|plum|ink|espresso)$/.test(p)) document.documentElement.dataset.palette = p;
+})();
+</script>
+
 <style>
 /* Prototype on Vaadin web components + Aura. Our tokens point at Aura's, so light and dark follow color-scheme. */
 :root{
@@ -324,13 +333,13 @@ vaadin-button.filtered{--vaadin-button-background:var(--hit-bg);--vaadin-button-
 .cg.pass .tag{background:var(--ok)} .cg.cut .tag{background:var(--fail)}
 
 /* action bar */
-.actionbar{display:none;align-items:center;gap:8px;padding:8px 20px;background:var(--ink);color:var(--paper);flex-wrap:wrap}
+.actionbar{display:none;align-items:center;gap:8px;padding:8px 20px;background:var(--accent);color:var(--on-accent);flex-wrap:wrap}
 .actionbar.on{display:flex}
 .actionbar .n{font-weight:650;margin-right:6px}
 .actionbar .sub{opacity:.75;font-size:12px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.actionbar vaadin-button{--vaadin-button-background:color-mix(in srgb,var(--paper) 14%,transparent);--vaadin-button-text-color:var(--paper);--vaadin-button-border-color:color-mix(in srgb,var(--paper) 30%,transparent)}
-.actionbar vaadin-button[theme~="primary"]{--vaadin-button-background:var(--paper);--vaadin-button-text-color:var(--ink)}
-.actionbar kbd{background:transparent;color:inherit;opacity:.8;border-color:color-mix(in srgb,var(--paper) 40%,transparent)}
+.actionbar vaadin-button{--vaadin-button-background:color-mix(in srgb,var(--on-accent) 14%,transparent);--vaadin-button-text-color:var(--on-accent);--vaadin-button-border-color:color-mix(in srgb,var(--on-accent) 35%,transparent)}
+.actionbar vaadin-button[theme~="primary"]{--vaadin-button-background:var(--on-accent);--vaadin-button-text-color:var(--accent)}
+.actionbar kbd{background:transparent;color:inherit;opacity:.8;border-color:color-mix(in srgb,var(--on-accent) 40%,transparent)}
 
 /* ---------- drawer (kept markup, Aura tokens) ---------- */
 .dr-h{position:sticky;top:0;z-index:3;background:var(--paper);display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
@@ -583,6 +592,45 @@ body.drawer-overlay .drawer.open{position:fixed;right:0;top:var(--top);bottom:0;
   .res colgroup{display:none}
   #q{max-width:none}
 }
+
+/* ---------- palettes: Aura token overrides (html[data-palette]); light and dark both come from these ---------- */
+/* hazel: warm hazelnut and cream neutrals, violet accent */
+html[data-palette="hazel"]{
+  --aura-background-color-light:oklch(0.95 0.02 72);
+  --aura-background-color-dark:oklch(0.205 0.018 62);
+  --aura-accent-color-light:oklch(0.5 0.19 293);
+  --aura-accent-color-dark:oklch(0.74 0.14 293);
+  --hit-bg:light-dark(#FBF3D6,#2E2812);
+}
+/* plum: deeper hazelnut, muted aubergine accent, softer */
+html[data-palette="plum"]{
+  --aura-background-color-light:oklch(0.925 0.03 66);
+  --aura-background-color-dark:oklch(0.215 0.02 56);
+  --aura-accent-color-light:oklch(0.45 0.11 318);
+  --aura-accent-color-dark:oklch(0.74 0.09 318);
+  --hit-bg:light-dark(#F8EDCF,#2F2712);
+}
+/* ink: cool neutral greys, the violet accent only */
+html[data-palette="ink"]{
+  --aura-background-color-light:oklch(0.955 0.004 270);
+  --aura-background-color-dark:oklch(0.2 0.006 270);
+  --aura-accent-color-light:oklch(0.5 0.19 293);
+  --aura-accent-color-dark:oklch(0.74 0.14 293);
+}
+/* espresso: dark brown surfaces first, lavender accent */
+html[data-palette="espresso"]{
+  --aura-background-color-light:oklch(0.93 0.028 55);
+  --aura-background-color-dark:oklch(0.19 0.036 48);
+  --aura-accent-color-light:oklch(0.52 0.15 300);
+  --aura-accent-color-dark:oklch(0.8 0.1 300);
+  --hit-bg:light-dark(#FAF1D4,#30260F);
+}
+.palbtn{display:inline-grid;grid-template-columns:1fr 1fr;width:18px;height:18px;border-radius:50%;overflow:hidden;box-shadow:inset 0 0 0 1px var(--line-2)}
+.palbtn i{display:block}
+.palpick{display:flex;flex-wrap:wrap;gap:6px}
+.palpick button{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink);border-radius:999px;min-height:30px;padding:0 12px 0 6px;font-size:12.5px}
+.palpick button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:600}
+@media (max-width:700px){#btnPalette{display:none}}
 </style>
 </head>
 <body>
@@ -606,6 +654,8 @@ body.drawer-overlay .drawer.open{position:fixed;right:0;top:var(--top);bottom:0;
     <vaadin-combo-box id="jump" placeholder="Jump to scope or rule…" aria-label="Jump to a scope, rule or mechanic (⌘K or G)" clear-button-visible></vaadin-combo-box>
     <vaadin-button id="btnAdd">Add cards</vaadin-button>
     <vaadin-button id="btnChanges">Changes <vaadin-badge id="chgBadge" theme="small">0</vaadin-badge></vaadin-button>
+    <vaadin-button id="btnPalette" theme="tertiary icon" aria-label="Colour palette" aria-haspopup="menu"><span class="palbtn" aria-hidden="true"><i style="background:var(--chrome)"></i><i style="background:var(--accent)"></i></span></vaadin-button>
+    <vaadin-tooltip for="btnPalette" text="Colour palette"></vaadin-tooltip>
     <vaadin-button id="btnData" theme="tertiary"><span class="l-long">Data sources</span><span class="l-short">Data</span></vaadin-button>
     <vaadin-button id="btnKeys" theme="tertiary" aria-label="Help, shortcuts and AI agents"><span class="xl">Help</span><span class="xs">?</span></vaadin-button>
     <vaadin-tooltip for="btnAdd" text="Search cards outside the cube (A)"></vaadin-tooltip>
@@ -1055,6 +1105,28 @@ const ICON = {
   tree: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M8 12h12M12 19h8"/></svg>',
 };
 let uiSync = false, treeInit = false; // true while the page sets component state itself, so change events are ignored
+
+/* ================= palettes (prototype): Aura token sets, picked here, ?palette=<name>, remembered ================= */
+const PALETTES = [["aura", "Aura (default)"], ["hazel", "Hazel & violet"], ["plum", "Hazel & plum"], ["ink", "Ink & violet"], ["espresso", "Espresso"]];
+function currentPalette() { return document.documentElement.dataset.palette || "aura"; }
+function setPalette(name) {
+  if (!PALETTES.some((p) => p[0] === name)) name = "aura";
+  if (name === "aura") delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = name;
+  try { localStorage.setItem("cubewarden:palette", name); } catch (e) { /* storage blocked */ }
+  if (drawerKind === "keys") renderDrawer();
+}
+function palettePicker() {
+  return h("div", { class: "palpick", role: "group", "aria-label": "Colour palette" }, ...PALETTES.map(([k, l]) => h("button", { type: "button", "aria-pressed": String(currentPalette() === k), onclick: () => setPalette(k) }, l)));
+}
+const palMenu = document.createElement("vaadin-context-menu");
+palMenu.setAttribute("position", "bottom-end");
+document.body.append(palMenu);
+palMenu.addEventListener("item-selected", (e) => setPalette(e.detail.value.key));
+$("#btnPalette").addEventListener("click", (e) => {
+  palMenu.items = PALETTES.map(([k, l]) => ({ text: l, key: k, checked: currentPalette() === k }));
+  palMenu.close && palMenu.close();
+  palMenu.listenOn = $("#btnPalette"); palMenu.open(e);
+});
 
 /* ================= top bar ================= */
 const viewTabs = $("#viewSeg"), scaleSw = $("#scaleSeg"), jump = $("#jump");
@@ -2769,6 +2841,7 @@ function renderKeys() {
   const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
   return [drawerHead("Help"), h("div", { class: "dr-b" },
     h("div", { class: "row" }, h("button", { class: "btn sm", type: "button", onclick: () => openDrawer("data") }, "Where the numbers come from")),
+    h("h3", { class: "help-h" }, "Colour palette"), palettePicker(),
     h("h3", { class: "help-h" }, "Keyboard shortcuts"),
     h("div", { class: "keys", html: K.map(([a, b]) => `<div>${a.split(" / ").map((x) => `<kbd>${esc(x)}</kbd>`).join(" ")}</div><div>${esc(b)}</div>`).join("") }),
     h("h3", { class: "help-h", id: "for-agents" }, "For AI agents"),
