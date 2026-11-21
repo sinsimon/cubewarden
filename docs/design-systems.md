@@ -318,7 +318,9 @@ Tag names checked against the 25.3.7 sources (`static get is()` in each package'
   - jsDelivr's `+esm` build of the module strips the commented collecting code, and it contained no submit URL.
 - **Shortcuts vs grid keyboard.** The grid handles arrow keys, Space, Enter and F2 itself [pkg:
   `vaadin-grid-keyboard-navigation-mixin.js`]. Our J/K, X and Backspace shortcuts must skip events that come from
-  inside the grid, or move to the grid's active-item events.
+  inside the grid, or move to the grid's active-item events. One exception: Backspace (and Shift+Backspace) from the
+  selection column, found with `grid.getEventContext(e).column`, removes the selected cards, so the key works right
+  after ticking a row's checkbox.
 - **Shadow DOM.** Style through Aura tokens, `--vaadin-*` properties and `::part()`. Cell content and slotted
   inputs are light DOM, so our existing cell CSS still applies there.
 - **Commercial boundary.** Grid Pro (inline cell editing), CRUD, Charts, Dashboard and Rich Text Editor need a

@@ -331,12 +331,16 @@ vaadin-button.filtered{--vaadin-button-background:var(--hit-bg);--vaadin-button-
 .cg.pass .tag{background:var(--ok)} .cg.cut .tag{background:var(--fail)}
 
 /* action bar */
-.actionbar{display:none;align-items:center;gap:8px;padding:8px 20px;background:var(--accent);color:var(--on-accent);flex-wrap:wrap}
+/* sticky to the bottom of the workbench's scroller (.main): always in view while cards are selected; it keeps its
+   own space in the flow, so scrolled to the end it sits under the list and covers no row */
+.actionbar{display:none;align-items:center;gap:8px;padding:8px 20px;background:var(--accent);color:var(--on-accent);flex-wrap:wrap;position:sticky;bottom:0;z-index:6;flex:none;box-shadow:0 -4px 14px rgba(0,0,0,.14)}
 .actionbar.on{display:flex}
 .actionbar .n{font-weight:650;margin-right:6px}
 .actionbar .sub{opacity:.75;font-size:12px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .actionbar vaadin-button{--vaadin-button-background:color-mix(in srgb,var(--on-accent) 14%,transparent);--vaadin-button-text-color:var(--on-accent);--vaadin-button-border-color:color-mix(in srgb,var(--on-accent) 35%,transparent)}
 .actionbar vaadin-button[theme~="primary"]{--vaadin-button-background:var(--on-accent);--vaadin-button-text-color:var(--accent)}
+/* toasts rise above the bar while it is shown */
+body.has-actionbar vaadin-notification-container{padding-bottom:calc(var(--actionbar-h,0px) + 8px)}
 .actionbar kbd{background:transparent;color:inherit;opacity:.8;border-color:color-mix(in srgb,var(--on-accent) 40%,transparent)}
 
 /* ---------- drawer (kept markup, Aura tokens) ---------- */
@@ -1811,17 +1815,20 @@ function countConds(f) { if (!f) return 0; if (f.field) return 1; return (f.item
 /* ================= action bar ================= */
 function renderActionBar() {
   const bar = $("#actionbar");
-  if (!selected.size) { bar.classList.remove("on"); bar.innerHTML = ""; return; }
+  if (!selected.size) { bar.classList.remove("on"); bar.innerHTML = ""; document.body.classList.remove("has-actionbar"); return; }
   const ids = [...selected].filter((id) => byId[id]);
   const known = ids.map((id) => byId[id].wrAdj).filter((v) => v != null);
   const avg = known.length ? known.reduce((s, v) => s + v, 0) / known.length : null;
   bar.classList.add("on");
   bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">avg adjusted WR ${avg == null ? "no data" : E.pct(avg)}${known.length < ids.length ? `, ${ids.length - known.length} no data` : ""}</span>
     <vaadin-button theme="small" data-act="remove">Remove <kbd>⌫</kbd></vaadin-button>
+    <vaadin-button theme="small" data-act="remove-mb" aria-label="Remove to maybeboard"><span class="xl">Remove to maybeboard</span><span class="xs">To maybeboard</span> <kbd>⇧⌫</kbd></vaadin-button>
     <vaadin-button theme="small primary" data-act="replace">Replace… <kbd>R</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="add">Add cards… <kbd>A</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="clear-selection">Clear <kbd>Esc</kbd></vaadin-button>`;
+  document.body.classList.add("has-actionbar");
 }
+new ResizeObserver(() => document.documentElement.style.setProperty("--actionbar-h", $("#actionbar").offsetHeight + "px")).observe($("#actionbar"));
 function removeSelected() {
   if (!selected.size) return;
   const n = selected.size;
@@ -1830,6 +1837,16 @@ function removeSelected() {
   S.current = S.current.filter((id) => !selected.has(id));
   selected.clear(); anchor = null;
   afterChange(`Removed ${n === 1 ? names : n + " cards"}`);
+}
+/** Out of the cube, kept in the maybeboard (as applyChanges({ remove, toMaybeboard: true }) does): one undo step. */
+function removeToMaybeboard() {
+  if (!selected.size) return;
+  const ids = [...selected], n = ids.length;
+  pushUndo(`move ${n} card${n > 1 ? "s" : ""} to the maybeboard`);
+  S.current = S.current.filter((id) => !selected.has(id));
+  S.maybeboard = [...new Set([...(S.maybeboard || []), ...ids])];
+  selected.clear(); anchor = null;
+  afterChange(`Moved ${n === 1 ? byId[ids[0]].name : n + " cards"} to the maybeboard`);
 }
 
 /* ================= render all ================= */
@@ -1898,6 +1915,7 @@ function handleAct(a) {
     case "clear-sel": setSel(null); break;
     case "find-rule": openFind("add", true); break;
     case "remove": removeSelected(); break;
+    case "remove-mb": removeToMaybeboard(); break;
     case "replace": openFind("replace", true); break;
     case "add": openFind("add", false); break;
     case "clear-selection": selected.clear(); renderTable(); break;
@@ -2001,6 +2019,11 @@ document.addEventListener("keydown", (e) => {
   }
   if (typing || $("#modal").opened) return;
   if (drawerKind) return; // a panel is open: only Esc works, so typing in it never triggers list actions
+  // ⌫ on a row's (or the header's) selection checkbox removes the selection; elsewhere in the grid the grid owns it
+  if ((e.key === "Backspace" || e.key === "Delete") && !mod && U.view === "work" && path.includes(grid)) {
+    const ctx = grid.getEventContext(e);
+    if (ctx && ctx.column === selCol && (ctx.section === "body" || ctx.section === "header")) { e.preventDefault(); e.shiftKey ? removeToMaybeboard() : removeSelected(); return; }
+  }
   if (onControl && (e.key === " " || e.key === "Enter" || e.key === "Backspace" || e.key === "Delete")) return;
   if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
   if (mod && e.key.toLowerCase() === "a") { if (U.view === "work") { e.preventDefault(); visibleIds.forEach((id) => selected.add(id)); renderTable(); } return; }
@@ -2019,7 +2042,7 @@ document.addEventListener("keydown", (e) => {
     case "ArrowLeft": if (U.layout === "cards") { e.preventDefault(); moveFocus(-1, e.shiftKey); } break;
     case "v": U.layout = U.layout === "cards" ? "table" : "cards"; save(); renderTable(); break;
     case " ": case "x": e.preventDefault(); if (focusId) { selected.has(focusId) ? selected.delete(focusId) : selected.add(focusId); anchor = focusId; syncGridSelection(); renderSelectionBits(); } break;
-    case "Delete": case "Backspace": e.preventDefault(); removeSelected(); break;
+    case "Delete": case "Backspace": e.preventDefault(); e.shiftKey ? removeToMaybeboard() : removeSelected(); break;
     case "r": if (selected.size) openFind("replace", true); else toast("Select cards to replace first"); break;
     case "a": openFind("add", false); break;
     case "/": e.preventDefault(); $("#q").focus(); break;
@@ -2794,7 +2817,7 @@ function renderData() {
   return [drawerHead("Where the numbers come from"), body];
 }
 function renderKeys() {
-  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
+  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["Shift + ⌫", "Remove them and keep them in the maybeboard"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
   return [drawerHead("Help"), h("div", { class: "dr-b" },
     h("div", { class: "row" }, h("button", { class: "btn sm", type: "button", onclick: () => openDrawer("data") }, "Where the numbers come from")),
     h("h3", { class: "help-h" }, "Appearance"), themePicker(),
