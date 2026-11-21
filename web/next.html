@@ -511,6 +511,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 
 /* ---------- responsive ---------- */
 .l-short{display:none}
+.xs{display:none}
+@media (max-width:700px){.xl{display:none}.xs{display:inline}#scaleSeg::part(label){display:none}.brand .cname{display:none}.top{gap:6px;padding:6px 10px}}
 @media (max-width:1280px){.l-long{display:none}.l-short{display:inline}}
 body.drawer-overlay .drawer.open{position:fixed;right:0;top:var(--top);bottom:0;width:min(520px,100vw);z-index:42;box-shadow:-6px 0 28px rgba(0,0,0,.22)}
 @media (max-width:1100px),(max-height:760px){
@@ -589,7 +591,7 @@ body.drawer-overlay .drawer.open{position:fixed;right:0;top:var(--top);bottom:0;
     <vaadin-button id="btnAdd">Add cards</vaadin-button>
     <vaadin-button id="btnChanges">Changes <vaadin-badge id="chgBadge" theme="small">0</vaadin-badge></vaadin-button>
     <vaadin-button id="btnData" theme="tertiary"><span class="l-long">Data sources</span><span class="l-short">Data</span></vaadin-button>
-    <vaadin-button id="btnKeys" theme="tertiary" aria-label="Help, shortcuts and AI agents">Help</vaadin-button>
+    <vaadin-button id="btnKeys" theme="tertiary" aria-label="Help, shortcuts and AI agents"><span class="xl">Help</span><span class="xs">?</span></vaadin-button>
     <vaadin-tooltip for="btnAdd" text="Search cards outside the cube (A)"></vaadin-tooltip>
     <vaadin-tooltip for="btnChanges" text="Changes and export (C)"></vaadin-tooltip>
     <vaadin-tooltip for="btnData" text="Where the numbers come from"></vaadin-tooltip>
@@ -1404,6 +1406,7 @@ function renderHead() {
   const r = curR(), sc = U.scope, sr = scopeRes(r, sc), res = selResult(r);
   const st = scopeStat(scopeRes(R, sc));
   $("#crumbs").innerHTML = crumbsHtml();
+  const cn = $("#crumbs .crumbs"); if (cn) cn.scrollLeft = cn.scrollWidth; // the current crumb stays in view on a phone
   let title, meta, acts = "";
   if (isShared(sc)) {
     const n = sc.kind === "allColors" ? 5 : Object.keys(r.archetypes).length;
@@ -1589,7 +1592,7 @@ grid.addEventListener("click", (e) => {
   if (ctx.column === selCol) { anchor = id; focusId = id; grid.generateCellPartNames(); return; }
   if (e.target.closest && e.target.closest("a")) return;
   if (e.shiftKey && anchor && visibleIds.includes(anchor)) rangeSelect(anchor, id);
-  else if (e.metaKey || e.ctrlKey) { selected.has(id) ? selected.delete(id) : selected.add(id); anchor = id; }
+  else if (e.metaKey || e.ctrlKey || e.detail === 0) { selected.has(id) ? selected.delete(id) : selected.add(id); anchor = id; } // detail 0: Space in the grid toggles
   else { selected = new Set([id]); anchor = id; }
   focusId = id;
   syncGridSelection(); renderSelectionBits(); grid.generateCellPartNames();
@@ -1892,7 +1895,7 @@ document.addEventListener("keydown", (e) => {
   if (drawerKind) return; // a panel is open: only Esc works, so typing in it never triggers list actions
   if (onControl && (e.key === " " || e.key === "Enter" || e.key === "Backspace" || e.key === "Delete")) return;
   if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
-  if (mod && e.key.toLowerCase() === "a") { if (U.view === "work" && !inVaadin) { e.preventDefault(); visibleIds.forEach((id) => selected.add(id)); renderTable(); } return; }
+  if (mod && e.key.toLowerCase() === "a") { if (U.view === "work") { e.preventDefault(); visibleIds.forEach((id) => selected.add(id)); renderTable(); } return; }
   if (mod || e.altKey) return;
   const k = e.key;
   if (k === "o" || k === "O") { U.view = U.view === "overview" ? "work" : "overview"; renderAll(); return; }

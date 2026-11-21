@@ -4,17 +4,13 @@
  * so every element below is defined before the first render.
  */
 import '@vaadin/grid/all-imports.js';
-import '@vaadin/breadcrumbs';
 import '@vaadin/badge';
 import '@vaadin/button';
 import '@vaadin/checkbox';
 import '@vaadin/combo-box';
 import '@vaadin/context-menu';
-import '@vaadin/details';
 import '@vaadin/dialog';
 import '@vaadin/notification';
-import '@vaadin/popover';
-import '@vaadin/select';
 import '@vaadin/switch';
 import '@vaadin/tabs';
 import '@vaadin/text-field';
