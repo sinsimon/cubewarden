@@ -1860,7 +1860,7 @@ const scheduleDraft = debounce(() => {
 }, 140);
 function scryFor(filter, sc) {
   const scope = sc.kind === "color" ? { kind: "color", color: sc.color } : sc.kind === "archetype" && archOf(sc) ? { kind: "archetype", colors: archOf(sc).colors } : null;
-  try { return E.toScryfall(filter, { scope, sets: allowedSets() || undefined }); } catch (e) { return null; }
+  try { return E.toScryfall(filter, { scope, sets: allowedSets() || undefined, mechanics: mechList(S.config, sc) || undefined }); } catch (e) { return null; }
 }
 function scryHtml(filter, sc) {
   const x = scryFor(filter, sc); if (!x) return "";
