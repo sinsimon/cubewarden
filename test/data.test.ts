@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { run } from "../src/cli.ts";
 import { recentre, setCentres, withWinRate, type WinRateTable } from "../src/data/index.ts";
 import { mergeCards } from "../src/hosted.ts";
+import { readCubeCobra } from "../src/index.ts";
 import { card } from "./fixtures/cards.ts";
 
 /** A data folder as the data branch had it before WR Δ: shards with the adjusted WR (wrAdj), no centre in the index. */
@@ -54,6 +55,20 @@ describe("WR Δ in the published data", () => {
     expect(await run(["data", "recentre", "--out", out], { cwd: out, write: (s) => (text += s) })).toBe(0);
     expect(text).toContain("2 set file(s), 2 rewritten");
     expect(read(out, "index.json").sets[0].wr.centre).toBe(0.59);
+  });
+});
+
+describe("the hosted page's card images", () => {
+  it("shows Scryfall's image of the printing the CubeCobra cube chose", async () => {
+    const sample = JSON.parse(readFileSync(new URL("./fixtures/cubecobra-cube.json", import.meta.url), "utf8"));
+    const d = sample.cards.mainboard[0].details;
+    const cube = await readCubeCobra({ cards: { mainboard: [sample.cards.mainboard[0]] } });
+    const index = { version: 1 as const, builtAt: "2026-02-01", sets: [{ code: "new", name: "New", released: "2026-01-01", cards: 1 }] };
+    const shards = [{ set: "new", cards: [card("X", { id: d.oracle_id, set: "new", printSets: ["new"], scryfallId: "other",
+      image: "https://cards.scryfall.io/normal/front/0/0/other.jpg" })] }];
+    expect(mergeCards(shards, index, cube.cards)[0]).toMatchObject({
+      scryfallId: d.scryfall_id, image: `https://cards.scryfall.io/normal/front/e/e/${d.scryfall_id}.jpg`,
+    });
   });
 });
 

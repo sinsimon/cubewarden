@@ -31,6 +31,20 @@ describe("reading a CubeCobra cube", () => {
     expect(byName(cube.cards, "Abandoned Campground").ccTags).toEqual(["DSK"]);
     expect(cube.tags).toEqual(expect.arrayContaining(["DSK", "TLA", "MKM", "WOE"]));
   });
+  it("shows the cube's printing with Scryfall's image of it, not CubeCobra's image cache", async () => {
+    const cube = await readCubeCobra(SAMPLE);
+    const first = SAMPLE.cards.mainboard[0].details;
+    expect(cube.cards[first.oracle_id]).toMatchObject({
+      scryfallId: "ee0565f5-ebdb-43f9-bbb4-0485b1968937",
+      image: "https://cards.scryfall.io/normal/front/e/e/ee0565f5-ebdb-43f9-bbb4-0485b1968937.jpg",
+    });
+  });
+  it("falls back to CubeCobra's image only when the card has no Scryfall id", async () => {
+    const { scryfall_id: _, ...details } = SAMPLE.cards.mainboard[0].details;
+    const json = { ...SAMPLE, cards: { mainboard: [{ ...SAMPLE.cards.mainboard[0], details }] } };
+    const cube = await readCubeCobra(json);
+    expect(cube.cards[details.oracle_id].image).toBe(details.image_normal);
+  });
   it("prefers the card data we already have, but keeps the cube's tags", async () => {
     const spiderId = SAMPLE.cards.mainboard[1].details.oracle_id;
     const known = { [spiderId]: { ...BY_ID.W1, id: spiderId, name: "Known Spider", wrDelta: 2.5 } };

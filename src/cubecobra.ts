@@ -76,6 +76,14 @@ export interface CubeCobraJson {
   cards?: { mainboard?: CubeCobraItem[]; maybeboard?: CubeCobraItem[] };
 }
 
+/**
+ * Scryfall's image of one printing (the front face of a double-faced card, like `image_uris` / `card_faces[0]`).
+ * CubeCobra's own image cache can show another language for the same printing, so it is only the last resort.
+ */
+export function scryfallImage(scryfallId: string): string {
+  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`;
+}
+
 /** A CubeCobra card → our card. */
 export function cardFromCubeCobra(d: CubeCobraDetails): Card {
   const manaCost = costFromParsed(d.parsed_cost);
@@ -84,7 +92,7 @@ export function cardFromCubeCobra(d: CubeCobraDetails): Card {
     manaCost, hybrid: isHybridCost(manaCost), type: d.type || "", mv: Number(d.cmc) || 0, power: d.power ?? null, toughness: d.toughness ?? null,
     text: d.oracle_text || "", keywords: (d.keywords || []).map((x) => x.toLowerCase()), tags: (d.oracle_tags || []).map(slug),
     set: d.set ?? null, number: d.collector_number ?? null, rarity: d.rarity ?? null, printSets: d.set ? [d.set] : [],
-    image: d.image_normal || null, scryfallId: d.scryfall_id ?? null,
+    image: d.scryfall_id ? scryfallImage(d.scryfall_id) : d.image_normal || null, scryfallId: d.scryfall_id ?? null,
     wrDelta: null, wrRaw: null, games: null, ccElo: d.elo ?? null, ccCubes: d.cubeCount ?? null, ccPicks: d.pickCount ?? null,
   };
 }
