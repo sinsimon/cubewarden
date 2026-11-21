@@ -20,6 +20,7 @@ avg(wr, member:any) in 55%..60%                 archetype members average 55–6
 otag:counterspell >= 4                          blue: at least 4 counterspells
 curve(t:creature) 1:1..3 2:5..7 3:4..6 6+:0..2  creatures per mana value (6+ = six and above)
 curve(t:creature) 2:20%..30% 3:15%..25%         the same in percent of the creatures
+curve(-t:land) 1-2:8..12 3-4:6..9 5+:2..4       a bucket can cover a range of mana values (1-2 = one or two)
 ```
 
 An **archetype** is 2 to 5 colours, a name and **mechanics**: a mechanic is a filter (with AND, OR, groups and NOT)

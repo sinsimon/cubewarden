@@ -164,6 +164,8 @@ describe("writing rules back as text", () => {
     "curve()",
     "curve(t:creature -(kw:flying or kw:reach)) 4+:0..3",
     "curve() 3:>=2 5+:<=3",
+    "curve(t:creature) 0:0 1-3:2..4 4-5:20%..30% 6+:<=1",
+    "curve() 1-2:>=3 3-4:<=5 fixed",
   ];
   it.each(examples)("writes %s back unchanged", (src) => {
     expect(ruleToText(parseRule(src))).toBe(src);
@@ -213,6 +215,29 @@ describe("curve rules", () => {
   });
   it("sorts buckets by mana value", () => {
     expect(ruleToText(parseRule("curve() 3:1..2 1:0..1"))).toBe("curve() 1:0..1 3:1..2");
+  });
+  it("reads a bucket covering a range of mana values, 1-3 meaning 1, 2 or 3", () => {
+    expect(parseRule("curve(t:creature) 1-3:2..4 4-5:20%..30% 6+:0..2").measure).toEqual({ kind: "curve", buckets: [
+      { mv: 1, mvMax: 3, constraint: { kind: "range", min: 2, max: 4 } },
+      { mv: 4, mvMax: 5, constraint: { kind: "range", min: 20, max: 30, unit: "percent" } },
+      { mv: 6, plus: true, constraint: { kind: "range", min: 0, max: 2 } },
+    ] });
+  });
+  it("reads a one-value range as that mana value", () => {
+    expect(parseRule("curve() 2-2:3").measure).toEqual({ kind: "curve", buckets: [{ mv: 2, constraint: { kind: "exact", value: 3 } }] });
+    expect(ruleToText(parseRule("curve() 2-2:3"))).toBe("curve() 2:3");
+  });
+  it("sorts range buckets by their lowest mana value", () => {
+    expect(ruleToText(parseRule("curve() 6+:1 4-5:2 0:0 1-3:3"))).toBe("curve() 0:0 1-3:3 4-5:2 6+:1");
+  });
+  it.each([
+    ["curve() 1-3:2..4 3:1", /"1-3" and "3" overlap/],
+    ["curve() 1-3:2..4 2-4:1", /"1-3" and "2-4" overlap/],
+    ["curve() 4-6:1 5+:0..2", /"5\+" must be the highest/],
+    ["curve() 3-1:2", /"3-1:2".*1-3/],
+    ["curve() 1-3+:2", /"1-3\+:2"/],
+  ])("explains what is wrong with range buckets in %s", (src, msg) => {
+    expect(() => parseRule(src)).toThrowError(msg);
   });
   it.each([
     ["curve() 2:1..2 2:3..4", /MV 2 twice/],

@@ -103,6 +103,8 @@ describe("cubewarden CLI", () => {
     expect(r.out).toContain("MV2 1 (target 2–3) near");
     expect(r.out).toContain("MV4+ 0% (target 10%–20%) fail");
     expect((await cli(dir, "explain", "w-curve")).out).toContain("MV3 1 (target = 1) ok");
+    expect((await cli(dir, "rule", "set", "w-range", "--scope", "color:W", "--text", "curve() 1-3:2..4 4+:0")).code).toBe(0);
+    expect((await cli(dir, "explain", "w-range")).out).toContain("MV1–3 3 (target 2–4) ok");
   });
   it("explain and search answer in JSON", async () => {
     const dir = setup();
