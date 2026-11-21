@@ -226,7 +226,9 @@ body.nav-none #btnScopes{display:inline-flex}
 .cf-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--vaadin-radius-m);background:var(--paper)}
 .cf-row vaadin-integer-field{width:64px}
 .cf-l{font-weight:600}
-.cf-sep{margin-left:8px}
+.cf-g{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin-right:10px}
+.cf-row .cf-l,.cf-row .muted,.cf-row vaadin-checkbox{white-space:nowrap}
+@media (max-width:640px){.cf-row vaadin-integer-field{width:54px}.cf-row{padding:6px}}
 .cf-row .fb-x{margin-left:auto}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* the selected rule */
@@ -875,7 +877,7 @@ function fmtValue(res) {
 function fmtTarget(res) {
   const m = res.measure || {};
   if (m.kind === "every") return m.metric && res.constraint ? "each " + E.formatConstraint(res.constraint, m.metric) : "every card";
-  if (m.kind === "curve") return m.buckets.map((b) => `MV${b.mv}${b.plus ? "+" : ""} ${E.formatConstraint(b.constraint)}`).join(" · ");
+  if (m.kind === "curve") return m.buckets.map((b) => `MV${E.bucketLabel(b)} ${E.formatConstraint(b.constraint)}`).join(" · ");
   return E.formatConstraint(res.constraint, m.kind === "avg" ? m.metric : null);
 }
 /** A rule or mechanic with something to check: a target, an "every card" rule, or a curve with buckets. */
@@ -2365,11 +2367,11 @@ function curveForm(o, onChange) {
       const toF = num(`Bucket ${i + 1}: mana value to`, r.plus ? null : r.to, (v) => (r.to = v), { ph: r.plus ? "∞" : "" });
       if (r.plus) toF.setAttribute("disabled", "");
       return h("div", { class: "cf-row" },
-        h("span", { class: "cf-l" }, "Mana value"), h("span", { class: "muted" }, "from"), num(`Bucket ${i + 1}: mana value from`, r.from, (v) => { r.from = v; if (r.to == null || r.to < v) r.to = v; }),
-        h("span", { class: "muted" }, "to"), toF, plus,
-        h("span", { class: "cf-l cf-sep" }, st.pct ? "Share" : "Cards"), h("span", { class: "muted" }, "min"), num(`Bucket ${i + 1}: minimum`, r.min, (v) => (r.min = v), { ph: "–" }),
-        h("span", { class: "muted" }, "max"), num(`Bucket ${i + 1}: maximum`, r.max, (v) => (r.max = v), { ph: "–" }),
-        st.pct ? h("span", { class: "muted" }, "%") : null,
+        h("span", { class: "cf-g" }, h("span", { class: "cf-l" }, "Mana value"), h("span", { class: "muted" }, "from"), num(`Bucket ${i + 1}: mana value from`, r.from, (v) => { r.from = v; if (r.to == null || r.to < v) r.to = v; }),
+          h("span", { class: "muted" }, "to"), toF, plus),
+        h("span", { class: "cf-g" }, h("span", { class: "cf-l" }, st.pct ? "Share" : "Cards"), h("span", { class: "muted" }, "min"), num(`Bucket ${i + 1}: minimum`, r.min, (v) => (r.min = v), { ph: "–" }),
+          h("span", { class: "muted" }, "max"), num(`Bucket ${i + 1}: maximum`, r.max, (v) => (r.max = v), { ph: "–" }),
+          st.pct ? h("span", { class: "muted" }, "%") : null),
         h("button", { class: "fb-x", type: "button", title: "Remove this bucket", "aria-label": `Remove bucket ${i + 1}`, onclick: () => { st.rows.splice(i, 1); draw(); apply(); } }, "×"));
     });
     const add = h("button", { class: "fb-add", type: "button", onclick: () => {
