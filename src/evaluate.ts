@@ -65,9 +65,9 @@ export function colorPool(cards: Card[], code: string): Card[] {
   return cards.filter((c) => c.colors === code && !isLand(c));
 }
 
-/** The cards an archetype draws from: nonland cards whose colours are a non-empty subset of the archetype's. */
+/** The cards an archetype draws from: nonland cards in its colours (a subset of them) and colourless nonland cards. */
 export function archetypePool(cards: Card[], colors: string): Card[] {
-  return cards.filter((c) => !isLand(c) && c.colors !== "" && [...c.colors].every((x) => colors.includes(x)));
+  return cards.filter((c) => !isLand(c) && [...c.colors].every((x) => colors.includes(x)));
 }
 
 export function scopeCards(scope: Scope, cards: Card[], config: Config): Card[] {

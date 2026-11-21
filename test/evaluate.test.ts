@@ -89,9 +89,9 @@ const WU = { id: "wu", name: "Azorius Flyers", colors: "WU", mechanics: [
 ] };
 
 describe("archetypes", () => {
-  it("draws from nonland cards in the archetype's colours and counts as members the cards matching a mechanic", () => {
+  it("draws from nonland cards in the archetype's colours plus colourless ones, and counts as members the cards matching a mechanic", () => {
     const a = evaluate(config({ archetypes: [WU] }), ALL, BY_ID).archetypes.wu;
-    expect(a.cards.sort()).toEqual(["U1", "U2", "W1", "W2", "W3", "WU1", "WU2"]);
+    expect(a.cards.sort()).toEqual(["C1", "U1", "U2", "W1", "W2", "W3", "WU1", "WU2"]);
     expect(a.members.sort()).toEqual(["W2", "W3"]);
   });
   it("reads 'c=scope' as the archetype's colours, so gold and hybrid slots can be one shared rule", () => {

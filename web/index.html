@@ -1146,7 +1146,7 @@ function renderHead() {
   }
   else if (sc.kind === "cube") { title = esc(S.config.cube.name || "Whole cube"); meta = `Every card in the cube`; act = `<button class="btn sm" data-act="edit-cube">Cube settings</button>`; }
   else if (sc.kind === "color") { title = `${scopeIcon(sc.color, "lg")} ${CNAME[sc.color] || sc.color}`; meta = colorScopeDesc(sc.color); }
-  else { const a = archOf(sc); title = `${colorPips(a.colors, "lg")} ${esc(archLabel(a))}`; meta = `Nonland cards in ${a.colors.split("").join("/")}, ${sr.members.length} members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}`; act = `<button class="btn sm" data-act="edit-arch">Edit archetype</button>`; }
+  else { const a = archOf(sc); title = `${colorPips(a.colors, "lg")} ${esc(archLabel(a))}`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, ${sr.members.length} members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}`; act = `<button class="btn sm" data-act="edit-arch">Edit archetype</button>`; }
   const lights = scopeLights(R, sc);
   const scopeBlock = `<div class="stat scopestat"><b>${sr.cards.length}</b><span>cards in scope</span>${lights}</div>`;
   let html = `<div class="shead-top"><h1>${title}</h1>${pill(st.main)}${st.warn ? pill("warn") : ""}<span class="meta">${meta}</span><span class="spacer"></span>${act}</div>${descHtml(sc)}`;

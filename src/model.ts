@@ -5,7 +5,8 @@
  *   Condition  = { field, op, value, not? }
  *   Constraint = min | max | exact | range, with unit "percent" on counts = share of the scope.
  *   Rule       = scope + measure (count | avg of a metric | every card) + optional filter + constraint + priority.
- *   Archetype  = 2 to 5 colours + name + mechanics; a mechanic is a filter with an optional constraint.
+ *   Archetype  = 2 to 5 colours + name + mechanics; a mechanic is a filter with an optional constraint. It draws from
+ *                nonland cards in its colours and colourless nonland cards.
  */
 
 export type Color = "W" | "U" | "B" | "R" | "G";
