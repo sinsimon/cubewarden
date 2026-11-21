@@ -138,8 +138,9 @@ vaadin-badge{--vaadin-badge-font-size:11.5px;white-space:nowrap}
 .tr .shr{font-size:10.5px;margin-left:5px;padding:0 5px;border-radius:7px;background:var(--accent-tint);color:var(--accent-text);font-weight:600}
 .tr.secrow{font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-2)}
 .tr.rule .nm{font-size:12.5px}
-.tr .v{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;max-width:46%;overflow:hidden;text-overflow:ellipsis}
+.tr .v{font-size:11.5px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap;max-width:52%;overflow:hidden;text-overflow:ellipsis;flex:none}
 .tr .v b{color:var(--ink);font-weight:600}
+.tr .v.ok b{color:var(--ok)}.tr .v.near b{color:var(--near)}.tr .v.fail b{color:var(--fail)}
 .tr .ed{border:0;background:none;width:24px;height:24px;border-radius:4px;color:var(--ink-2);opacity:0;flex:none}
 .tr .ed:focus-visible,#tree [data-cur] .ed{opacity:1}
 #tree vaadin-grid-cell-content:hover .ed{opacity:1}
@@ -213,10 +214,15 @@ body.nav-none #btnScopes{display:inline-flex}
 .subnav{display:flex;align-items:center;gap:8px;margin-top:12px;min-width:0}
 #ruleTabs{flex:1;min-width:0;--vaadin-tabs-background:transparent;background:transparent}
 #ruleTabs vaadin-tab{font-size:12.5px;gap:6px;white-space:nowrap}
-#ruleTabs vaadin-tab .tv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-weight:500}
-#ruleTabs vaadin-tab .tk{font-size:10.5px;color:var(--ink-3);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
-#ruleTabs vaadin-tab[selected] .tv{color:inherit}
-.subnav .addrule{flex:none}
+#ruleTabs vaadin-tab .tv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-weight:600}
+#ruleTabs vaadin-tab .tv.ok{color:var(--ok)}#ruleTabs vaadin-tab .tv.near{color:var(--near)}#ruleTabs vaadin-tab .tv.fail{color:var(--fail)}
+.mhint{border:1px solid var(--mark-edge);background:var(--hit-bg);color:var(--near);border-radius:999px;font-size:12px;font-weight:600;padding:3px 10px;min-height:26px}
+.mhint:hover{filter:brightness(.97)}
+.mrow{display:flex;flex-direction:column;gap:5px;padding:10px 0;border-top:1px solid var(--line)}
+.mrow-h{display:flex;align-items:center;gap:8px}
+.mrow-t{font-size:12px;color:var(--near)}
+.kempty{padding:3px 0;color:var(--ink-3);font-size:12.5px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* the selected rule */
 .rulepanel{margin:0;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--chrome);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:start}
 .rulepanel:empty{display:none}
@@ -1066,10 +1072,13 @@ function scopeList() {
   S.config.archetypes.forEach((a) => { if (R.archetypes[a.id]) out.push({ kind: "archetype", id: a.id }); });
   return out;
 }
+/** The rules of a scope: the only things the navigator, the tabs, the menus and Jump to list. Mechanics are
+ *  named filters, edited in the scope's Mechanics panel (a mechanic's count goes in a rule: count(member:<id>)). */
 function scopeItems(sc) {
   const sr = scopeRes(R, sc); if (!sr) return [];
-  return (sr.mechanics || []).map((x) => ({ kind: "mechanic", id: x.id, res: x })).concat(sr.rules.map((x) => ({ kind: "rule", id: x.id, res: x })));
+  return sr.rules.map((x) => ({ kind: "rule", id: x.id, res: x }));
 }
+function targetedMechs(sc) { return (mechList(S.config, sc) || []).filter((m) => m.constraint); }
 function renderJump() {
   const items = [];
   for (const sc of scopeList()) {
@@ -1100,7 +1109,7 @@ const tree = $("#tree"), NODE = new Map();
 function nodeOf(key, props) { let n = NODE.get(key); if (!n) { n = { key }; NODE.set(key, n); } return Object.assign(n, props); }
 function scopeNode(sc) {
   const r = R, key = "s|" + scopeKey(sc), sr = scopeRes(r, sc), st = scopeStat(sr);
-  const nItems = (sr.mechanics || []).length + sr.rules.length;
+  const nItems = sr.rules.length;
   let inner, count, tip;
   if (isShared(sc)) {
     const n = sr.rules.length;
@@ -1125,7 +1134,7 @@ function itemNode(sc, it) {
   let txt = ""; try { txt = cfgO ? E.ruleToText(cfgO) : ""; } catch (e) { txt = ""; }
   const tip = res.error || [`${it.kind === "rule" ? "Rule" : "Mechanic"}: ${ST_LABEL[ds]}${res.priority === "secondary" ? " (secondary)" : ""}`, `${fmtValue(res)}${hasGoal(res) ? ", target " + fmtTarget(res) : ", no target"}`, res.inherited ? `Shared rule from ${SHARED_NAME[res.from]}` : "", cfgO && cfgO.description ? cfgO.description : "", txt].filter(Boolean).join("\n");
   return nodeOf(key, { type: "item", sc, sel: { kind: it.kind, id: it.id }, hasKids: false, tip,
-    html: `${stGlyph(ds)}<span class="nm">${esc(res.name)}${res.inherited ? '<span class="shr">shared</span>' : ""}${res.priority === "secondary" ? '<span class="sec">2nd</span>' : ""}</span><span class="v"><b>${esc(fmtValue(res))}</b></span><button class="ed" data-edit="1" aria-label="Edit ${esc(res.name)}" tabindex="-1">✎</button>` });
+    html: `${stGlyph(ds)}<span class="nm">${esc(res.name)}${res.inherited ? '<span class="shr">shared</span>' : ""}${res.priority === "secondary" ? '<span class="sec">2nd</span>' : ""}</span><span class="v ${hasGoal(res) ? VT_CLASS[ds] || "" : ""}"><b>${esc(valueTarget(res))}</b></span><button class="ed" data-edit="1" aria-label="Edit ${esc(res.name)}" tabindex="-1">✎</button>` });
 }
 function treeChildren(parent) {
   if (!parent) return [scopeNode({ kind: "cube" }),
@@ -1255,7 +1264,7 @@ $("#btnNav").addEventListener("click", () => {
   if (U.navCollapsed && innerWidth >= 1280 && !(drawerKind && innerWidth < 1600)) { U.navCollapsed = false; save(); updateCompact(); requestAnimationFrame(() => tree.requestContentUpdate()); return; }
   openNav();
 });
-window.addEventListener("resize", debounce(() => { setTopVar(); updateCompact(); sizeTable(); }, 80));
+window.addEventListener("resize", debounce(() => { setTopVar(); updateCompact(); sizeTable(); revealTab(); }, 80));
 if (window.ResizeObserver) { new ResizeObserver(() => setTopVar()).observe($(".top")); new ResizeObserver(debounce(sizeTable, 50)).observe($("#tablewrap")); }
 $("#backdrop").addEventListener("click", () => { if (document.body.classList.contains("nav-open")) closeNav(); else if (drawerKind) closeDrawer(); });
 
@@ -1344,7 +1353,7 @@ function sharedTable(r, sc) {
 function groupScope(sc) { return sc.kind === "color" || sc.kind === "allColors" ? { kind: "allColors" } : sc.kind === "archetype" || sc.kind === "allArchetypes" ? { kind: "allArchetypes" } : null; }
 function crumbs() {
   const sc = U.scope, out = [];
-  const itemsMenu = (s) => scopeItems(s).map((it) => ({ text: `${it.kind === "mechanic" ? "Mechanic" : "Rule"}: ${it.res.name}`, checked: !!(U.sel && sameScope(s, U.scope) && U.sel.kind === it.kind && U.sel.id === it.id), go: () => { setScope(s); setSel({ kind: it.kind, id: it.id }); } }));
+  const itemsMenu = (s) => scopeItems(s).map((it) => ({ text: it.res.name, checked: !!(U.sel && sameScope(s, U.scope) && U.sel.kind === it.kind && U.sel.id === it.id), go: () => { setScope(s); setSel({ kind: it.kind, id: it.id }); } }));
   const scopeMenu = (list) => list.map((s) => ({ text: s.kind === "archetype" ? `${scopeName(s)} (${archOf(s).colors})` : scopeName(s), checked: sameScope(s, U.scope), go: () => setScope(s) }));
   out.push({ label: esc(S.config.cube.name || "Whole cube"), sc: { kind: "cube" }, menuLabel: "the cube",
     menu: () => [{ text: "Colours (shared rules)", checked: U.scope.kind !== "cube" && groupScope(U.scope) && groupScope(U.scope).kind === "allColors", go: () => setScope({ kind: "allColors" }) },
@@ -1385,6 +1394,27 @@ function stepScope(d) {
   const list = scopeList(), i = list.findIndex((s) => sameScope(s, U.scope));
   setScope(list[(i + d + list.length) % list.length]);
 }
+/* ---- mechanics: named filters of a colour or archetype, edited in their own panel ---- */
+function mechBtn(sc) { const n = (mechList(S.config, sc) || []).length; return `<vaadin-button theme="small" data-act="open-mechs">Mechanics (${n})</vaadin-button>`; }
+function renderMechs() {
+  const sc = U.scope, list = mechList(S.config, sc) || [], sr = scopeRes(R, sc) || { mechanics: [] };
+  const body = h("div", { class: "dr-b" });
+  body.append(h("p", { class: "help muted", style: "margin:0;font-size:12.5px" }, sc.kind === "archetype"
+    ? "Mechanics are named filters. A card that matches at least one is a member of the archetype. Rules count them with member:<mechanic>, and the CSV can tag cards with them for CubeCobra."
+    : "Mechanics are named filters for this colour. Rules count them with member:<mechanic>, and the CSV can tag cards with them for CubeCobra."));
+  if (!list.length) body.append(h("div", { class: "kempty" }, "No mechanics yet."));
+  for (const m of list) {
+    const res = (sr.mechanics || []).find((x) => x.id === m.id), n = res && res.cards ? res.cards.length : 0;
+    let ft = ""; try { ft = E.filterToText(m.filter); } catch (e) { ft = ""; }
+    body.append(h("div", { class: "mrow" },
+      h("div", { class: "mrow-h" }, h("b", null, m.name || "Untitled"), h("span", { class: "muted" }, `${n} card${n === 1 ? "" : "s"}`), h("span", { class: "spacer" }),
+        h("button", { class: "btn sm", type: "button", onclick: () => openEditor("mechanic", U.scope, m) }, "Edit")),
+      h("code", { class: "rtext" }, ft || "every card"),
+      m.constraint ? h("div", { class: "mrow-t" }, `Has a target (${E.formatConstraint(m.constraint)}): it should become a rule, count(member:${m.id}) ${E.formatConstraint(m.constraint).replace(/\s+/g, " ")}.`) : null));
+  }
+  const foot = h("div", { class: "dr-f" }, h("button", { class: "btn primary", type: "button", onclick: () => openEditor("mechanic", U.scope, null) }, "+ Mechanic"), h("button", { class: "btn", type: "button", onclick: closeDrawer }, "Close"));
+  return [drawerHead("Mechanics (filters)", "in " + scopeName(sc)), body, foot];
+}
 /* ---- the header itself ---- */
 let tabsSig = "", tabsList = [];
 function headSkeleton() {
@@ -1406,7 +1436,7 @@ function renderHead() {
   const r = curR(), sc = U.scope, sr = scopeRes(r, sc), res = selResult(r);
   const st = scopeStat(scopeRes(R, sc));
   $("#crumbs").innerHTML = crumbsHtml();
-  const cn = $("#crumbs .crumbs"); if (cn) cn.scrollLeft = cn.scrollWidth; // the current crumb stays in view on a phone
+  setTimeout(() => { const cn = $("#crumbs .crumbs"); if (cn && cn.scrollWidth > cn.clientWidth) cn.scrollLeft = cn.scrollWidth; }, 60); // the current crumb stays in view on a phone
   let title, meta, acts = "";
   if (isShared(sc)) {
     const n = sc.kind === "allColors" ? 5 : Object.keys(r.archetypes).length;
@@ -1414,22 +1444,35 @@ function renderHead() {
     meta = `Shared rules, each checked in ${sc.kind === "allColors" ? "White, Blue, Black, Red and Green" : `all ${n} archetypes`}. The list shows every card in those pools.`;
     acts = `<vaadin-button theme="small" data-act="new-rule">+ Shared rule</vaadin-button>`;
   } else if (sc.kind === "cube") { title = `<span class="tt">${esc(S.config.cube.name || "Whole cube")}</span>`; meta = "Every card in the cube"; acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button><vaadin-button theme="small" data-act="edit-cube">Cube settings</vaadin-button>`; }
-  else if (sc.kind === "color") { title = `${scopeIcon(sc.color, "lg")}<span class="tt">${CNAME[sc.color] || sc.color}</span>`; meta = colorScopeDesc(sc.color); acts = `<vaadin-button theme="small" data-act="new-mech">+ Mechanic</vaadin-button><vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>`; }
-  else { const a = archOf(sc); title = `<span style="display:inline-flex">${colorPips(a.colors, "lg")}</span><span class="tt">${esc(archLabel(a))}</span>`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, <b>${sr.members.length}</b> members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}`; acts = `<vaadin-button theme="small" data-act="new-mech">+ Mechanic</vaadin-button><vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button><vaadin-button theme="small" data-act="edit-arch">Edit archetype</vaadin-button>`; }
-  $("#titleRow").innerHTML = `<h1>${title}</h1>${pill(st.main)}${st.warn ? pill("warn") : ""}<span class="acts">${acts}</span>`;
+  else if (sc.kind === "color") { title = `${scopeIcon(sc.color, "lg")}<span class="tt">${CNAME[sc.color] || sc.color}</span>`; meta = colorScopeDesc(sc.color); acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>${mechBtn(sc)}`; }
+  else { const a = archOf(sc); title = `<span style="display:inline-flex">${colorPips(a.colors, "lg")}</span><span class="tt">${esc(archLabel(a))}</span>`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, <b>${sr.members.length}</b> members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}`; acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>${mechBtn(sc)}<vaadin-button theme="small" data-act="edit-arch">Edit archetype</vaadin-button>`; }
+  const tm = targetedMechs(sc).length;
+  const hint = tm ? `<button type="button" class="mhint" data-act="open-mechs" title="Mechanics are now plain filters: their targets belong in rules, count(member:&lt;mechanic&gt;)">⚠ ${tm} mechanic${tm > 1 ? "s" : ""} with targets — convert to rules</button>` : "";
+  $("#titleRow").innerHTML = `<h1>${title}</h1>${pill(st.main)}${st.warn ? pill("warn") : ""}${hint}<span class="acts">${acts}</span>`;
   $("#descBox").innerHTML = descHtml(sc);
   const s = statsFor(sr.cards, "wrAdj");
   $("#metaRow").innerHTML = `<span>${meta}</span><span><b>${sr.cards.length}</b> cards</span>${isShared(sc) ? "" : `<span>avg adj. WR <b>${s.avg == null ? "no data" : E.pct(s.avg)}</b></span><span class="hide-sm"><b>${s.noData}</b> without 17Lands data</span><span><b>${s.cre} / ${s.non}</b> creatures / non</span>${curveBlock(s)}`}`;
   renderTabs(sc);
   renderRulePanel(r, sc, sr, res);
 }
+/** Short "value/target" for the tabs and the navigator: 3/7, 6/3, 428/≤360, 13/13–14, 57.5%/54.0%–62.0%; just the value without a target. */
+function valueTarget(res) {
+  if (!res) return "";
+  const m = res.measure || { kind: "count" }, c = res.constraint;
+  if (res.summary) return `${res.summary.counts.ok}/${sumTotal(res.summary)}`;
+  if (res.status === "error" || m.kind === "every" || m.kind === "curve" || !c) return fmtValue(res);
+  let t = fmtTarget(res).replace(/\s+/g, "");
+  if (c.kind === "min" || c.kind === "exact") t = t.replace(/^[≥=]/, "");
+  return `${fmtValue(res)}/${t}`;
+}
+const VT_CLASS = { ok: "ok", near: "near", warn: "near", fail: "fail", error: "fail" };
 function renderTabs(sc) {
   const tabs = $("#ruleTabs"), list = [{ sel: null }].concat(scopeItems(sc).map((it) => ({ sel: { kind: it.kind, id: it.id }, res: it.res })));
   const sig = scopeKey(sc) + "|" + list.map((t) => (t.sel ? t.sel.kind + t.sel.id : "")).join(",");
   const tabHtml = (t) => {
     if (!t.sel) return `All cards <span class="tv">${scopeRes(R, sc).cards.length}</span>`;
-    const ds = dstat(t.res);
-    return `${stGlyph(ds)}${t.sel.kind === "mechanic" ? '<span class="tk">mech</span>' : ""}<span>${esc(t.res.name)}</span><span class="tv">${esc(fmtValue(t.res))}</span><vaadin-tooltip slot="tooltip" text="${esc(`${t.sel.kind === "mechanic" ? "Mechanic" : "Rule"}: ${t.res.name}. ${fmtValue(t.res)}${hasGoal(t.res) ? ", target " + fmtTarget(t.res) : ", no target"} (${ST_LABEL[ds]})`)}"></vaadin-tooltip>`;
+    const ds = dstat(t.res), cls = hasGoal(t.res) ? VT_CLASS[ds] || "" : "";
+    return `${stGlyph(ds)}<span>${esc(t.res.name)}</span><span class="tv ${cls}">${esc(valueTarget(t.res))}</span><vaadin-tooltip slot="tooltip" text="${esc(`${t.sel.kind === "mechanic" ? "Mechanic" : "Rule"}: ${t.res.name}. ${fmtValue(t.res)}${hasGoal(t.res) ? ", target " + fmtTarget(t.res) : ", no target"} (${ST_LABEL[ds]})`)}"></vaadin-tooltip>`;
   };
   tabsList = list;
   uiSync = true;
@@ -1438,6 +1481,14 @@ function renderTabs(sc) {
   const idx = U.sel ? list.findIndex((t) => t.sel && t.sel.kind === U.sel.kind && t.sel.id === U.sel.id) : 0;
   tabs.selected = idx < 0 ? 0 : idx;
   uiSync = false;
+  setTimeout(revealTab, 120);
+}
+/** Keep the selected tab in view when the row of tabs overflows (phones, many rules). */
+function revealTab() {
+  const tabs = $("#ruleTabs"), t = tabs && tabs.children[tabs.selected], sc = tabs && tabs.shadowRoot && tabs.shadowRoot.querySelector('[part="tabs"]');
+  if (!t || !sc) return;
+  const tr = t.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+  if (tr.left < sr.left || tr.right > sr.right) sc.scrollLeft += tr.left - sr.left - 32;
 }
 function renderRulePanel(r, sc, sr, res) {
   const box = $("#rulepanel");
@@ -1732,6 +1783,7 @@ function removeSelected() {
 function validateUi() {
   if (U.scope.kind === "archetype" && !archOf(U.scope)) { U.scope = { kind: "cube" }; U.sel = null; }
   if (U.sel && !configObj(U.sel) && !(draft && draft.obj.id === U.sel.id)) U.sel = null;
+  if (U.sel && U.sel.kind === "mechanic" && !(draft && draft.obj.id === U.sel.id)) U.sel = null; // mechanics are not selectable views any more
 }
 function renderAll() {
   if (!R) return;
@@ -1739,7 +1791,9 @@ function renderAll() {
   document.body.classList.toggle("drawer-open", !!drawerKind);
   updateCompact();
   if (refsList().some((r) => !refStore[r.id])) loadRefs();
+  if (drawerKind === "mechs" && !mechList(S.config, U.scope)) { drawerKind = null; $("#drawer").classList.remove("open"); }
   renderTop(); renderSide(); renderHead(); renderTable();
+  if (drawerKind === "mechs") renderDrawer();
   $("#overview").classList.toggle("on", U.view === "overview");
   if (U.view === "overview") renderOverview();
 }
@@ -1784,6 +1838,7 @@ function handleAct(a) {
     case "edit-cube": openCubeModal(); break;
     case "new-rule": openEditor("rule", U.scope, null); break;
     case "new-mech": openEditor("mechanic", U.scope, null); break;
+    case "open-mechs": openDrawer("mechs"); break;
     case "edit-sel": if (U.sel) openEditFor(U.sel); break;
     case "edit-desc": startDescEdit(); break;
     case "matches": { const o = configObj(U.sel) || (draft && draft.obj); if (o) openMatches(o.filter, U.scope, o.name); break; }
@@ -1925,7 +1980,7 @@ document.addEventListener("keydown", (e) => {
 });
 function cycleSel(d) {
   const sr = scopeRes(R, U.scope);
-  const list = (sr.mechanics || []).map((m) => ({ kind: "mechanic", id: m.id })).concat(sr.rules.map((r) => ({ kind: "rule", id: r.id })));
+  const list = sr.rules.map((r) => ({ kind: "rule", id: r.id }));
   if (!list.length) return;
   let i = U.sel ? list.findIndex((x) => x.kind === U.sel.kind && x.id === U.sel.id) : -1;
   i = (i + d + list.length) % list.length;
@@ -2130,7 +2185,7 @@ function renderDrawer() {
   updateCompact();
   if (!drawerKind) { d.classList.remove("open"); return; }
   d.classList.add("open");
-  const fn = { editor: renderEditor, find: renderFind, changes: renderChanges, data: renderData, keys: renderKeys, filter: renderViewFilter }[drawerKind];
+  const fn = { editor: renderEditor, find: renderFind, changes: renderChanges, data: renderData, keys: renderKeys, filter: renderViewFilter, mechs: renderMechs }[drawerKind];
   d.replaceChildren(...[].concat(fn()));
   d.scrollTop = 0;
 }
