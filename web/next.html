@@ -80,6 +80,7 @@ vaadin-button[theme~="error"]:not(.armed){--vaadin-button-text-color:var(--fail)
 .st.warn{width:0;height:0;border-radius:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid var(--warn)}
 vaadin-badge .st{margin-right:1px}
 vaadin-badge{--vaadin-badge-font-size:11.5px;white-space:nowrap}
+vaadin-badge.counts{--vaadin-badge-font-size:12.5px;--vaadin-badge-padding:3px 9px}
 .warnmark{color:var(--warn);font-weight:700;font-size:11px}
 
 /* mana */
@@ -91,8 +92,9 @@ vaadin-badge{--vaadin-badge-font-size:11.5px;white-space:nowrap}
 .pip.gen{background:#E4E1DC}
 .pip.sm{width:11px;height:11px;font-size:0;vertical-align:-1px}
 .pip.lg{width:26px;height:26px;font-size:12.5px;vertical-align:-5px}
-.pip.shared-ic{background:var(--ink);color:var(--paper);font-size:11px}
-.pip.lg.shared-ic{font-size:17px}
+.pip.shared-ic{background:var(--ink);color:var(--paper);font-size:0!important;line-height:0;position:relative}
+/* the asterisk is drawn, so it sits in the optical centre of the circle at every size */
+.pip.shared-ic::before{content:"";position:absolute;inset:19%;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9' stroke='black' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9' stroke='black' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") center/contain no-repeat}
 .facesep{color:var(--ink-3);margin:0 3px;font-size:11px}
 
 /* ---------- app frame ---------- */
@@ -1086,9 +1088,20 @@ function scopeList() {
 }
 /** The rules of a scope: the only things the navigator, the tabs, the menus and Jump to list. Mechanics are
  *  named filters, edited in the scope's Mechanics panel (a mechanic's count goes in a rule: count(member:<id>)). */
+const ST_RANK = { error: 0, fail: 0, near: 1, warn: 2 };
 function scopeItems(sc) {
   const sr = scopeRes(R, sc); if (!sr) return [];
-  return sr.rules.map((x) => ({ kind: "rule", id: x.id, res: x }));
+  // fails first, then almost, then secondary warnings, then the rest (stable within each group)
+  return sr.rules.map((x, i) => ({ kind: "rule", id: x.id, res: x, i })).sort((a, b) => (ST_RANK[dstat(a.res)] ?? 3) - (ST_RANK[dstat(b.res)] ?? 3) || a.i - b.i);
+}
+/** The status badge by the title: the scope's rules counted by status, fails first, in the colour of the worst. */
+function countsBadge(sc) {
+  const n = { fail: 0, near: 0, warn: 0, ok: 0 };
+  for (const it of scopeItems(sc)) { const d = dstat(it.res); if (d === "error" || d === "fail") n.fail++; else if (n[d] != null) n[d]++; }
+  const parts = [[n.fail, "fail"], [n.near, "almost"], [n.warn, n.warn === 1 ? "warning" : "warnings"], [n.ok, "pass"]].filter(([k]) => k).map(([k, l]) => `${k} ${l}`);
+  const worst = n.fail ? "fail" : n.near ? "near" : n.warn ? "warn" : n.ok ? "ok" : "none";
+  const label = parts.length ? parts.join("\u00a0·\u00a0") : scopeItems(sc).length ? "No targets" : "No rules";
+  return `<vaadin-badge class="counts" theme="${BADGE_THEME[worst] || ""}" title="Rules in this scope by status${n.warn ? " (warnings: secondary rules out of target)" : ""}"><span slot="icon" style="display:inline-flex">${stGlyph(worst)}</span>${label}</vaadin-badge>`;
 }
 function targetedMechs(sc) { return (mechList(S.config, sc) || []).filter((m) => m.constraint); }
 function renderJump() {
@@ -1460,7 +1473,7 @@ function renderHead() {
   else { const a = archOf(sc); title = `<span style="display:inline-flex">${colorPips(a.colors, "lg")}</span><span class="tt">${esc(archLabel(a))}</span>`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, <b>${sr.members.length}</b> members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}`; acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>${mechBtn(sc)}<vaadin-button theme="small" data-act="edit-arch">Edit archetype</vaadin-button>`; }
   const tm = targetedMechs(sc).length;
   const hint = tm ? `<button type="button" class="mhint" data-act="open-mechs" title="Mechanics are now plain filters: their targets belong in rules, count(member:&lt;mechanic&gt;)">⚠ ${tm} mechanic${tm > 1 ? "s" : ""} with targets — convert to rules</button>` : "";
-  $("#titleRow").innerHTML = `<h1>${title}</h1>${pill(st.main)}${st.warn ? pill("warn") : ""}${hint}<span class="acts">${acts}</span>`;
+  $("#titleRow").innerHTML = `<h1>${title}</h1>${countsBadge(sc)}${hint}<span class="acts">${acts}</span>`;
   $("#descBox").innerHTML = descHtml(sc);
   const s = statsFor(sr.cards, "wrAdj");
   $("#metaRow").innerHTML = `<span>${meta}</span><span><b>${sr.cards.length}</b> cards</span>${isShared(sc) ? "" : `<span>avg adj. WR <b>${s.avg == null ? "no data" : E.pct(s.avg)}</b></span><span class="hide-sm"><b>${s.noData}</b> without 17Lands data</span><span><b>${s.cre} / ${s.non}</b> creatures / non</span>${curveBlock(s)}`}`;
@@ -1992,7 +2005,7 @@ document.addEventListener("keydown", (e) => {
 });
 function cycleSel(d) {
   const sr = scopeRes(R, U.scope);
-  const list = sr.rules.map((r) => ({ kind: "rule", id: r.id }));
+  const list = scopeItems(U.scope).map((r) => ({ kind: "rule", id: r.id }));
   if (!list.length) return;
   let i = U.sel ? list.findIndex((x) => x.kind === U.sel.kind && x.id === U.sel.id) : -1;
   i = (i + d + list.length) % list.length;
