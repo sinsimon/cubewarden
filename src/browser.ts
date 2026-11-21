@@ -8,7 +8,7 @@
 import type { Card, Config, Filter, Scope } from "./model.ts";
 import { aboutMarkdown, REPO_URL } from "./about.ts";
 import { colorSet } from "./colors.ts";
-import { formatConstraint, gap, inConstraint, statusOf } from "./constraint.ts";
+import { bucketLabel, formatConstraint, gap, inConstraint, statusOf } from "./constraint.ts";
 import { cubeCobraListUrl, decodeRules, encodeRules, fetchCubeCobra, readCubeCobra } from "./cubecobra.ts";
 import { describeFilter } from "./describe.ts";
 import { archetypePool, evaluate, scopeCards } from "./evaluate.ts";
@@ -74,7 +74,7 @@ function boot(storageKey: string) {
 
 W.CubeEngine = {
   FIELDS, FIELD, METRICS, FilterError, pct, slug, isLand, isCreature, metricOf, colorSet,
-  matches, validateFilter, describeFilter, inConstraint, gap, formatConstraint, statusOf,
+  matches, validateFilter, describeFilter, inConstraint, gap, formatConstraint, bucketLabel, statusOf,
   scopeCards, archetypePool, evaluate, candidates, cubeGateRules, sortCards,
   diff, exportChangelist: changelist, exportCsv, storage, boot,
   encodeConfig: encodeRules, decodeConfig: decodeRules, readCubeCobra, referenceCube, mechanicTags, cubeCobraListUrl,

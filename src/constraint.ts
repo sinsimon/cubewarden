@@ -42,7 +42,13 @@ export function formatConstraint(c: Constraint | null | undefined, metric?: Metr
   }
 }
 
-/** A curve bucket's name: "2", or "6+" for six and above. */
-export function bucketLabel(b: Pick<CurveBucket, "mv" | "plus">): string {
-  return b.mv + (b.plus ? "+" : "");
+/** A curve bucket's name: "2", "1–3" for one to three, or "6+" for six and above. */
+export function bucketLabel(b: Pick<CurveBucket, "mv" | "mvMax" | "plus">): string {
+  return b.mv + (b.mvMax != null && b.mvMax > b.mv ? "–" + b.mvMax : "") + (b.plus ? "+" : "");
+}
+
+/** Whether a mana value (rounded down) falls in a curve bucket. */
+export function inBucket(mv: number, b: Pick<CurveBucket, "mv" | "mvMax" | "plus">): boolean {
+  const v = Math.floor(mv);
+  return b.plus ? v >= b.mv : v >= b.mv && v <= Math.max(b.mv, b.mvMax ?? b.mv);
 }

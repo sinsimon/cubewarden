@@ -193,6 +193,17 @@ describe("curve rules", () => {
     expect(r.perCard).toEqual({ W1: 2, W2: 3, U1: 2, WU1: 3, WU2: 2, G1: 4 });
     expect(buckets(cubeRule("curve() 0:1 1:1 2+:8"))).toEqual([["0", 1, "ok"], ["1", 1, "ok"], ["2+", 8, "ok"]]);
   });
+  it("counts a range bucket as every mana value from its lowest to its highest, labelled 1–3", () => {
+    const r = cubeRule("curve(t:creature) 1-3:4..5 4:1");
+    expect(r).toMatchObject({ status: "ok", value: 0 });
+    expect(buckets(r)).toEqual([["1–3", 5, "ok"], ["4", 1, "ok"]]);
+    expect(r.buckets?.[0]).toMatchObject({ mv: 1, mvMax: 3 });
+    expect(buckets(cubeRule("curve() 0-1:2 2-3:6 4+:1"))).toEqual([["0–1", 2, "ok"], ["2–3", 7, "near"], ["4+", 1, "ok"]]);
+    expect(cubeRule("curve() 0-1:2 2-3:4..5 4+:1")).toMatchObject({ value: 1, status: "fail" });
+  });
+  it("gives a range bucket in percent its share of the filtered cards", () => {
+    expect(buckets(cubeRule("curve(t:creature) 2-3:80%..90% 4+:10%"))).toEqual([["2–3", 83.3, "ok"], ["4+", 16.7, "fail"]]);
+  });
   it("counts the buckets out of range: near when every miss is within one card, fail beyond", () => {
     expect(cubeRule("curve(t:creature) 2:4..5 3:2")).toMatchObject({ value: 1, status: "near" });
     const r = cubeRule("curve(t:creature) 2:5..6 3:0 4:1");
@@ -207,6 +218,8 @@ describe("curve rules", () => {
     const cards = { X: card("X", { mv: 2.5 }) };
     const r = evaluate(config({ rules: [rule("r", cube, "curve() 2:1 3:0")] }), ["X"], cards).cube.rules[0];
     expect(buckets(r)).toEqual([["2", 1, "ok"], ["3", 0, "ok"]]);
+    const range = evaluate(config({ rules: [rule("r", cube, "curve() 0-1:0 2-3:1")] }), ["X"], cards).cube.rules[0];
+    expect(buckets(range)).toEqual([["0–1", 0, "ok"], ["2–3", 1, "ok"]]);
   });
   it("scales bucket counts in a colour like counts, unless fixed or in percent", () => {
     const W = { kind: "color", color: "W" } as const;

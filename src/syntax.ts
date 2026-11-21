@@ -7,11 +7,10 @@
  *          space = and, "or", ( ), "-" = not.
  * Rules:   count(F) >= 6 · count(F) in 13..14 · count(t:creature) >= 50% · count(c=scope -is:hybrid) = 3 fixed
  *          avg(wr, member:any) in 55%..60% · every(s:fdn,trk) · every(mv, t:creature) <= 5 · shorthand "F >= 6"
- *          curve(t:creature) 1:1..3 2:5..7 6+:0..2 · curve(t:creature) 2:20%..30% · curve() 2:4 fixed
+ *          curve(t:creature) 1:1..3 2:5..7 6+:0..2 · curve(t:creature) 1-3:20%..30% · curve() 2:4 fixed
  */
 import type { Condition, Constraint, CurveBucket, Filter, Measure, Metric, RuleBody } from "./model.ts";
 import { colorSet } from "./colors.ts";
-import { bucketLabel } from "./constraint.ts";
 import { isSupportedScryfallTerm } from "./scryfall-subset.ts";
 import { slug } from "./slug.ts";
 
@@ -186,16 +185,23 @@ const METRIC_TEXT: Record<Metric, string> = {
   wrAdj: "wr", wrRaw: "wrraw", mv: "mv", power: "pow", ccElo: "elo", ccCubes: "cubes", ccPicks: "picks", colorCount: "ncolors",
 };
 
-const CURVE_HELP = "write mana value:target, e.g. 2:5..7, 6+:0..2 or 2:20%..30%";
+const CURVE_HELP = "write mana value:target, e.g. 2:5..7, 1-3:8..10, 6+:0..2 or 2:20%..30%";
 
-/** One curve bucket: "2:5..7", "6+:0..2", "2:20%..30%", "0:1", "3:>=2", "5+:<=3". `at` = its offset in the rule text. */
+/** A curve bucket as written in rule text: "2", "1-3" or "6+". */
+function bucketText(b: CurveBucket): string {
+  return b.mv + (b.mvMax != null && b.mvMax > b.mv ? "-" + b.mvMax : "") + (b.plus ? "+" : "");
+}
+
+/** One curve bucket: "2:5..7", "1-3:8..10", "6+:0..2", "2:20%..30%", "0:1", "3:>=2", "5+:<=3". `at` = its offset in the rule text. */
 function curveBucket(tok: string, at: number): CurveBucket {
-  const m = tok.match(/^(\d+)(\+?):(.+)$/);
+  const m = tok.match(/^(\d+)(?:-(\d+))?(\+?):(.+)$/);
   if (!m) {
     if (/^[\d.]+%?\.\./.test(tok)) throw new SyntaxError(`Curve bucket "${tok}" needs a mana value first (${CURVE_HELP})`, at);
     throw new SyntaxError(`Cannot read curve bucket "${tok}" (${CURVE_HELP})`, at);
   }
-  const t = m[3];
+  const lo = Number(m[1]), hi = m[2] == null ? lo : Number(m[2]), t = m[4];
+  if (hi < lo) throw new SyntaxError(`Curve bucket "${tok}" goes from high to low: write ${hi}-${lo}`, at);
+  if (m[2] != null && m[3]) throw new SyntaxError(`Curve bucket "${tok}": "+" goes on a single mana value (${lo}+), not on a range`, at);
   const num = (x: string) => {
     if (!/^\d+(\.\d+)?%?$/.test(x)) throw new SyntaxError(`Cannot read curve bucket "${tok}": "${x}" is not a number (${CURVE_HELP})`, at);
     return Number(x.replace(/%$/, ""));
@@ -209,7 +215,19 @@ function curveBucket(tok: string, at: number): CurveBucket {
   const pct = ends.map((x) => x.endsWith("%"));
   if (pct.some((x) => x !== pct[0])) throw new SyntaxError(`Curve bucket "${tok}" mixes percent and cards: write both ends in percent or both in cards`, at);
   if (pct[0]) c.unit = "percent";
-  return { mv: Number(m[1]), ...(m[2] ? { plus: true } : {}), constraint: c };
+  return { mv: lo, ...(hi > lo ? { mvMax: hi } : {}), ...(m[3] ? { plus: true } : {}), constraint: c };
+}
+
+/** Why two curve buckets cannot both be in a curve (they share a mana value), or null when they can. */
+function overlap(a: CurveBucket, b: CurveBucket): string | null {
+  const top = (x: CurveBucket) => (x.plus ? Infinity : x.mvMax ?? x.mv);
+  if (a.mv > top(b) || b.mv > top(a)) return null;
+  if (a.mv === b.mv && a.mvMax == null && b.mvMax == null) return `MV ${a.mv} twice in the curve ("${bucketText(a)}" and "${bucketText(b)}")`;
+  const [low, high] = a.mv <= b.mv ? [a, b] : [b, a];
+  const open = low.plus ? low : high.plus ? high : null;
+  const other = open === low ? high : low;
+  if (open && top(other) > open.mv) return `"${bucketText(open)}" must be the highest curve bucket: cards in "${bucketText(other)}" would count twice`;
+  return `Curve buckets "${bucketText(low)}" and "${bucketText(high)}" overlap: MV ${high.mv} would count twice`;
 }
 
 /** "curve(F) 1:1..3 2:5..7 6+:0..2 [fixed]" → RuleBody, or null when the text is not a curve. */
@@ -234,15 +252,13 @@ function parseCurve(src: string): RuleBody | null {
   while ((m = re.exec(src))) {
     if (/^fixed$/i.test(m[0]) && re.lastIndex === end) { absolute = true; break; }
     const b = curveBucket(m[0], m.index);
-    const label = bucketLabel(b);
-    const same = buckets.find((x) => x.mv === b.mv);
-    if (same) throw new SyntaxError(`MV ${b.mv} twice in the curve ("${bucketLabel(same)}" and "${label}")`, m.index);
+    for (const x of buckets) {
+      const why = overlap(x, b);
+      if (why) throw new SyntaxError(why, m.index);
+    }
     buckets.push(b);
   }
   buckets.sort((a, b) => a.mv - b.mv);
-  const open = buckets.find((b) => b.plus);
-  const above = open && buckets.find((b) => b.mv > open.mv);
-  if (open && above) throw new SyntaxError(`"${bucketLabel(open)}" must be the highest curve bucket: cards in "${bucketLabel(above)}" would count twice`);
   const measure: Measure = { kind: "curve", buckets, ...(absolute ? { absolute: true } : {}) };
   return { measure, filter: filter.items.length ? filter : null, constraint: null };
 }
@@ -354,7 +370,7 @@ export function ruleToText(r: { measure?: Measure; filter?: Filter | null; const
   const m: Measure = r.measure || { kind: "count" };
   const ft = filterToText(r.filter);
   if (m.kind === "curve") {
-    return `curve(${ft})` + m.buckets.map((b) => ` ${bucketLabel(b)}:${bucketTarget(b.constraint)}`).join("") + (m.absolute ? " fixed" : "");
+    return `curve(${ft})` + m.buckets.map((b) => ` ${bucketText(b)}:${bucketTarget(b.constraint)}`).join("") + (m.absolute ? " fixed" : "");
   }
   let head: string;
   if (m.kind === "avg") head = `avg(${METRIC_TEXT[m.metric]}${ft ? ", " + ft : ""})`;

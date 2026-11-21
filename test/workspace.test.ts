@@ -62,6 +62,16 @@ describe("curve rules", () => {
     expect(e.cards.map((c) => [c.name, c.value]).sort()).toEqual([["W1", 2], ["W2", 3]]);
     expect(e.buckets?.map((b) => b.label)).toEqual(["2", "3", "4+"]);
   });
+  it("labels a range bucket 1–3 in the target and in the buckets", () => {
+    const w = ws();
+    w.setRule({ id: "w-range", name: "White range", scope: "color:W", text: "curve(t:creature) 1-3:2..4 4+:0" });
+    const e = w.explain("w-range");
+    expect(e.target).toBe("MV1–3 2–4 · MV4+ = 0");
+    expect(e.buckets).toEqual([
+      { label: "1–3", value: 2, target: "2–4", status: "ok" },
+      { label: "4+", value: 0, target: "= 0", status: "ok" },
+    ]);
+  });
   it("cannot turn a mechanic into a curve", () => {
     expect(() => ws().setMechanic({ id: "fly", text: "curve(kw:flying) 2:1" })).toThrowError(/counts cards/);
   });

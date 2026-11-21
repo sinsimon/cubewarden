@@ -813,7 +813,7 @@ function fmtValue(res) {
 function fmtTarget(res) {
   const m = res.measure || {};
   if (m.kind === "every") return m.metric && res.constraint ? "each " + E.formatConstraint(res.constraint, m.metric) : "every card";
-  if (m.kind === "curve") return m.buckets.map((b) => `MV${b.mv}${b.plus ? "+" : ""} ${E.formatConstraint(b.constraint)}`).join(" · ");
+  if (m.kind === "curve") return m.buckets.map((b) => `MV${E.bucketLabel(b)} ${E.formatConstraint(b.constraint)}`).join(" · ");
   return E.formatConstraint(res.constraint, m.kind === "avg" ? m.metric : null);
 }
 /** A rule or mechanic with something to check: a target, an "every card" rule, or a curve with buckets. */

@@ -5,7 +5,8 @@
  *   Condition  = { field, op, value, not? }
  *   Constraint = min | max | exact | range, with unit "percent" on counts = share of the scope.
  *   Rule       = scope + measure (count | avg of a metric | every card | curve) + optional filter + constraint + priority.
- *   Curve      = a target per mana value bucket ("2" = mana value 2, "6+" = 6 and above) over the filtered cards.
+ *   Curve      = a target per mana value bucket ("2" = mana value 2, "1-3" = 1 to 3, "6+" = 6 and above) over the
+ *                filtered cards. Buckets do not overlap and only the highest can be "+".
  *   Archetype  = 2 to 5 colours + name + mechanics; a mechanic is a filter with an optional constraint. It draws from
  *                nonland cards in its colours and colourless nonland cards.
  */
@@ -42,9 +43,13 @@ export type Constraint = (
 
 export type Metric = "wrAdj" | "wrRaw" | "mv" | "power" | "ccElo" | "ccCubes" | "ccPicks" | "colorCount";
 
-/** One mana value of a curve: cards whose mana value (rounded down) is `mv`, or `mv` and above when `plus`. */
+/**
+ * One bucket of a curve: cards whose mana value (rounded down) is `mv`, from `mv` to `mvMax` when set, or `mv` and
+ * above when `plus`. `mvMax` (> mv) and `plus` never go together.
+ */
 export interface CurveBucket {
   mv: number;
+  mvMax?: number;
   plus?: boolean;
   /** Cards, or with unit "percent" a share of the cards matching the curve's filter. */
   constraint: Constraint;

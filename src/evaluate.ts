@@ -1,13 +1,15 @@
 /** Evaluating a config against a cube: every rule and mechanic in every scope. */
 import type { Card, Config, Constraint, Measure, Mechanic, Priority, Rule, Scope } from "./model.ts";
-import { bucketLabel, gap, inConstraint, statusOf, type Status } from "./constraint.ts";
+import { bucketLabel, gap, inBucket, inConstraint, statusOf, type Status } from "./constraint.ts";
 import { isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 import { WUBRG } from "./colors.ts";
 
-/** One mana value of a curve rule: its count (scaled like counts) or share in %, and how it compares with its target. */
+/** One bucket of a curve rule: its count (scaled like counts) or share in %, and how it compares with its target. */
 export interface CurveBucketResult {
+  /** "2", "1–3" or "6+". */
   label: string;
   mv: number;
+  mvMax?: number;
   plus?: boolean;
   value: number;
   /** Unscaled number of cards. */
@@ -140,9 +142,9 @@ export function measureRule(rule: Rule, pool: Card[], ctx: MatchContext | undefi
     if (m.kind === "curve") {
       const scale = rule.scope.kind === "cube" || m.absolute ? 1 : factor;
       const buckets = m.buckets.map((b): CurveBucketResult => {
-        const n = hit.filter((c) => (b.plus ? Math.floor(c.mv) >= b.mv : Math.floor(c.mv) === b.mv)).length;
+        const n = hit.filter((c) => inBucket(c.mv, b)).length;
         const value = b.constraint.unit === "percent" ? (hit.length ? Math.round((1000 * n) / hit.length) / 10 : 0) : Math.round(n * scale);
-        return { label: bucketLabel(b), mv: b.mv, ...(b.plus ? { plus: true } : {}), value, raw: n, constraint: b.constraint,
+        return { label: bucketLabel(b), mv: b.mv, ...(b.mvMax != null && b.mvMax > b.mv ? { mvMax: b.mvMax } : {}), ...(b.plus ? { plus: true } : {}), value, raw: n, constraint: b.constraint,
           status: statusOf(value, b.constraint, "count") };
       });
       const misses = buckets.filter((b) => b.status !== "ok");
