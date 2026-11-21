@@ -90,7 +90,7 @@ data, rebuilt only when something changed. People's cubes never leave their brow
 npm install
 npm test            # vitest
 npm run typecheck
-npm run build:web   # bundles src/browser.ts into web/dist/
+npm run build:web   # bundles src/browser.ts and the page's Vaadin components (web/ui.js) into web/dist/
 ```
 
 `src/` is the engine (no I/O except `cli.ts`, `serve.ts` and `src/data/`). Tests sit on four public seams: the rule

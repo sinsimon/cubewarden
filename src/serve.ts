@@ -13,9 +13,13 @@ import type { Project } from "./workspace.ts";
 
 const WEB = fileURLToPath(new URL("../web/", import.meta.url));
 const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".map": "application/json",
-  ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".css": "text/css" };
+  ".txt": "text/plain; charset=utf-8", ".json": "application/json", ".css": "text/css", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
 
 async function ensureBundle() {
+  // The page's Vaadin components and theme ship prebuilt in the npm package; a clone builds them once.
+  if (!existsSync(join(WEB, "dist/ui.js")) || !existsSync(join(WEB, "dist/aura/aura.css"))) {
+    throw new Error(`Missing ${join(WEB, "dist/ui.js")}: run npm install and npm run build:web in the cubewarden folder first`);
+  }
   if (existsSync(join(WEB, "dist/cubewarden.js"))) return;
   const { build } = await import("esbuild");
   await build({ entryPoints: [fileURLToPath(new URL("./browser.ts", import.meta.url))], bundle: true, format: "iife", target: "es2022", outfile: join(WEB, "dist/cubewarden.js") });

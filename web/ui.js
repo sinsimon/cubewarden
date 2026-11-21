@@ -1,5 +1,5 @@
 /**
- * Vaadin web components for web/next.html, the design-system prototype (Aura theme).
+ * Vaadin web components for the page (web/index.html), with the Aura theme (web/dist/aura/aura.css).
  * Bundled by scripts/build-web.ts into web/dist/ui.js. The page's own scripts run after this bundle,
  * so every element below is defined before the first render.
  */

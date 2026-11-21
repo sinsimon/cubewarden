@@ -1,7 +1,7 @@
 /**
  * Bundles the page scripts into web/dist/:
- *   cubewarden.js  the engine (src/browser.ts), used by index.html and next.html;
- *   ui.js          Vaadin web components for next.html (the design-system prototype), from web/ui.js;
+ *   cubewarden.js  the engine (src/browser.ts);
+ *   ui.js          the Vaadin web components the page uses (web/ui.js);
  *   aura/          the Aura theme stylesheet and its font.
  */
 import { cp, readFile } from "node:fs/promises";
@@ -48,3 +48,6 @@ if ((await readFile("web/dist/ui.js", "utf8")).includes("usage-stats/submit")) {
 
 const aura = dirname(require.resolve("@vaadin/aura/package.json"));
 await cp(join(aura, "dist"), "web/dist/aura", { recursive: true });
+// Licences travel with the files: Aura (Apache-2.0) and its Instrument Sans font (SIL OFL).
+await cp(join(aura, "LICENSE"), "web/dist/aura/LICENSE");
+await cp(join(aura, "src/fonts/InstrumentSans/LICENSE.txt"), "web/dist/aura/fonts/InstrumentSans/LICENSE.txt");

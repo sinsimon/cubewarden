@@ -10,5 +10,6 @@
 - CubeCobra is read only. Rules travel in the cube's own text (`src/cubecobra.ts`).
 - Project data (`cubewarden.json`, `cards.json`, `data.js`) and caches are gitignored: never commit someone's cube or
   third-party card data.
-- The page (`web/index.html`) calls the engine through `window.CubeEngine` (built by `src/browser.ts`) and exposes
+- The page (`web/index.html`) is built on Vaadin web components with the Aura theme (`web/ui.js`, bundled by
+  `npm run build:web`; see `docs/design-systems.md`). It calls the engine through `window.CubeEngine` (built by `src/browser.ts`) and exposes
   `window.cubewarden` for agents; keep the CLI, `window.cubewarden`, WebMCP tools and `web/llms.txt` in step.

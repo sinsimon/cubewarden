@@ -50,6 +50,7 @@
     "bin/",
     "dist/",
     "web/index.html",
+    "web/next.html",
     "web/llms.txt",
     "web/dist/",
     "skills/",
