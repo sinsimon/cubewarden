@@ -163,6 +163,7 @@ describe("writing rules back as text", () => {
     "curve(t:creature)",
     "curve()",
     "curve(t:creature -(kw:flying or kw:reach)) 4+:0..3",
+    "curve() 3:>=2 5+:<=3",
   ];
   it.each(examples)("writes %s back unchanged", (src) => {
     expect(ruleToText(parseRule(src))).toBe(src);
@@ -198,6 +199,12 @@ describe("curve rules", () => {
       constraint: null,
     });
     expect(parseRule("curve(t:creature)").measure).toEqual({ kind: "curve", buckets: [] });
+  });
+  it("reads a minimum or a maximum for a bucket", () => {
+    expect(parseRule("curve() 3:>=2 5+:<=30%").measure).toEqual({ kind: "curve", buckets: [
+      { mv: 3, constraint: { kind: "min", min: 2 } },
+      { mv: 5, plus: true, constraint: { kind: "max", max: 30, unit: "percent" } },
+    ] });
   });
   it("keeps parentheses and quotes inside the filter", () => {
     const r = parseRule('curve(t:creature -(kw:flying or o:"a (b)")) 2:5..7');
