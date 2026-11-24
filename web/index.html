@@ -130,6 +130,14 @@ vaadin-badge.counts{--vaadin-badge-font-size:12.5px;--vaadin-badge-padding:3px 9
 /* Add cards / Replace: wide enough for the results table, while the page keeps at least 600px (nav is the 56px rail below 1600px, the 300px tree above) */
 .drawer.wide{width:clamp(468px,calc(100vw - 656px),960px)}
 @media (min-width:1600px){.drawer.wide{width:clamp(468px,calc(100vw - 900px),960px)}}
+/* ...and laid out as a column: the middle scrolls, the results table fills the free height (never under ~9 rows),
+   the footer keeps its buttons in view and its summary short */
+.drawer.wide.open{display:flex;flex-direction:column;overflow:hidden}
+.drawer.wide>.dr-h,.drawer.wide>.dr-f{flex:none}
+.drawer.wide>.dr-b{flex:1 1 auto;min-height:0;overflow:auto}
+.drawer.wide #findRes:has(.res-scroll){flex:1 0 auto;min-height:360px;display:flex;flex-direction:column}
+.drawer.wide #findRes>.res{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+.drawer.wide #findRes .res-scroll{flex:1 1 0;min-height:0;max-height:none}
 
 /* ---------- navigator: tree (full) or icon rail (collapsed) ---------- */
 .side{display:flex;flex-direction:column;width:300px;min-height:0;background:var(--chrome);border-right:1px solid var(--line)}
@@ -429,6 +437,10 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .outchips{display:flex;flex-wrap:wrap;gap:4px}
 .outchips .chip{text-transform:none;background:var(--fail-bg)}
 .inchips .chip{text-transform:none;background:var(--accent-tint)}
+.find-sum{width:100%;max-height:min(30vh,200px);overflow:auto}
+.find-sum .inchips{flex-wrap:nowrap;overflow-x:auto;align-items:center;margin-bottom:6px;scrollbar-width:thin}
+.find-sum .inchips>*{flex:none}
+.find-sum .preview-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:3px 18px}
 .preview-list{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
 .preview-list .pl{display:flex;gap:8px;align-items:center}
 .preview-list .pl .arrow{color:var(--ink-3)}
@@ -2722,8 +2734,11 @@ function renderFindFoot() {
     lines.push(["Cube size", String(R.size), String(R2.size), null]);
     const wr = R2.cube.rules.find((r) => r.measure.kind === "avg" && r.measure.metric === "wrDelta"), wr1 = R.cube.rules.find((r) => wr && r.id === wr.id);
     if (wr && wr1) lines.push(["Cube " + wr.name.toLowerCase(), fmtValue(wr1), fmtValue(wr), dstat(wr)]);
-    parts.push(h("div", { style: "width:100%" },
-      n ? h("div", { class: "outchips inchips", style: "margin-bottom:6px" }, h("span", { class: "muted", style: "font-size:12px" }, "Putting in:"), ...f.picked.map((id) => h("span", { class: "chip", "data-card": id }, byId[id].name, h("button", { type: "button", "data-unpick": id, "aria-label": "Unpick" }, "×")))) : null,
+    // failing and almost-there lines first, plain counts last
+    const rank = (l) => (l[3] == null ? 5 : ST_RANK[l[3]] ?? 4);
+    lines.sort((x, y) => rank(x) - rank(y));
+    parts.push(h("div", { class: "find-sum" },
+      n ? h("div", { class: "outchips inchips" }, h("span", { class: "muted", style: "font-size:12px" }, `Putting in (${n}):`), ...f.picked.map((id) => h("span", { class: "chip", "data-card": id }, byId[id].name, h("button", { type: "button", "data-unpick": id, "aria-label": "Unpick" }, "×")))) : null,
       h("div", { class: "preview-list", html: lines.map(([k, a, b, st]) => `<div class="pl">${st ? stGlyph(st) : '<span class="st none"></span>'}<span>${esc(k)}</span><span class="muted">${esc(a)}</span><span class="arrow">→</span><b>${esc(b)}</b></div>`).join("") })));
   }
   const label = f.mode === "replace" ? `Swap ${f.out.length} out, ${n} in` : `Add ${n} to the cube`;
