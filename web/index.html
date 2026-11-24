@@ -127,6 +127,9 @@ vaadin-badge.counts{--vaadin-badge-font-size:12.5px;--vaadin-badge-padding:3px 9
 .drawer{width:468px;border-left:1px solid var(--line);background:var(--paper);overflow:auto;display:none;min-height:0}
 .drawer.open{display:block}
 @media (max-width:1340px){.drawer{width:430px}}
+/* Add cards / Replace: wide enough for the results table, while the page keeps at least 600px (nav is the 56px rail below 1600px, the 300px tree above) */
+.drawer.wide{width:clamp(468px,calc(100vw - 656px),960px)}
+@media (min-width:1600px){.drawer.wide{width:clamp(468px,calc(100vw - 900px),960px)}}
 
 /* ---------- navigator: tree (full) or icon rail (collapsed) ---------- */
 .side{display:flex;flex-direction:column;width:300px;min-height:0;background:var(--chrome);border-right:1px solid var(--line)}
@@ -543,6 +546,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 @media (max-width:700px){.xl{display:none}.xs{display:inline}#scaleSeg::part(label){display:none}.brand .cname{display:none}.top{gap:6px;padding:6px 10px}}
 @media (max-width:1280px){.l-long{display:none}.l-short{display:inline}}
 body.drawer-overlay .drawer.open{position:fixed;right:0;top:var(--top);bottom:0;width:min(520px,100vw);z-index:42;box-shadow:-6px 0 28px rgba(0,0,0,.22)}
+body.drawer-overlay .drawer.wide.open{width:min(880px,100vw)}
 @media (max-width:1100px),(max-height:760px){
   .main{overflow-y:auto}
   .tablewrap{flex:none;height:max(420px,calc(100dvh - var(--top) - 24px))}
@@ -2290,6 +2294,7 @@ function renderDrawer() {
   updateCompact();
   if (!drawerKind) { d.classList.remove("open"); return; }
   d.classList.add("open");
+  d.classList.toggle("wide", drawerKind === "find");
   const fn = { editor: renderEditor, find: renderFind, changes: renderChanges, data: renderData, keys: renderKeys, filter: renderViewFilter, mechs: renderMechs }[drawerKind];
   d.replaceChildren(...[].concat(fn()));
   d.scrollTop = 0;
