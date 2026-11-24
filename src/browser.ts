@@ -19,6 +19,7 @@ import { toScryfall } from "./scryfall.ts";
 import { slug } from "./slug.ts";
 import { spellCosts } from "./spell-costs.ts";
 import { SOURCES } from "./sources.ts";
+import { linkedRule, linkedRules, mechanicOfRule, mechanicTarget, removeMechanic, saveMechanic } from "./mechanic-target.ts";
 import { filterToText, parseFilter, parseRule, ruleToText } from "./syntax.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { createWorkspace, cubeAllows, sortCards, type Project, type SearchSource, type SortKey } from "./workspace.ts";
@@ -82,6 +83,7 @@ W.CubeEngine = {
   encodeConfig: encodeRules, decodeConfig: decodeRules, readCubeCobra, referenceCube, mechanicTags, cubeCobraListUrl,
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
   REPO_URL, SYNTAX_HELP, SOURCES, resolveNames, spellCosts,
+  linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic,
 };
 
 /** Hosted page: assemble the card data before the page's own scripts run. */

@@ -238,11 +238,6 @@ body.nav-none #btnScopes{display:inline-flex}
 #ruleTabs vaadin-tab{font-size:12.5px;gap:6px;white-space:nowrap}
 #ruleTabs vaadin-tab .tv{font-variant-numeric:tabular-nums;color:var(--ink-2);font-weight:600}
 #ruleTabs vaadin-tab .tv.ok{color:var(--ok)}#ruleTabs vaadin-tab .tv.near{color:var(--near)}#ruleTabs vaadin-tab .tv.fail{color:var(--fail)}
-.mhint{border:1px solid var(--mark-edge);background:var(--hit-bg);color:var(--near);border-radius:999px;font-size:12px;font-weight:600;padding:3px 10px;min-height:26px}
-.mhint:hover{filter:brightness(.97)}
-.mrow{display:flex;flex-direction:column;gap:5px;padding:10px 0;border-top:1px solid var(--line)}
-.mrow-h{display:flex;align-items:center;gap:8px}
-.mrow-t{font-size:12px;color:var(--near)}
 .kempty{padding:3px 0;color:var(--ink-3);font-size:12.5px}
 .cf{display:flex;flex-direction:column;gap:8px}
 .cf-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:var(--vaadin-radius-m);background:var(--paper)}
@@ -732,6 +727,7 @@ for (const [id, t] of Object.entries(S.ccTags || {})) if (byId[id]) byId[id].ccT
 
 let R = null;          // evaluation of the saved config
 let RD = null;         // evaluation with the draft rule/mechanic being edited
+let RDC = null;        // the config RD comes from
 let draft = null;      // { type: "rule"|"mechanic", owner: scope, obj, isNew }
 let drawerKind = null; // "editor" | "find" | "changes" | "data" | "keys" | "filter"
 let selected = new Set();
@@ -745,7 +741,7 @@ let find = null;
 function save() { B.save(); }
 function recompute() {
   R = E.evaluate(S.config, S.current, byId, { scale: U.scale });
-  if (draft) RD = E.evaluate(draftConfig(), S.current, byId, { scale: U.scale });
+  if (draft) { RDC = draftConfig(); RD = E.evaluate(RDC, S.current, byId, { scale: U.scale }); }
   evalRefs(false);
 }
 /* ---- reference cubes: other public CubeCobra cubes, evaluated with our rules ---- */
@@ -784,7 +780,7 @@ function refValues(sc, sel, useDraft) {
     if (st.status === "error") return { name, text: "!", title: `${name}: ${st.error}` };
     const ev = (useDraft && draft ? refEvalDraft : refEval)[r.id]; if (!ev) return { name, text: "…", title: name };
     const sr = scopeRes(ev, sc); if (!sr) return { name, text: "–", title: `${name}: scope missing` };
-    const x = (sel.kind === "rule" ? sr.rules : sr.mechanics || []).find((y) => y.id === sel.id);
+    const x = resIn(ev, useDraft && draft && RDC ? RDC : S.config, sc, sel);
     if (!x) return { name, text: "–", title: name };
     return { name, text: fmtValue(x), status: dstat(x), title: `${name} (${st.ref.ids.length} cards): ${fmtValue(x)}` };
   });
@@ -903,7 +899,7 @@ function wrd(v) { return E.METRICS.wrDelta.format(v); }
 const TIP = {
   wrDelta: "WR Δ: 17Lands win rate when drawn, adjusted for the strength of the decks the card was in, in points above or below the typical common/uncommon of its set",
   wrRaw: "Raw WR: 17Lands GIH win rate, games where the card was in hand",
-  members: "Cards in this archetype's pool that match at least one of its mechanics. Pool: nonland cards in its colours plus colourless",
+  members: "Mechanics are named filters. A card that matches at least one is a member of the archetype. Rules count them with member:<mechanic>, and the CSV can tag cards with them for CubeCobra. Pool: nonland cards in its colours plus colourless",
   noData: "Cards with no WR Δ (no 17Lands data for their set). They are left out of the averages",
   creNon: "Creatures / every other card in this list",
   curve: "Mana curve of the nonland cards: dark = creatures, light = noncreature. Hover a bar for its count",
@@ -1004,12 +1000,29 @@ function configObj(sel, cfg = S.config, sc = U.scope) {
   if (sel.kind === "rule") return cfg.rules.find((r) => r.id === sel.id) || null;
   const l = mechList(cfg, sc); return l ? l.find((m) => m.id === sel.id) || null : null;
 }
-function selResult(r) {
-  if (!U.sel) return null;
-  const sr = scopeRes(r, U.scope); if (!sr) return null;
-  const list = U.sel.kind === "rule" ? sr.rules : sr.mechanics;
-  return (list || []).find((x) => x.id === U.sel.id) || null;
+/** The config an evaluation came from: the draft's while editing, else the saved one. */
+function cfgOf(r) { return r && r === RD && RDC ? RDC : S.config; }
+/** A mechanic and its target rule are one thing on the page: a selection of a mechanic's linked rule becomes the mechanic. */
+function normSel(sel, sc = U.scope) {
+  if (!sel || sel.kind !== "rule" || isShared(sc)) return sel;
+  const rl = S.config.rules.find((x) => x.id === sel.id);
+  const m = rl && sameScope(rl.scope, sc) ? E.mechanicOfRule(S.config, rl) : null;
+  return m ? { kind: "mechanic", id: m.id } : sel;
 }
+/** A rule's or mechanic's result in an evaluation. A mechanic with a target shows its linked rule's result (value,
+ *  target, status) under the mechanic's id and name; without one, its own count (no target). */
+function resIn(r, cfg, sc, sel) {
+  if (!sel || !r) return null;
+  const sr = scopeRes(r, sc); if (!sr) return null;
+  if (sel.kind === "rule") return (sr.rules || []).find((x) => x.id === sel.id) || null;
+  const own = (sr.mechanics || []).find((x) => x.id === sel.id) || null;
+  const rl = isShared(sc) ? null : E.linkedRule(cfg, sc, sel.id);
+  const lr = rl && (sr.rules || []).find((x) => x.id === rl.id);
+  return lr ? { ...lr, kind: "mechanic", id: sel.id, name: own ? own.name : lr.name, linkedRule: rl.id } : own;
+}
+function selResult(r) { return resIn(r, cfgOf(r), U.scope, U.sel); }
+/** A mechanic as rule text with its target: count(filter) >= n [fixed]. */
+function mechText(filter, res) { return safeRuleText({ filter, measure: (res && res.measure) || { kind: "count" }, constraint: res ? res.constraint : null }, true); }
 /** The cube's "every card" rules (primary): what "Only cards your cube rules allow" applies to search results. */
 function gateRules() { return E.cubeGateRules(S.config); }
 function gateLabel(short) { const n = gateRules().length; return short ? `Outside: only cards your cube rules allow (${n})` : `Only cards your cube rules allow (${n} rule${n > 1 ? "s" : ""})`; }
@@ -1048,9 +1061,10 @@ function draftConfig() {
   if (draft.type === "rule") {
     const i = c.rules.findIndex((r) => r.id === o.id);
     if (i >= 0) c.rules[i] = o; else c.rules.push(o);
-  } else {
-    const l = mechList(c, draft.owner);
-    if (l) { const i = l.findIndex((m) => m.id === o.id); if (i >= 0) l[i] = o; else l.push(o); }
+  } else if (mechList(c, draft.owner)) {
+    // the mechanic, and its target as its linked rule: exactly what Save writes
+    const { constraint, ...mech } = o;
+    return E.saveMechanic(c, draft.owner, mech, { constraint: constraint || null, absolute: !!draft.absolute });
   }
   return c;
 }
@@ -1100,7 +1114,7 @@ function toast(msg, action) {
 /* ================= the workbench on Vaadin web components + Aura =================
    - the navigator: a vaadin-grid treegrid (scopes > their rules), or an icon rail when there is no room;
    - the page header: breadcrumb with a sibling menu on each separator, a big title, the description, and the
-     scope's rules as vaadin-tabs (mechanics are named filters, edited in the scope's Mechanics panel);
+     scope's mechanics and rules as vaadin-tabs (a mechanic and its target rule are one tab);
    - the card list: a vaadin-grid with a selection column and sorters. */
 const ICON = {
   chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
@@ -1155,13 +1169,21 @@ function scopeList() {
   S.config.archetypes.forEach((a) => { if (R.archetypes[a.id]) out.push({ kind: "archetype", id: a.id }); });
   return out;
 }
-/** The rules of a scope: the only things the navigator, the tabs, the menus and Jump to list. Mechanics are
- *  named filters, edited in the scope's Mechanics panel (a mechanic's count goes in a rule: count(member:<id>)). */
+/** What a scope checks, as the navigator, the tabs, the menus and Jump to list it: one row per mechanic (with the
+ *  target of its linked rule, count(member:<id>), or none), then the rules that are not a mechanic's target. */
 const ST_RANK = { error: 0, fail: 0, near: 1, warn: 2 };
 function scopeItems(sc) {
   const sr = scopeRes(R, sc); if (!sr) return [];
+  const taken = new Set(), items = [];
+  for (const m of isShared(sc) ? [] : mechList(S.config, sc) || []) {
+    const res = resIn(R, S.config, sc, { kind: "mechanic", id: m.id });
+    if (!res) continue;
+    if (res.linkedRule) taken.add(res.linkedRule);
+    items.push({ kind: "mechanic", id: m.id, res });
+  }
+  for (const x of sr.rules) if (!taken.has(x.id)) items.push({ kind: "rule", id: x.id, res: x });
   // fails first, then almost, then secondary warnings, then the rest (stable within each group)
-  return sr.rules.map((x, i) => ({ kind: "rule", id: x.id, res: x, i })).sort((a, b) => (ST_RANK[dstat(a.res)] ?? 3) - (ST_RANK[dstat(b.res)] ?? 3) || a.i - b.i);
+  return items.map((x, i) => ({ ...x, i })).sort((a, b) => (ST_RANK[dstat(a.res)] ?? 3) - (ST_RANK[dstat(b.res)] ?? 3) || a.i - b.i);
 }
 /** The status badge by the title: the scope's rules counted by status, fails first, in the colour of the worst. */
 function countsBadge(sc) {
@@ -1172,7 +1194,6 @@ function countsBadge(sc) {
   const label = parts.length ? parts.join("\u00a0·\u00a0") : scopeItems(sc).length ? "No targets" : "No rules";
   return `<vaadin-badge class="counts" theme="${BADGE_THEME[worst] || ""}" title="Rules in this scope by status${n.warn ? " (warnings: secondary rules out of target)" : ""}"><span slot="icon" style="display:inline-flex">${stGlyph(worst)}</span>${label}</vaadin-badge>`;
 }
-function targetedMechs(sc) { return (mechList(S.config, sc) || []).filter((m) => m.constraint); }
 function renderJump() {
   const items = [];
   for (const sc of scopeList()) {
@@ -1203,7 +1224,7 @@ const tree = $("#tree"), NODE = new Map();
 function nodeOf(key, props) { let n = NODE.get(key); if (!n) { n = { key }; NODE.set(key, n); } return Object.assign(n, props); }
 function scopeNode(sc) {
   const r = R, key = "s|" + scopeKey(sc), sr = scopeRes(r, sc), st = scopeStat(sr);
-  const nItems = sr.rules.length;
+  const nItems = scopeItems(sc).length;
   let inner, count, tip;
   if (isShared(sc)) {
     const n = sr.rules.length;
@@ -1225,7 +1246,7 @@ function scopeNode(sc) {
 function itemNode(sc, it) {
   const res = it.res, ds = dstat(res), key = "i|" + scopeKey(sc) + "|" + it.kind + ":" + it.id;
   const cfgO = configObj({ kind: it.kind, id: it.id }, S.config, sc);
-  let txt = ""; try { txt = cfgO ? E.ruleToText(cfgO) : ""; } catch (e) { txt = ""; }
+  let txt = ""; try { txt = !cfgO ? "" : it.kind === "mechanic" ? mechText(cfgO.filter, res) : E.ruleToText(cfgO); } catch (e) { txt = ""; }
   const tip = res.error || [`${it.kind === "rule" ? "Rule" : "Mechanic"}: ${ST_LABEL[ds]}${res.priority === "secondary" ? " (secondary)" : ""}`, `${fmtValue(res)}${hasGoal(res) ? ", target " + fmtTarget(res) : ", no target"}`, res.inherited ? `Shared rule from ${SHARED_NAME[res.from]}` : "", cfgO && cfgO.description ? cfgO.description : "", txt].filter(Boolean).join("\n");
   return nodeOf(key, { type: "item", sc, sel: { kind: it.kind, id: it.id }, hasKids: false, tip,
     html: `${stGlyph(ds)}<span class="nm">${esc(res.name)}${res.inherited ? '<span class="shr">shared</span>' : ""}${res.priority === "secondary" ? '<span class="sec">2nd</span>' : ""}</span><span class="v ${hasGoal(res) ? VT_CLASS[ds] || "" : ""}"><b>${esc(valueTarget(res))}</b></span><button class="ed" data-edit="1" aria-label="Edit ${esc(res.name)}" tabindex="-1">✎</button>` });
@@ -1487,26 +1508,16 @@ function stepScope(d) {
   const list = scopeList(), i = list.findIndex((s) => sameScope(s, U.scope));
   setScope(list[(i + d + list.length) % list.length]);
 }
-/* ---- mechanics: named filters of a colour or archetype, edited in their own panel ---- */
-function mechBtn(sc) { const n = (mechList(S.config, sc) || []).length; return `<vaadin-button theme="small" data-act="open-mechs">Mechanics (${n})</vaadin-button>`; }
-function renderMechs() {
-  const sc = U.scope, list = mechList(S.config, sc) || [], sr = scopeRes(R, sc) || { mechanics: [] };
-  const body = h("div", { class: "dr-b" });
-  body.append(h("p", { class: "help muted", style: "margin:0;font-size:12.5px" }, sc.kind === "archetype"
-    ? "Mechanics are named filters. A card that matches at least one is a member of the archetype. Rules count them with member:<mechanic>, and the CSV can tag cards with them for CubeCobra."
-    : "Mechanics are named filters for this colour. Rules count them with member:<mechanic>, and the CSV can tag cards with them for CubeCobra."));
-  if (!list.length) body.append(h("div", { class: "kempty" }, "No mechanics yet."));
-  for (const m of list) {
-    const res = (sr.mechanics || []).find((x) => x.id === m.id), n = res && res.cards ? res.cards.length : 0;
-    let ft = ""; try { ft = E.filterToText(m.filter); } catch (e) { ft = ""; }
-    body.append(h("div", { class: "mrow" },
-      h("div", { class: "mrow-h" }, h("b", null, m.name || "Untitled"), h("span", { class: "muted" }, `${n} card${n === 1 ? "" : "s"}`), h("span", { class: "spacer" }),
-        h("button", { class: "btn sm", type: "button", onclick: () => openEditor("mechanic", U.scope, m) }, "Edit")),
-      h("code", { class: "rtext" }, ft || "every card"),
-      m.constraint ? h("div", { class: "mrow-t" }, `Has a target (${E.formatConstraint(m.constraint)}): it should become a rule, count(member:${m.id}) ${E.formatConstraint(m.constraint).replace(/\s+/g, " ")}.`) : null));
-  }
-  const foot = h("div", { class: "dr-f" }, h("button", { class: "btn primary", type: "button", onclick: () => openEditor("mechanic", U.scope, null) }, "+ Mechanic"), h("button", { class: "btn", type: "button", onclick: closeDrawer }, "Close"));
-  return [drawerHead("Mechanics (filters)", "in " + scopeName(sc)), body, foot];
+/* ---- "+ Add" in a colour or archetype: a mechanic (filter + optional target) or a rule ---- */
+const ADD_BTN = `<vaadin-button theme="small" data-act="add-menu" aria-haspopup="menu" title="Add a mechanic (a named filter, with an optional target) or a rule">+ Add</vaadin-button>`;
+function openAddMenu(btn, e) {
+  sibMenu.items = [
+    { text: "Mechanic: a filter, with an optional target", go: () => openEditor("mechanic", U.scope, null) },
+    { text: "Rule: curve, average, every card, other counts", go: () => openEditor("rule", U.scope, null) },
+  ];
+  sibMenu.close && sibMenu.close();
+  sibMenu.listenOn = btn;
+  sibMenu.open(e);
 }
 /* ---- the header itself ---- */
 let tabsSig = "", tabsList = [];
@@ -1537,11 +1548,9 @@ function renderHead() {
     meta = `Shared rules, each checked in ${sc.kind === "allColors" ? "White, Blue, Black, Red and Green" : `all ${n} archetypes`}. The list shows every card in those pools.`;
     acts = `<vaadin-button theme="small" data-act="new-rule">+ Shared rule</vaadin-button>`;
   } else if (sc.kind === "cube") { title = `<span class="tt">${esc(S.config.cube.name || "Whole cube")}</span>`; meta = "Every card in the cube"; acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button><vaadin-button theme="small" data-act="edit-cube">Cube settings</vaadin-button>`; }
-  else if (sc.kind === "color") { title = `${scopeIcon(sc.color, "lg")}<span class="tt">${CNAME[sc.color] || sc.color}</span>`; meta = colorScopeDesc(sc.color); acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>${mechBtn(sc)}`; }
-  else { const a = archOf(sc); title = `<span style="display:inline-flex">${colorPips(a.colors, "lg")}</span><span class="tt">${esc(archLabel(a))}</span>`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, <span title="${esc(TIP.members)}"><b>${sr.members.length}</b> members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}</span>`; acts = `<vaadin-button theme="small" data-act="new-rule">+ Rule</vaadin-button>${mechBtn(sc)}<vaadin-button theme="small" data-act="edit-arch">Edit archetype</vaadin-button>`; }
-  const tm = targetedMechs(sc).length;
-  const hint = tm ? `<button type="button" class="mhint" data-act="open-mechs" title="Mechanics are now plain filters: their targets belong in rules, count(member:&lt;mechanic&gt;)">⚠ ${tm} mechanic${tm > 1 ? "s" : ""} with targets — convert to rules</button>` : "";
-  $("#titleRow").innerHTML = `<h1>${title}</h1>${countsBadge(sc)}${hint}<span class="acts">${acts}</span>`;
+  else if (sc.kind === "color") { title = `${scopeIcon(sc.color, "lg")}<span class="tt">${CNAME[sc.color] || sc.color}</span>`; meta = colorScopeDesc(sc.color); acts = ADD_BTN; }
+  else { const a = archOf(sc); title = `<span style="display:inline-flex">${colorPips(a.colors, "lg")}</span><span class="tt">${esc(archLabel(a))}</span>`; meta = `Nonland cards in ${a.colors.split("").join("/")} and colourless, <span title="${esc(TIP.members)}"><b>${sr.members.length}</b> members${scaledOn() ? ` (${sr.membersScaled} scaled)` : ""}</span>`; acts = `${ADD_BTN}<vaadin-button theme="small" data-act="edit-arch">Edit archetype</vaadin-button>`; }
+  $("#titleRow").innerHTML = `<h1>${title}</h1>${countsBadge(sc)}<span class="acts">${acts}</span>`;
   $("#descBox").innerHTML = descHtml(sc);
   const s = statsFor(sr.cards, "wrDelta");
   $("#metaRow").innerHTML = `<span>${meta}</span><span><b>${sr.cards.length}</b> cards</span>${isShared(sc) ? "" : `<span>${wrPair(s.avg, s.avgRaw, true)}</span><span class="hide-sm" title="${esc(TIP.noData)}"><b>${s.noData}</b> without 17Lands data</span><span title="${esc(TIP.creNon)}"><b>${s.cre} / ${s.non}</b> creatures / non</span>${curveBlock(s)}`}`;
@@ -1589,18 +1598,20 @@ function renderRulePanel(r, sc, sr, res) {
   const m = res.measure || { kind: "count" };
   const cfgObj = configObj(U.sel) || (draft && draft.obj);
   const sharedFrom = res.summary ? sc.kind : res.inherited ? res.from : null;
-  const kindTxt = (U.sel.kind === "mechanic" ? "Mechanic, counts cards" : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${metricLabel(m.metric)}` : m.kind === "curve" ? `Rule, mana curve${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : `Rule, every card${m.metric ? " " + metricLabel(m.metric) : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
+  const kindTxt = (U.sel.kind === "mechanic" ? `Mechanic, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "count" ? `Rule, counts cards${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : m.kind === "avg" ? `Rule, average ${metricLabel(m.metric)}` : m.kind === "curve" ? `Rule, mana curve${m.absolute && hasTarget() ? " (fixed, never scaled)" : ""}` : `Rule, every card${m.metric ? " " + metricLabel(m.metric) : " matches"}`) + (sharedFrom ? (res.summary ? ", shared" : `, shared from ${SHARED_NAME[sharedFrom]}`) : "");
   const ids = res.cards || [];
   const metric = m.kind === "avg" || (m.kind === "every" && m.metric) ? m.metric : "wrDelta";
   const s = statsFor(m.kind === "every" ? sr.cards : ids, metric);
   const scaled = isScaledCount(res, sc);
   const isDraft = draft && draft.obj.id === res.id;
-  const rdescr = cfgObj && cfgObj.description ? `<div class="rnote">${mdInline(cfgObj.description)}</div>` : "";
+  const linked = res.linkedRule ? cfgOf(r).rules.find((x) => x.id === res.linkedRule) : null;
+  const descr = (cfgObj && cfgObj.description) || (linked && linked.description);
+  const rdescr = descr ? `<div class="rnote">${mdInline(descr)}</div>` : "";
   box.innerHTML = `
     <div class="rname">${esc(res.name)}<span class="kind">${kindTxt}${res.priority === "secondary" ? ", secondary" : ""}${isDraft ? ", editing" : ""}</span>${pill(dstat(res))}</div>
     <div class="ract">${isDraft ? "" : `<vaadin-button theme="small" data-act="edit-sel">${sharedFrom ? "Edit shared rule" : "Edit"} <kbd>E</kbd></vaadin-button>`}<vaadin-button theme="small primary" data-act="find-rule">Add cards</vaadin-button><vaadin-button theme="small" data-act="matches">Check matches</vaadin-button><vaadin-button theme="small tertiary icon" data-act="clear-sel" aria-label="Clear the rule (Esc)" title="Clear the rule (Esc)">${ICON.close}</vaadin-button></div>
     ${rdescr}
-    <div class="rdesc">${res.error ? `<span style="color:var(--fail)">${esc(res.error)}</span>` : `<code class="rtext" title="${esc(E.describeFilter(cfgObj ? cfgObj.filter : null))}">${esc(cfgObj ? safeRuleText(cfgObj, U.sel.kind === "rule") : "")}</code>`}</div>
+    <div class="rdesc">${res.error ? `<span style="color:var(--fail)">${esc(res.error)}</span>` : `<code class="rtext" title="${esc(E.describeFilter(cfgObj ? cfgObj.filter : null))}">${esc(!cfgObj ? "" : U.sel.kind === "mechanic" ? mechText(cfgObj.filter, res) : safeRuleText(cfgObj, true))}</code>`}</div>
     <div class="rlinks">${refsBlock(sc, U.sel, !!isDraft, fmtValue(res))}${scryHtml(cfgObj ? cfgObj.filter : null, sc)}</div>
     ${res.summary ? `<div class="rcut">${countsTxt(res.summary)}. Click a chip to open that scope.</div><div style="grid-column:1/-1">${sharedChips(res.summary, sc.kind)}</div>` : ""}
     <div class="stats">
@@ -1893,8 +1904,8 @@ function removeToMaybeboard() {
 /* ================= render all ================= */
 function validateUi() {
   if (U.scope.kind === "archetype" && !archOf(U.scope)) { U.scope = { kind: "cube" }; U.sel = null; }
+  if (U.sel && !draft) U.sel = normSel(U.sel);
   if (U.sel && !configObj(U.sel) && !(draft && draft.obj.id === U.sel.id)) U.sel = null;
-  if (U.sel && U.sel.kind === "mechanic" && !(draft && draft.obj.id === U.sel.id)) U.sel = null; // mechanics are not selectable views any more
 }
 function renderAll() {
   if (!R) return;
@@ -1902,9 +1913,7 @@ function renderAll() {
   document.body.classList.toggle("drawer-open", !!drawerKind);
   updateCompact();
   if (refsList().some((r) => !refStore[r.id])) loadRefs();
-  if (drawerKind === "mechs" && !mechList(S.config, U.scope)) { drawerKind = null; $("#drawer").classList.remove("open"); }
   renderTop(); renderSide(); renderHead(); renderTable();
-  if (drawerKind === "mechs") renderDrawer();
   $("#overview").classList.toggle("on", U.view === "overview");
   if (U.view === "overview") renderOverview();
 }
@@ -1914,6 +1923,7 @@ function setScope(sc) {
   U.view = "work"; save(); renderAll();
 }
 function setSel(sel) {
+  sel = normSel(sel);
   if (draft && !(sel && draft.obj.id === sel.id)) { cancelDraft(); }
   U.sel = sel; if (!sel) U.show = "all"; save(); renderAll();
 }
@@ -1933,7 +1943,9 @@ function headClick(e) {
   if (descEditing && e.target.closest(".desc")) return;
   const l = e.target.closest("[data-sel]");
   if (l) { const [k, id] = l.dataset.sel.split(/:(.*)/s); const same = U.sel && U.sel.kind === k && U.sel.id === id; setSel(same ? null : { kind: k, id }); return; }
-  const a = e.target.closest("[data-act]"); if (a) handleAct(a.dataset.act);
+  const a = e.target.closest("[data-act]");
+  if (a && a.dataset.act === "add-menu") { openAddMenu(a, e); return; }
+  if (a) handleAct(a.dataset.act);
 }
 headSkeleton();
 $("#shead").addEventListener("click", headClick);
@@ -1949,7 +1961,6 @@ function handleAct(a) {
     case "edit-cube": openCubeModal(); break;
     case "new-rule": openEditor("rule", U.scope, null); break;
     case "new-mech": openEditor("mechanic", U.scope, null); break;
-    case "open-mechs": openDrawer("mechs"); break;
     case "edit-sel": if (U.sel) openEditFor(U.sel); break;
     case "edit-desc": startDescEdit(); break;
     case "matches": { const o = configObj(U.sel) || (draft && draft.obj); if (o) openMatches(o.filter, U.scope, o.name); break; }
@@ -2097,7 +2108,7 @@ document.addEventListener("keydown", (e) => {
 });
 function cycleSel(d) {
   const sr = scopeRes(R, U.scope);
-  const list = scopeItems(U.scope).map((r) => ({ kind: "rule", id: r.id }));
+  const list = scopeItems(U.scope).map((r) => ({ kind: r.kind, id: r.id }));
   if (!list.length) return;
   let i = U.sel ? list.findIndex((x) => x.kind === U.sel.kind && x.id === U.sel.id) : -1;
   i = (i + d + list.length) % list.length;
@@ -2307,7 +2318,7 @@ function renderDrawer() {
   if (!drawerKind) { d.classList.remove("open"); return; }
   d.classList.add("open");
   d.classList.toggle("wide", drawerKind === "find");
-  const fn = { editor: renderEditor, find: renderFind, changes: renderChanges, data: renderData, keys: renderKeys, filter: renderViewFilter, mechs: renderMechs }[drawerKind];
+  const fn = { editor: renderEditor, find: renderFind, changes: renderChanges, data: renderData, keys: renderKeys, filter: renderViewFilter }[drawerKind];
   d.replaceChildren(...[].concat(fn()));
   d.scrollTop = 0;
 }
@@ -2315,6 +2326,7 @@ function renderDrawer() {
 /* ================= rule / mechanic editor ================= */
 /** Edit a rule or mechanic. A shared rule is edited as itself, while the list keeps showing the current scope. */
 function openEditFor(sel) {
+  sel = normSel(sel);
   const o = configObj(sel); if (!o) return;
   openEditor(sel.kind, sel.kind === "rule" ? o.scope : U.scope, o, { stay: true });
 }
@@ -2327,7 +2339,11 @@ function openEditor(type, owner, existing, opts) {
   if (obj.filter.field) obj.filter = { op: "and", items: [obj.filter] };
   if (type === "rule" && !obj.measure) obj.measure = { kind: "count" };
   if (!("constraint" in obj)) obj.constraint = null;
-  draft = { type, owner: clone(owner), obj, isNew: !existing, view: clone(opts && opts.stay ? U.scope : owner) };
+  // A mechanic is edited with its target: the linked rule's (or an old project's target kept on the mechanic).
+  const t = type === "mechanic" && existing ? E.mechanicTarget(S.config, owner, existing.id) : null;
+  if (t) obj.constraint = t.constraint;
+  draft = { type, owner: clone(owner), obj, isNew: !existing, view: clone(opts && opts.stay ? U.scope : owner), absolute: !!(t && t.absolute),
+    linked: existing && type === "mechanic" ? E.linkedRules(S.config, owner, existing.id).length : 0 };
   if (!sameScope(draft.view, U.scope)) { U.scope = clone(draft.view); selected.clear(); }
   U.sel = { kind: type, id: obj.id }; U.show = "all";
   drawerKind = "editor"; U.view = "work";
@@ -2342,7 +2358,7 @@ function cancelDraft() {
 }
 const scheduleDraft = debounce(() => {
   if (!draft) return;
-  RD = E.evaluate(draftConfig(), S.current, byId, { scale: U.scale });
+  RDC = draftConfig(); RD = E.evaluate(RDC, S.current, byId, { scale: U.scale });
   evalRefs(true);
   updateLive(); renderHead(); renderTable();
 }, 140);
@@ -2421,7 +2437,7 @@ function updateLive() {
   line += `, target ${esc(fmtTarget(res))} ${pill(dstat(res))}`;
   const refs = refsBlock(U.scope, U.sel, true, fmtValue(res));
   el.innerHTML = line + (refs ? `<div style="margin-top:4px">${refs}</div>` : "") + `<div class="muted" style="font-size:12px;margin-top:3px">The list shows this ${draft.type} live as you edit.</div>`;
-  const dt = $("#draftText"); if (dt) dt.textContent = safeRuleText(draft.obj, draft.type === "rule");
+  const dt = $("#draftText"); if (dt) dt.textContent = draft.type === "rule" ? safeRuleText(draft.obj, true) : mechText(draft.obj.filter, { measure: draft.absolute ? { kind: "count", absolute: true } : { kind: "count" }, constraint: draft.obj.constraint });
   const ds = $("#draftScry"); if (ds) ds.innerHTML = scryHtml(draft.obj.filter, draft.view);
 }
 /** Curve rules in Builder mode: one row per mana value bucket. The rows are written as curve text and read back
@@ -2497,6 +2513,7 @@ function renderEditor() {
   const d = draft, o = d.obj, isRule = d.type === "rule";
   const arch = archOf(d.owner);
   const title = (d.isNew ? "New " : "Edit ") + (isRule ? "rule" : d.owner.kind === "color" ? "mechanic (must)" : "mechanic");
+  const textOf = () => (isRule ? safeRuleText(o, true) : mechText(o.filter, { measure: d.absolute ? { kind: "count", absolute: true } : { kind: "count" }, constraint: o.constraint }));
   const body = h("div", { class: "dr-b" });
   const nameIn = inp("text", o.name, (v) => { o.name = v; scheduleDraft(); }, isRule ? "e.g. Gold cards" : "e.g. Removal");
   body.append(h("div", { class: "fld" }, h("label", null, "Name"), nameIn));
@@ -2541,7 +2558,7 @@ function renderEditor() {
   let sentence;
   if (U.editMode === "text") {
     const ta = h("textarea", { class: "txt mono", rows: "3", spellcheck: "false", "aria-label": "Rule as text" });
-    ta.value = safeRuleText(o, isRule);
+    ta.value = textOf();
     const errEl = h("div", { class: "fb-errors" });
     const apply = () => {
       try {
@@ -2549,7 +2566,7 @@ function renderEditor() {
         if (!isRule && pr.measure.kind !== "count") throw new Error("A mechanic counts cards: write count(…) or just the filter.");
         const f = pr.filter ? (pr.filter.field ? { op: "and", items: [pr.filter] } : pr.filter) : { op: "and", items: [] };
         const probs = filterProblems(f, d.owner);
-        if (isRule) o.measure = pr.measure;
+        if (isRule) o.measure = pr.measure; else d.absolute = !!pr.measure.absolute;
         o.filter = f; o.constraint = pr.constraint; draft.curve = null;
         errEl.replaceChildren(...probs.map((x) => h("div", { class: "fb-err" }, x)));
         scheduleDraft();
@@ -2560,13 +2577,18 @@ function renderEditor() {
   } else if (m.kind === "curve") {
     sentence = h("div", { class: "sentence" }, first, builder.el, h("div", { class: "sl" }, h("span", null, "should spread over these mana values:")), curveForm(o, scheduleDraft), h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
   } else {
-    sentence = h("div", { class: "sentence" }, first, builder.el, last, h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, safeRuleText(o, isRule))));
+    sentence = h("div", { class: "sentence" }, first, builder.el, last, h("div", { class: "astext" }, h("span", { class: "muted" }, "As text: "), h("code", { class: "rtext", id: "draftText" }, textOf())));
   }
   body.append(h("div", { class: "row", style: "justify-content:space-between" }, h("span", { class: "lbl", style: "font-size:12px;font-weight:600;color:var(--ink-2)" }, isRule ? "Rule" : "Mechanic"), modeSeg));
   if (isRule && (m.kind === "count" || m.kind === "curve") && d.owner.kind !== "cube" && hasTarget()) {
     const cb = h("input", { type: "checkbox" }); cb.checked = !!m.absolute;
     cb.addEventListener("change", () => { if (cb.checked) o.measure.absolute = true; else delete o.measure.absolute; scheduleDraft(); });
     sentence.append(h("label", { class: "row help", style: "gap:6px;font-size:12px", title: "Use for fixed slots such as gold or hybrid cards" }, cb, `Fixed count: never scale it to ${S.config.cube.targetSize} cards`));
+  }
+  if (!isRule && hasTarget()) {
+    const cb = h("input", { type: "checkbox" }); cb.checked = !!d.absolute;
+    cb.addEventListener("change", () => { d.absolute = cb.checked; scheduleDraft(); });
+    sentence.append(h("label", { class: "row help", style: "gap:6px;font-size:12px", title: "With a target: compare the cards in the cube now, not scaled to the target size" }, cb, `Fixed count: never scale it to ${S.config.cube.targetSize} cards`));
   }
   body.append(sentence);
   body.append(h("div", { class: "live", id: "live" }, "Counting…"));
@@ -2577,7 +2599,7 @@ function renderEditor() {
   body.append(h("label", { class: "row help prio", style: "gap:6px" }, sec, "Secondary: show as a warning, never fail the scope"));
   const del = d.isNew ? null : h("button", { class: "btn danger", type: "button", onclick: (e) => {
     const b = e.currentTarget;
-    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Click again to delete"; return; }
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = d.linked ? `Click again: delete it and its target rule${d.linked > 1 ? "s" : ""}` : "Click again to delete"; return; }
     deleteDraftTarget();
   } }, "Delete");
   const foot = h("div", { class: "dr-f" },
@@ -2602,7 +2624,7 @@ function deleteDraftTarget() {
   const d = draft; if (!d) return;
   pushUndo(`delete ${d.type} "${d.obj.name}"`);
   if (d.type === "rule") S.config.rules = S.config.rules.filter((r) => r.id !== d.obj.id);
-  else { const l = mechList(S.config, d.owner); const i = l.findIndex((m) => m.id === d.obj.id); if (i >= 0) l.splice(i, 1); }
+  else S.config = E.removeMechanic(S.config, d.owner, d.obj.id); // with the rules that are its target
   draft = null; RD = null; drawerKind = null; U.sel = null;
   $("#drawer").classList.remove("open");
   save(); recompute(); renderAll();
@@ -2725,10 +2747,8 @@ function renderFindFoot() {
     const R2 = E.evaluate(S.config, hypo, byId, { scale: U.scale });
     const lines = [];
     const res1 = selResult(R), sr2 = scopeRes(R2, U.scope);
-    if (res1 && sr2) {
-      const l2 = U.sel.kind === "rule" ? sr2.rules : sr2.mechanics, res2 = l2.find((x) => x.id === U.sel.id);
-      if (res2) lines.push([res1.name, fmtValue(res1), fmtValue(res2), dstat(res2)]);
-    }
+    const res2 = resIn(R2, S.config, U.scope, U.sel);
+    if (res1 && res2) lines.push([res1.name, fmtValue(res1), fmtValue(res2), dstat(res2)]);
     const s1 = scopeStat(scopeRes(R, U.scope)).main, s2 = scopeStat(sr2).main;
     lines.push([scopeName(U.scope) + " status", ST_LABEL[s1], ST_LABEL[s2], s2]);
     lines.push(["Cube size", String(R.size), String(R2.size), null]);
@@ -2879,7 +2899,7 @@ function renderData() {
   return [drawerHead("Where the numbers come from"), body];
 }
 function renderKeys() {
-  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["Shift + ⌫", "Remove them and keep them in the maybeboard"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
+  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["Shift + ⌫", "Remove them and keep them in the maybeboard"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule or mechanic"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
   return [drawerHead("Help"), h("div", { class: "dr-b" },
     h("div", { class: "row" }, h("button", { class: "btn sm", type: "button", onclick: () => openDrawer("data") }, "Where the numbers come from")),
     h("h3", { class: "help-h" }, "Appearance"), themePicker(),
