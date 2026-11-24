@@ -1817,7 +1817,7 @@ function renderCards(ids, hit, res) {
     const c = byId[id], mk = res ? cardMark(res, id, hit) : "";
     const tag = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
     const img = c.image ? c.image.replace("/normal/", "/small/") : "";
-    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}" title="${esc(c.name)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
+    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
   }).join("");
 }
 function renderTable() {
@@ -2399,7 +2399,7 @@ function matchList(ids, layout) {
   const LIM = 240, shown = ids.slice(0, LIM);
   if (!ids.length) return `<div class="kempty" style="padding:8px 0">None.</div>`;
   const more = ids.length > LIM ? `<div class="muted" style="font-size:12px;padding:6px 0">Showing the first ${LIM} of ${ids.length}, sorted like Add cards (${esc(sortLabel())}).</div>` : "";
-  if (layout === "images") return `<div class="mgrid">${shown.map((id) => { const c = byId[id]; return `<figure title="${esc(c.name)}"><img loading="lazy" src="${esc((c.image || "").replace("/normal/", "/small/"))}" alt="${esc(c.name)}"><figcaption>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}</figcaption></figure>`; }).join("")}</div>${more}`;
+  if (layout === "images") return `<div class="mgrid">${shown.map((id) => { const c = byId[id]; return `<figure><img loading="lazy" src="${esc((c.image || "").replace("/normal/", "/small/"))}" alt="${esc(c.name)}"><figcaption>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}</figcaption></figure>`; }).join("")}</div>${more}`;
   return `<table class="mlist">${shown.map((id) => { const c = byId[id]; return `<tr><td><span class="nm" data-card="${id}">${esc(c.name)}</span></td><td>${pips(c.manaCost)}</td><td class="muted">${esc(c.type)}</td><td class="num">${c.wrDelta == null ? '<span class="nd">no data</span>' : wrd(c.wrDelta)}</td></tr>`; }).join("")}</table>${more}`;
 }
 function renderMatches() {
@@ -2723,7 +2723,7 @@ const refreshFind = debounce(() => {
   box.innerHTML = `<div class="res"><div class="res-note"><span>${find.source === "maybeboard" ? (list.length ? `${list.length} maybeboard card${list.length > 1 ? "s" : ""} match.` : mbIds().length ? "No maybeboard cards match. Loosen the filter or change the colours." : "The maybeboard is empty: ⇧⌫ in the list moves selected cards there.") : list.length ? `${list.length} cards outside the cube match.` : "No cards outside the cube match. Loosen the filter or change the colours."}${list.length > LIM ? ` Showing the first ${LIM}.` : ""} Click a row to pick it.</span>${picker}</div>
     ${list.length ? `<div class="res-scroll"><table style="min-width:${findTableMinWidth(cols)}px"><colgroup><col style="width:28px"><col>${cols.map((c) => `<col style="width:${c.w}px">`).join("")}</colgroup>
     <thead><tr><th></th>${sortTh({ label: "Name", sort: "name" })}${cols.map(sortTh).join("")}</tr></thead><tbody>
-    ${list.slice(0, LIM).map((c) => `<tr data-pick="${c.id}" class="${find.picked.includes(c.id) ? "pk" : ""}"><td><input type="checkbox" tabindex="-1" ${find.picked.includes(c.id) ? "checked" : ""} aria-label="Pick ${esc(c.name)}"></td><td title="${esc(c.type)}"><span class="nm" data-card="${c.id}">${esc(c.name)}</span></td>${cols.map((col) => `<td>${col.cell(c)}</td>`).join("")}</tr>`).join("")}
+    ${list.slice(0, LIM).map((c) => `<tr data-pick="${c.id}" class="${find.picked.includes(c.id) ? "pk" : ""}"><td><input type="checkbox" tabindex="-1" ${find.picked.includes(c.id) ? "checked" : ""} aria-label="Pick ${esc(c.name)}"></td><td><span class="nm" data-card="${c.id}">${esc(c.name)}</span></td>${cols.map((col) => `<td>${col.cell(c)}</td>`).join("")}</tr>`).join("")}
     </tbody></table></div>` : ""}</div>`;
   renderFindFoot();
 }, 90);
