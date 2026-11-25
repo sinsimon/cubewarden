@@ -391,10 +391,11 @@ export type SearchSource = (typeof SEARCH_SOURCES)[number];
 export const SORT_KEYS = { cubes: "ccCubes", elo: "ccElo", picks: "ccPicks", wr: "wrDelta", wrraw: "wrRaw", mv: "mv", name: "name" } as const;
 export type SortKey = keyof typeof SORT_KEYS;
 
-export function sortCards<T extends Card>(cards: T[], key: SortKey): T[] {
-  const f = SORT_KEYS[key];
+/** A sort key, or a value per card (sorted like the metrics: high to low, missing last, then by name). */
+export function sortCards<T extends Card>(cards: T[], key: SortKey | ((c: Card) => number | null | undefined)): T[] {
+  const f = typeof key === "function" ? key : SORT_KEYS[key];
   if (!f) throw new Error(`Unknown sort "${key}" (${Object.keys(SORT_KEYS).join(", ")})`);
-  const val = (c: Card) => (f === "name" ? null : metricOf(c, f));
+  const val = (c: Card) => (typeof f === "function" ? f(c) ?? null : f === "name" ? null : metricOf(c, f));
   return cards.sort((a, b) => {
     if (f !== "name") {
       const x = val(a), y = val(b);

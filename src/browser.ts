@@ -20,6 +20,7 @@ import { slug } from "./slug.ts";
 import { spellCosts } from "./spell-costs.ts";
 import { SOURCES } from "./sources.ts";
 import { linkedRule, linkedRules, mechanicOfRule, mechanicTarget, removeMechanic, saveMechanic } from "./mechanic-target.ts";
+import { referenceCounts, type ReferenceState } from "./references.ts";
 import { filterToText, parseFilter, parseRule, ruleToText } from "./syntax.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { createWorkspace, cubeAllows, sortCards, type Project, type SearchSource, type SortKey } from "./workspace.ts";
@@ -32,7 +33,7 @@ const W = globalThis as Win;
 /** Cards outside the cube matching a filter in a scope's colours. Options: ctx, respectCubeRules, sort, and
  *  within: look only at these cards (the maybeboard). */
 function candidates(filter: Filter, scope: Scope | null, config: Config, cardsById: Record<string, Card>, cubeIds: string[],
-  opts: { ctx?: MatchContext; respectCubeRules?: boolean; sort?: SortKey; within?: string[] } = {}) {
+  opts: { ctx?: MatchContext; respectCubeRules?: boolean; sort?: SortKey | ((c: Card) => number | null | undefined); within?: string[] } = {}) {
   const inCube = new Set(cubeIds);
   let pool = (opts.within ? [...new Set(opts.within)].map((id) => cardsById[id]).filter(Boolean) : Object.values(cardsById)).filter((c) => !inCube.has(c.id));
   if (opts.respectCubeRules) pool = pool.filter(cubeAllows(config));
@@ -83,7 +84,7 @@ W.CubeEngine = {
   encodeConfig: encodeRules, decodeConfig: decodeRules, readCubeCobra, referenceCube, mechanicTags, cubeCobraListUrl,
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
   REPO_URL, SYNTAX_HELP, SOURCES, resolveNames, spellCosts,
-  linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic,
+  linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic, referenceCounts,
 };
 
 /** Hosted page: assemble the card data before the page's own scripts run. */
@@ -97,6 +98,8 @@ interface Hooks {
   before?: (label: string) => (() => void) | void;
   /** Called after an agent changed the project: save, recompute, redraw. */
   changed: () => void;
+  /** The project's reference cubes as the page has loaded them: search() results then carry refs. */
+  refs?: () => ReferenceState[];
 }
 
 /** Creates window.cubewarden on the page's live state and registers WebMCP tools. */
@@ -105,7 +108,7 @@ W.cubewardenAttach = (state: Project, cardsById: Record<string, Card>, hooks: Ho
   const ws = createWorkspace(state, cardsById, opts);
   ws.onChange(() => hooks.changed());
   const api = {
-    ...pick(ws, hooks.before ?? (() => {})),
+    ...pick(ws, hooks.before ?? (() => {}), hooks.refs),
     syntax: () => SYNTAX_HELP,
     help: () => AGENT_HELP,
   };
@@ -118,7 +121,7 @@ W.cubewardenAttach = (state: Project, cardsById: Record<string, Card>, hooks: Ho
 const names = (ch: { add?: string[]; remove?: string[] }) =>
   [ch.add?.length ? "add " + ch.add.join(", ") : "", ch.remove?.length ? "remove " + ch.remove.join(", ") : ""].filter(Boolean).join("; ");
 
-function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) => (() => void) | void) {
+function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) => (() => void) | void, refs?: () => ReferenceState[]) {
   /** Records an undo step, runs the change, and drops the step if the change throws. */
   const undoable = <T>(label: string, f: () => T): T => {
     const drop = before(label);
@@ -127,7 +130,12 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
   return {
     check: () => ws.check(),
     explain: (id: string) => ws.explain(id),
-    search: (filter: string, o?: Parameters<typeof ws.search>[1]) => ws.search(filter, { respectCubeRules: true, ...o }),
+    search: (filter: string, o?: Parameters<typeof ws.search>[1]) => {
+      const res = ws.search(filter, { respectCubeRules: true, ...o });
+      // refs: how many reference cubes play the card; left out while they load or when there are none.
+      const rc = refs ? referenceCounts(refs()) : null;
+      return rc ? { ...res, refsOf: rc.of, cards: res.cards.map((c) => ({ ...c, refs: rc.count(c) })) } : res;
+    },
     tryChanges: (ch: Parameters<typeof ws.tryChanges>[0]) => ws.tryChanges(ch),
     applyChanges: (ch: Parameters<typeof ws.applyChanges>[0]) => undoable(names(ch), () => ws.applyChanges(ch)),
     changes: () => ws.changes(),
@@ -147,7 +155,8 @@ const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same o
   explain(id)                     a rule's value, target and cards
   search(filter, {scope, sort, limit, source})   cards outside the cube; sort: cubes (default), elo, picks, wr, wrraw, mv, name;
                                   source: "maybeboard" looks only at the cards kept aside (all of them, whatever the
-                                  "every card" rules say); member: needs a scope (a colour like "W" or an archetype id)
+                                  "every card" rules say); member: needs a scope (a colour like "W" or an archetype id);
+                                  with reference cubes loaded, each card has refs (how many of them play it, out of refsOf)
   wr = WR Δ: 17Lands adjusted WR in points above (+) or below (−) the average common/uncommon of the card's set
        (wr>=1.5, avg(wr, member:any) in 1..3.5); wrraw = raw GIH WR in percent (wrraw>=55%)
   tryChanges({add:[names], remove:[names]})   effect of a swap, nothing saved

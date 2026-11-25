@@ -20,4 +20,5 @@ export {
   createWorkspace, cubeAllows, scopeToText, sortCards, summarizeCard, SEARCH_SOURCES, SORT_KEYS, type SearchSource,
   type CardSummary, type Changes, type CheckResult, type Delta, type Explanation, type Finding, type MechanicInput, type Project, type RuleInput, type RuleLine, type SortKey, type Workspace,
 } from "./workspace.ts";
+export { referenceCounts, type ReferenceCounts, type ReferenceState } from "./references.ts";
 export { SYNTAX_HELP } from "./syntax-help.ts";

@@ -748,6 +748,10 @@ function recompute() {
 const refStore = {}; // id -> { status: "loading"|"ok"|"error", ref, error }
 let refEval = {}, refEvalDraft = {};
 function refsList() { return S.config.references || []; }
+/** The references as the engine's ReferenceState: loading until the page has read them. */
+function refStates() {
+  return refsList().map((r) => { const st = refStore[r.id], name = r.name || r.id; return st && st.ref ? { status: "ok", name, ids: st.ref.ids, cardsById: st.ref.cardsById } : { status: st && st.status === "error" ? "error" : "loading", name }; });
+}
 function evalRefs(draftOnly) {
   const cfgD = draft ? draftConfig() : null;
   if (!draftOnly) refEval = {};
@@ -768,7 +772,7 @@ function loadRefs() {
       refStore[r.id] = { status: "ok", ref };
       if (!r.name && ref.name) { r.name = ref.name; save(); }
     }).catch((e) => { refStore[r.id] = { status: "error", error: e.message }; })
-      .finally(() => { evalRefs(false); renderSide(); renderHead(); if (draft) updateLive(); if ($("#refList")) renderRefList(); });
+      .finally(() => { evalRefs(false); renderSide(); renderHead(); if (draft) updateLive(); if ($("#refList")) renderRefList(); if (drawerKind === "find" && find) refreshFind(); });
   }
 }
 /** Values of the same rule or mechanic on each reference cube: [{ name, text, status, title }]. */
@@ -2389,10 +2393,10 @@ function computeMatches() {
   if (isShared(sc)) res.outNote = "Open a single colour or archetype to search outside the cube.";
   else {
     const ctx = archOf(sc) || sc.kind === "color" ? memberCtxByFilters(sc) : undefined;
-    const c = E.candidates(filter, sc, S.config, byId, S.current, { ctx, respectCubeRules: onlySets, sort: U.findSort || "cubes" });
+    const c = E.candidates(filter, sc, S.config, byId, S.current, { ctx, respectCubeRules: onlySets, sort: findSortArg() });
     if (c.error) res.err = res.err || c.error; else res.out = c.cards.map((x) => x.id);
   }
-  res.inIds = E.sortCards(res.inIds.map((id) => byId[id]), U.findSort || "cubes").map((c) => c.id);
+  res.inIds = E.sortCards(res.inIds.map((id) => byId[id]), findSortArg()).map((c) => c.id);
   return res;
 }
 function matchList(ids, layout) {
@@ -2661,7 +2665,7 @@ function findCompute() {
   const sc = find.scope;
   const ctx = archOf(sc) || sc.kind === "color" ? memberCtxByFilters(sc) : undefined;
   const mb = find.source === "maybeboard";
-  return E.candidates({ op: "and", items }, sc, S.config, byId, S.current, { ctx, respectCubeRules: !mb && find.onlySets, sort: U.findSort || "cubes", within: mb ? mbIds() : undefined });
+  return E.candidates({ op: "and", items }, sc, S.config, byId, S.current, { ctx, respectCubeRules: !mb && find.onlySets, sort: findSortArg(), within: mb ? mbIds() : undefined });
 }
 /** Maybeboard cards this page knows, out of the cube. */
 function mbIds() { const inCube = new Set(S.current); return (S.maybeboard || []).filter((id) => byId[id] && !inCube.has(id)); }
@@ -2700,6 +2704,7 @@ const num0 = (v) => (v == null ? nd : `<span title="${Math.round(v).toLocaleStri
 const FIND_COLS = [
   { k: "cost", label: "Cost", w: 78, sort: "mv", cell: (c) => pips(c.manaCost), title: "Mana cost (sorts by mana value)" },
   { k: "cubes", label: "Cubes", long: "CubeCobra cubes", w: 54, sort: "cubes", cell: (c) => num0(c.ccCubes), title: "How many CubeCobra cubes include the card" },
+  { k: "refs", label: "Refs", long: "Reference cubes", w: 50, sort: "refs", cell: (c) => refsCell(c), title: "Reference cubes that play this card" },
   { k: "elo", label: "ELO", long: "CubeCobra ELO", w: 52, sort: "elo", cell: (c) => num0(c.ccElo), title: "CubeCobra ELO from draft picks" },
   { k: "picks", label: "Picks", long: "CubeCobra picks", w: 54, sort: "picks", cell: (c) => num0(c.ccPicks), title: "How many times the card was picked in CubeCobra drafts" },
   { k: "wr", label: "WR Δ", long: "WR Δ (17Lands, points vs the set's average common/uncommon)", w: 62, sort: "wr", cell: (c) => (c.wrDelta == null ? nd : wrd(c.wrDelta)), title: TIP.wrDelta },
@@ -2708,6 +2713,21 @@ const FIND_COLS = [
   { k: "set", label: "Set", w: 42, cell: (c) => `<span style="text-transform:uppercase;font-size:11.5px;color:var(--ink-2)">${esc(c.set)}</span>` },
 ];
 function sortLabel() { const k = U.findSort || "cubes"; return k === "name" ? "name" : (FIND_COLS.find((c) => c.sort === k) || {}).long || (FIND_COLS.find((c) => c.sort === k) || {}).label || k; }
+/** Reference cube counts for the results, worked out once per redraw; null while they load or with none. */
+let findRefs = null;
+function refsCell(c) {
+  if (!findRefs) return refsList().length ? '<span class="nd" title="Reference cubes still loading">…</span>' : '<span class="nd" title="No reference cubes: add them in Cube settings">–</span>';
+  const names = findRefs.names(c);
+  return `<span title="${esc(names.length ? "In " + names.join(", ") : `In none of the ${findRefs.of} reference cubes`)}">${names.length}/${findRefs.of}</span>`;
+}
+/** The sort for candidates() and sortCards(): "refs" is the page's own (the references live here), by cubes until they load. */
+function findSortArg() {
+  const k = U.findSort || "cubes";
+  if (k !== "refs") return k;
+  const rc = E.referenceCounts(refStates()); if (!rc) return "cubes";
+  const memo = new Map();
+  return (c) => { let v = memo.get(c.id); if (v === undefined) { v = rc.count(c); memo.set(c.id, v); } return v; };
+}
 function findCols() { const on = U.findCols || ["cost", "cubes", "elo", "wr", "set"]; return FIND_COLS.filter((c) => on.includes(c.k)); }
 /** Name is the column that flexes: the table is never narrower than the fixed columns plus this, and scrolls sideways when the panel is. */
 const FIND_NAME_MIN = 150;
@@ -2715,6 +2735,7 @@ const findTableMinWidth = (cols) => 28 + FIND_NAME_MIN + cols.reduce((s, c) => s
 const refreshFind = debounce(() => {
   if (!find) return;
   const box = $("#findRes"); if (!box) return;
+  findRefs = E.referenceCounts(refStates());
   const res = findCompute();
   if (res.error) { box.innerHTML = `<div class="fb-err">${esc(res.error)}</div>`; renderFindFoot(); return; }
   const list = res.cards, LIM = 150, cols = findCols(), sort = U.findSort || "cubes";
@@ -3456,6 +3477,7 @@ async function importFromCubeCobra(text) {
     // An agent's change goes on the same undo stack as the person's, labelled as the agent's.
     before: (label) => { pushUndo("agent: " + label); return () => undoStack.pop(); },
     changed: () => { save(); recompute(); renderAll(); if (drawerKind === "changes") renderDrawer(); },
+    refs: refStates,
   });
   if (!S.started) renderFirstRun("import");
 })();

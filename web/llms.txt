@@ -13,7 +13,8 @@ The page exposes `window.cubewarden`, the same operations as the command line:
   "every card" rules allow. `sort`: `cubes` (default: most used on CubeCobra), `elo`, `picks`, `wr`, `wrraw`, `mv`, `name`.
   `source: "maybeboard"` looks only at the cards kept aside (all of them, whatever the "every card" rules say).
   With a colour or archetype as `scope`, the filter can use `member:<mechanic id>`, `member:any`, `member:primary`,
-  `member:secondary` (that scope's mechanics); without a scope `member:` is an error.
+  `member:secondary` (that scope's mechanics); without a scope `member:` is an error. Once the project's reference
+  cubes have loaded, each card carries `refs` (how many of them play it) and the result `refsOf` (how many loaded).
 - `cubewarden.tryChanges({ add: [names], remove: [names] })`: effect of a swap on every rule, nothing saved.
 - `cubewarden.applyChanges({ add, remove })`: make the swap; the page saves and redraws.
 - `cubewarden.changes()`: adds and removes against the imported list, with a changelist for CubeCobra.
