@@ -2190,7 +2190,7 @@ const pv = $("#preview");
 function showPreviewAt(id, x, y) {
   const c = byId[id]; if (!c || !c.image) return;
   const img = pv.querySelector("img");
-  if (img.dataset.id !== id) { img.src = c.image; img.alt = c.name; img.dataset.id = id; }
+  if (img.dataset.id !== id || img.dataset.src !== c.image) { img.src = c.image; img.alt = c.name; img.dataset.id = id; img.dataset.src = c.image; } // the image follows the printing
   const W = 244, H = 340;
   let left = x + 24, top = y - H / 2;
   if (left + W > innerWidth - 8) left = x - W - 24;
