@@ -428,6 +428,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .res-note{font-size:12px;color:var(--ink-2);padding:6px 8px;background:var(--chrome);display:flex;align-items:center;gap:10px;justify-content:space-between}
 .colpick{position:relative;flex:none}.colpick summary{cursor:pointer;font-size:12px;color:var(--ink-2);list-style:none;padding:2px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper)}.colpick summary::-webkit-details-marker{display:none}.colpick-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--paper);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:8px 10px;display:grid;gap:4px;min-width:200px;font-size:12.5px}.colpick-menu label{display:flex;gap:6px;align-items:center;white-space:nowrap}
 .find-src{align-self:flex-start;max-width:100%}.find-src button{min-height:30px;padding:0 12px}
+.find-filter summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:4px;min-width:0;font-size:12px;color:var(--ink-2)}.find-filter summary::-webkit-details-marker{display:none}
+.find-filter summary .lbl{font-weight:600;flex:none}.find-filter .ff-note{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.find-filter .ff-err{color:var(--fail);font-weight:600}
+.find-filter .ff-tog{flex:none;color:var(--accent-text);font-weight:600}.find-filter[open] summary{margin-bottom:6px}
 .mb-details{margin-top:10px}.mb-details summary{cursor:pointer;font-size:12.5px;color:var(--ink-2);padding:4px 0}
 .outchips{display:flex;flex-wrap:wrap;gap:4px}
 .outchips .chip{text-transform:none;background:var(--fail-bg)}
@@ -2179,6 +2182,8 @@ function filterProblems(root, sc, findMode) {
   if (hasScopeColors(root) && !(sc && (sc.kind === "archetype" || isShared(sc) || (sc.kind === "color" && WUBRG.includes(sc.color))))) errs.push(findMode ? "c=scope (this scope's colours) needs a colour or an archetype: pick one in Search in." : "c=scope (this scope's colours) works only in a colour, an archetype, All colours or All archetypes.");
   return errs;
 }
+/** How many conditions a filter holds, counting inside nested groups. */
+function countConds(g) { return !g ? 0 : g.field ? 1 : (g.items || []).reduce((n, it) => n + countConds(it), 0); }
 function makeBuilder(root, opts) {
   opts = opts || {};
   const wrap = h("div", { class: "fb" });
@@ -2688,8 +2693,24 @@ function renderFind() {
     cb.addEventListener("change", () => { f.onlySets = cb.checked; refreshFind(); });
     body.append(h("label", { class: "row help", style: "gap:6px", title: gateTitle() }, cb, gateLabel(false)));
   }
-  const b = makeBuilder(f.filter, { scope: f.scope, findMode: true, onChange: () => refreshFind(), emptyText: "No conditions: any card in the chosen colours." });
-  body.append(h("div", { class: "fld" }, h("span", { class: "lbl" }, f.from ? `Filter, pre-filled from "${f.from}"` : "Filter"), b.el));
+  // The filter editor folds into a one-line summary: closed each time Add/Replace opens, kept open across redraws once opened.
+  const sumNote = h("span", { class: "ff-note" });
+  const updSum = () => {
+    const n = countConds(f.filter), errs = filterProblems(f.filter, f.scope, true).length;
+    let txt = ""; try { txt = E.filterToText(f.filter); } catch (e) { txt = ""; }
+    sumNote.replaceChildren(` · ${n ? `${n} condition${n > 1 ? "s" : ""}` : "no conditions"}${f.filter.not ? ", inverted" : ""}`,
+      errs ? h("span", { class: "ff-err" }, ` · ${errs} problem${errs > 1 ? "s" : ""}`) : "");
+    sumNote.title = txt;
+  };
+  const b = makeBuilder(f.filter, { scope: f.scope, findMode: true, onChange: () => { updSum(); refreshFind(); }, emptyText: "No conditions: any card in the chosen colours." });
+  const det = h("details", { class: "find-filter" },
+    h("summary", null, h("span", { class: "lbl" }, f.from ? `Filter, pre-filled from "${f.from}"` : "Filter"), sumNote, h("span", { class: "ff-tog" })), b.el);
+  const tog = () => { det.querySelector(".ff-tog").textContent = det.open ? "Hide filter" : "Edit filter"; };
+  if (f.filterOpen) det.open = true;
+  det.addEventListener("toggle", () => { f.filterOpen = det.open; tog(); });
+  tog();
+  updSum();
+  body.append(det);
   body.append(h("div", { id: "findRes" }));
   const foot = h("div", { class: "dr-f", id: "findFoot" });
   setTimeout(() => refreshFind(true), 0);
