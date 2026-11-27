@@ -66,6 +66,8 @@ terminal, use Changes → "Download project file" and "Open project file".
   `curve(-t:land) 1-2:8..12 3-4:6..9 5+:2..4` (a bucket over a range of mana values: `1-3` = 1, 2 or 3; buckets must
   not overlap, only the highest can be `+`). Counts scale like `count()`, `fixed` at the end does not. `check()` and
   `explain(id)` return `buckets: [{ label, value, target, status }]`, with labels like `2`, `1–3`, `6+`.
+  A bucket is `near` when it is one card off: within 1 of a count target; for a percent target, moving one filtered
+  card into or out of the bucket (the total unchanged) reaches the range. The rule is `near` when every miss is.
 - Scopes: `cube`, `color:W` … `color:G`, `color:C` (colourless nonland), `color:L` (lands), `archetype:<id>`, `allColors`, `allArchetypes`.
 
 CubeCobra has no write API: changes go back as a changelist or a CSV the person uploads, and rules travel in a

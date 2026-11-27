@@ -50,11 +50,11 @@ describe("curve rules", () => {
   };
   it("check lists a curve with each bucket, its value, target and status", () => {
     const f = curve().check().failing.find((x) => x.id === "w-curve");
-    expect(f).toMatchObject({ status: "fail", value: 2, target: "MV2 2–3 · MV3 = 1 · MV4+ 10%–20%", rule: "curve(t:creature) 2:2..3 3:1 4+:10%..20%" });
+    expect(f).toMatchObject({ status: "near", value: 2, target: "MV2 2–3 · MV3 = 1 · MV4+ 10%–20%", rule: "curve(t:creature) 2:2..3 3:1 4+:10%..20%" });
     expect(f?.buckets).toEqual([
       { label: "2", value: 1, target: "2–3", status: "near" },
       { label: "3", value: 1, target: "= 1", status: "ok" },
-      { label: "4+", value: 0, target: "10%–20%", status: "fail" },
+      { label: "4+", value: 0, target: "10%–20%", status: "near" }, // 2 creatures: one card is 50 points
     ]);
   });
   it("explain lists the counted cards with their mana value", () => {

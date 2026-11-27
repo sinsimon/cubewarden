@@ -35,7 +35,8 @@ Curves: a target per mana value for the cards matching the filter (curve() = eve
   1-3:2..4 = mana value 1, 2 or 3 · buckets must not overlap, ranges go low to high, only the highest bucket can be +
   each bucket: a..b, a (exactly), >=a or <=b · buckets not written have no target
   counts are scaled to the target cube size like count(); "fixed" at the end never scales, percent never scales
-  the rule is ok when every bucket is in range, near when each miss is within 1 card (or 1 point of %)
+  the rule is ok when every bucket is in range, near when each miss is 1 card off
+  (a % bucket: moving one filtered card into or out of it reaches its range)
 
 Scopes: cube · color:W U B R G · color:C (colourless nonland) · color:L (lands) · archetype:<id> · allColors · allArchetypes
 `;

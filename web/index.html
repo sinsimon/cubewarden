@@ -1666,7 +1666,8 @@ function bucketsSvg(res) {
     const x = i * (W + G), c = b.constraint, pct = c.unit === "percent" ? "%" : "", col = LIGHT[b.status] || LIGHT.none;
     const lo = c.kind === "min" ? c.min : c.kind === "max" ? 0 : c.kind === "exact" ? c.value : c.min;
     const hi = c.kind === "min" ? max : top(c);
-    const tip = `MV ${b.label}: ${b.value}${pct}, target ${E.formatConstraint(c)} (${ST_LABEL[b.status] || b.status})`;
+    const of = pct ? ` (${b.raw} of ${res.raw ?? 0} cards)` : "", one = pct && b.status === "near" ? ", 1 card off" : "";
+    const tip = `MV ${b.label}: ${b.value}${pct}${of}, target ${E.formatConstraint(c)} (${ST_LABEL[b.status] || b.status}${one})`;
     s += `<g><title>${esc(tip)}</title><rect x="${x - 2}" y="${y(hi)}" width="${W + 4}" height="${Math.max(2, y(lo) - y(hi))}" style="fill:var(--line-2)" rx="2"/>`;
     s += `<rect x="${x + 4}" y="${y(b.value)}" width="${W - 8}" height="${T + Hh - y(b.value)}" style="fill:${col}" rx="1.5"/>`;
     s += `<text x="${x + W / 2}" y="${y(b.value) - 2}" font-size="9.5" text-anchor="middle" style="fill:var(--ink)">${b.value}${pct}</text>`;
@@ -3233,7 +3234,7 @@ function renderOverview() {
     <div class="ov-star"><h2>${esc(S.config.cube.name || "Cube")}</h2>
       <p>Colours sit on the pentagon and two-colour archetypes are the chords between them. Three- and four-colour archetypes sit on the outer ring, five-colour ones in the centre. Ring colour is the health of the primary rules; the badge shows members${scaledOn() ? ", scaled to " + S.config.cube.targetSize : ""}. Click anything to open it.</p>
       <div class="ov-starwrap">${svg}</div>
-      <div class="ov-key"><span>${stGlyph("ok")}Pass</span><span>${stGlyph("near")}Close (off by 1)</span><span>${stGlyph("fail")}Fail</span><span>${stGlyph("none")}No target</span><span><svg width="10" height="10"><circle cx="5" cy="5" r="4.5" fill="#B66C00"/></svg>Secondary warning</span>${hiddenN ? `<span class="muted">${hiddenN} unnamed archetype${hiddenN > 1 ? "s" : ""} hidden: name ${hiddenN > 1 ? "them" : "it"} in the workbench.</span>` : ""}</div>
+      <div class="ov-key"><span>${stGlyph("ok")}Pass</span><span>${stGlyph("near")}Close (off by 1 card)</span><span>${stGlyph("fail")}Fail</span><span>${stGlyph("none")}No target</span><span><svg width="10" height="10"><circle cx="5" cy="5" r="4.5" fill="#B66C00"/></svg>Secondary warning</span>${hiddenN ? `<span class="muted">${hiddenN} unnamed archetype${hiddenN > 1 ? "s" : ""} hidden: name ${hiddenN > 1 ? "them" : "it"} in the workbench.</span>` : ""}</div>
     </div>
     <div class="ov-side">
       <div class="ov-card"><h3><span>Whole cube</span>${pill(cubeSt.main)}</h3><div data-ovscope="cube">${ruleRows(r.cube.rules)}</div></div>

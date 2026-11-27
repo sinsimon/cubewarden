@@ -21,7 +21,8 @@ export function gap(v: number | null, c: Constraint | null | undefined): number 
   return v < lo ? v - lo : v > hi ? v - hi : 0;
 }
 
-/** ok | near | fail | none | nodata. near = outside by at most 1 card (counts), 1 WR point (wr, wrraw) or 0.25 of another metric (averages). */
+/** ok | near | fail | none | nodata. near = outside by at most 1 (a card for counts, a point for a count in percent),
+ *  1 WR point (wr, wrraw) or 0.25 of another metric (averages). Curve buckets in percent use shareStatus instead. */
 export function statusOf(v: number | null, c: Constraint | null | undefined, kind: "count" | "avg", metric?: Metric): Status {
   if (!c) return "none";
   if (v == null) return "nodata";
@@ -29,6 +30,25 @@ export function statusOf(v: number | null, c: Constraint | null | undefined, kin
   if (g === 0) return "ok";
   const tol = kind === "avg" ? (metric === "wrRaw" ? 0.01 : metric === "wrDelta" ? 1 : 0.25) : 1;
   return g <= tol + 1e-9 ? "near" : "fail";
+}
+
+/** n of total as a percent, to one decimal (0 when total is 0). */
+export function share(n: number, total: number): number {
+  return total ? Math.round((1000 * n) / total) / 10 : 0;
+}
+
+/** Status of a curve bucket in percent holding n of the total filtered cards. near = one card away: moving one card
+ *  of the filter into the bucket (when below) or out of it (when above) reaches or crosses the violated bound. The move
+ *  is a swap with another bucket, so the total stays put: that is the largest one-card step, since adding a new card
+ *  or dropping one from the filter moves the share less ((n+1)/total >= (n+1)/(total+1), (n-1)/total <= (n-1)/(total-1)).
+ *  "Reaches or crosses" keeps a target narrower than one card (an exact 33% with 6 cards) near rather than unreachable.
+ *  With no card in the filter there is nothing to move: a miss is a fail. */
+export function shareStatus(n: number, total: number, c: Constraint): Status {
+  const g = gap(share(n, total), c);
+  if (g === 0) return "ok";
+  if (!total) return "fail";
+  const moved = g < 0 ? gap(share(n + 1, total), c) >= 0 : gap(share(n - 1, total), c) <= 0;
+  return moved ? "near" : "fail";
 }
 
 export function formatConstraint(c: Constraint | null | undefined, metric?: Metric): string {

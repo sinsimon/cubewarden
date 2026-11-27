@@ -212,7 +212,8 @@ describe("curve rules", () => {
     expect(cubeRule("curve() 0-1:2 2-3:4..5 4+:1")).toMatchObject({ value: 1, status: "fail" });
   });
   it("gives a range bucket in percent its share of the filtered cards", () => {
-    expect(buckets(cubeRule("curve(t:creature) 2-3:80%..90% 4+:10%"))).toEqual([["2–3", 83.3, "ok"], ["4+", 16.7, "fail"]]);
+    // 6 creatures: one card is 16.7 points, so 4+ at 16.7% against 10% is one card off.
+    expect(buckets(cubeRule("curve(t:creature) 2-3:80%..90% 4+:10%"))).toEqual([["2–3", 83.3, "ok"], ["4+", 16.7, "near"]]);
   });
   it("counts the buckets out of range: near when every miss is within one card, fail beyond", () => {
     expect(cubeRule("curve(t:creature) 2:4..5 3:2")).toMatchObject({ value: 1, status: "near" });
@@ -220,9 +221,50 @@ describe("curve rules", () => {
     expect(r).toMatchObject({ value: 2, status: "fail" });
     expect(buckets(r)).toEqual([["2", 3, "fail"], ["3", 2, "fail"], ["4", 1, "ok"]]);
   });
-  it("reads percent targets as a share of the filtered cards, near within one point", () => {
-    expect(buckets(cubeRule("curve(t:creature) 2:50% 3:30%..40% 4:10%"))).toEqual([["2", 50, "ok"], ["3", 33.3, "ok"], ["4", 16.7, "fail"]]);
+  it("reads percent targets as a share of the filtered cards, near when one card fixes the bucket", () => {
+    expect(buckets(cubeRule("curve(t:creature) 2:50% 3:30%..40% 4:10%"))).toEqual([["2", 50, "ok"], ["3", 33.3, "ok"], ["4", 16.7, "near"]]);
     expect(cubeRule("curve(t:creature) 3:33% 4:16%")).toMatchObject({ value: 2, status: "near" });
+    // 2 of 6 creatures at 3 is 33.3%: one card more is 50%, one card less 16.7%.
+    expect(buckets(cubeRule("curve(t:creature) 3:>=60%"))).toEqual([["3", 33.3, "fail"]]);
+    expect(buckets(cubeRule("curve(t:creature) 3:>=45%"))).toEqual([["3", 33.3, "near"]]);
+    expect(buckets(cubeRule("curve(t:creature) 3:<=15%"))).toEqual([["3", 33.3, "fail"]]);
+    expect(buckets(cubeRule("curve(t:creature) 3:<=20%"))).toEqual([["3", 33.3, "near"]]);
+  });
+  describe("a percent bucket is near when one card moved into or out of it would reach its range", () => {
+    // 25 cards: 1 at MV 1, 7 at MV 2, 6 at MV 3, 10 at MV 4, 1 at MV 5. One card is 4 points.
+    const pool: Record<string, ReturnType<typeof card>> = {};
+    for (const [mv, n] of [[1, 1], [2, 7], [3, 6], [4, 10], [5, 1]]) for (let i = 0; i < n; i++) pool[`M${mv}-${i}`] = card(`M${mv}-${i}`, { mv });
+    const run = (text: string, ids = Object.keys(pool)) => evaluate(config({ rules: [rule("r", cube, text)] }), ids, pool).cube.rules[0];
+    it("below the range: 7 of 25 (28%) against 30%..36% is near, 6 of 25 (24%) is fail", () => {
+      expect(buckets(run("curve() 2:30%..36%"))).toEqual([["2", 28, "near"]]);
+      expect(buckets(run("curve() 3:30%..36%"))).toEqual([["3", 24, "fail"]]);
+    });
+    it("above the range: 10 of 25 (40%) against 30%..36% is near, 11 of 25 (44%) is fail", () => {
+      expect(buckets(run("curve() 4:30%..36%"))).toEqual([["4", 40, "near"]]);
+      // Swap the MV 1 card for an eleventh MV 4 card: still 25 cards, 11 of them at MV 4.
+      const more = { ...pool, X4: card("X4", { mv: 4 }) };
+      const ids = [...Object.keys(pool).filter((id) => id !== "M1-0"), "X4"];
+      const r = evaluate(config({ rules: [rule("r", cube, "curve() 4:30%..36%")] }), ids, more).cube.rules[0];
+      expect(buckets(r)).toEqual([["4", 44, "fail"]]);
+    });
+    it("one card is a share of the total, not a point: 28% against 29% is near, 24% against 29% is fail", () => {
+      expect(buckets(run("curve() 2:>=29% 3:>=29%"))).toEqual([["2", 28, "near"], ["3", 24, "fail"]]);
+    });
+    it("a target narrower than one card is near from either side", () => {
+      expect(buckets(run("curve() 2:30% 4:38%"))).toEqual([["2", 28, "near"], ["4", 40, "near"]]);
+    });
+    it("the rule is near when every miss is near, fail when one is not", () => {
+      expect(run("curve() 1:4% 2:30%..36% 4:30%..36% 5:4%")).toMatchObject({ value: 2, status: "near" });
+      expect(run("curve() 2:30%..36% 3:30%..36%")).toMatchObject({ value: 2, status: "fail" });
+    });
+    it("with no card matching the filter every bucket is 0%: ok when the range allows 0, fail otherwise", () => {
+      const r = run("curve(t:instant) 1:0%..10% 2:30%..36%");
+      expect(r).toMatchObject({ raw: 0, status: "fail" });
+      expect(buckets(r)).toEqual([["1", 0, "ok"], ["2", 0, "fail"]]);
+    });
+    it("counts keep their tolerance of one card", () => {
+      expect(buckets(run("curve() 2:8..9 3:8..9 4:8..9"))).toEqual([["2", 7, "near"], ["3", 6, "fail"], ["4", 10, "near"]]);
+    });
   });
   it("rounds a fractional mana value down", () => {
     const cards = { X: card("X", { mv: 2.5 }) };

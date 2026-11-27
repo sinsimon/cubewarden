@@ -1,6 +1,6 @@
 /** Evaluating a config against a cube: every rule and mechanic in every scope. */
 import type { Card, Config, Constraint, Measure, Mechanic, Priority, Rule, Scope } from "./model.ts";
-import { bucketLabel, gap, inBucket, inConstraint, statusOf, type Status } from "./constraint.ts";
+import { bucketLabel, gap, inBucket, inConstraint, share, shareStatus, statusOf, type Status } from "./constraint.ts";
 import { METRICS, RETIRED } from "./fields.ts";
 import { isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 import { WUBRG } from "./colors.ts";
@@ -145,9 +145,11 @@ export function measureRule(rule: Rule, pool: Card[], ctx: MatchContext | undefi
       const scale = rule.scope.kind === "cube" || m.absolute ? 1 : factor;
       const buckets = m.buckets.map((b): CurveBucketResult => {
         const n = hit.filter((c) => inBucket(c.mv, b)).length;
-        const value = b.constraint.unit === "percent" ? (hit.length ? Math.round((1000 * n) / hit.length) / 10 : 0) : Math.round(n * scale);
+        const pct = b.constraint.unit === "percent";
+        const value = pct ? share(n, hit.length) : Math.round(n * scale);
+        // A percent bucket is near when one card moved in or out reaches its range (shareStatus), not within 1 point.
         return { label: bucketLabel(b), mv: b.mv, ...(b.mvMax != null && b.mvMax > b.mv ? { mvMax: b.mvMax } : {}), ...(b.plus ? { plus: true } : {}), value, raw: n, constraint: b.constraint,
-          status: statusOf(value, b.constraint, "count") };
+          status: pct ? shareStatus(n, hit.length, b.constraint) : statusOf(value, b.constraint, "count") };
       });
       const misses = buckets.filter((b) => b.status !== "ok");
       const status: Status = !buckets.length ? "none" : !misses.length ? "ok" : misses.every((b) => b.status === "near") ? "near" : "fail";

@@ -112,7 +112,8 @@ describe("cubewarden CLI", () => {
     expect((await cli(dir, "rule", "set", "w-curve", "--scope", "color:W", "--text", "curve(t:creature) 2:2..3 3:1 4+:10%..20%")).code).toBe(0);
     const r = await cli(dir, "check");
     expect(r.out).toContain("MV2 1 (target 2–3) near");
-    expect(r.out).toContain("MV4+ 0% (target 10%–20%) fail");
+    // 2 white creatures: one card is 50 points, so 0% against 10%–20% is one card off.
+    expect(r.out).toContain("MV4+ 0% (target 10%–20%) near");
     expect((await cli(dir, "explain", "w-curve")).out).toContain("MV3 1 (target = 1) ok");
     expect((await cli(dir, "rule", "set", "w-range", "--scope", "color:W", "--text", "curve() 1-3:2..4 4+:0")).code).toBe(0);
     expect((await cli(dir, "explain", "w-range")).out).toContain("MV1–3 3 (target 2–4) ok");
