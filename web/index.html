@@ -493,6 +493,9 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .ov-star .chord:hover .line,.ov-star .chord.hl .line{stroke-width:9}
 .ov-star .chord:hover .badge,.ov-star .chord.hl .badge{stroke-width:3}
 .ov-star .cnode{cursor:pointer}
+.ov-starwrap{overflow-x:auto;overscroll-behavior-x:contain}
+@media (max-width:700px){.ov-star .ov-starwrap svg{min-width:640px}}
+.ov-star .elbl{paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}
 .ov-key{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:8px}
 .ov-key span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .ov-side{display:flex;flex-direction:column;gap:14px}
@@ -3142,6 +3145,12 @@ function whyLine(sr) {
     return `<span class="${cls}">${esc(x.name)} ${esc(fmtValue(x))}${x.constraint ? " / " + esc(fmtTarget(x)) : ""}</span>`;
   }).join(", ");
 }
+/** Text width in the star's units (its labels are 11.5 units, in the page's font). */
+function starMeasure() {
+  const ctx = (starMeasure.c ||= document.createElement("canvas").getContext("2d"));
+  ctx.font = `11.5px ${getComputedStyle(document.body).fontFamily}`;
+  return (s) => ctx.measureText(s).width;
+}
 function renderOverview() {
   const r = R, W = 820, H = 640, cx = 410, cy = 316, RR = 186;
   const ang = (c) => (-90 + 72 * WUBRG.indexOf(c)) * Math.PI / 180;
@@ -3176,7 +3185,7 @@ function renderOverview() {
     if (a.colors.length === 2) {
       const [x1, y1] = pos(a.colors[0]), [x2, y2] = pos(a.colors[1]);
       g += `<line class="line" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${col}" stroke-width="6" stroke-linecap="round" opacity=".85"/>`;
-      const same = named.filter((x) => x.colors === a.colors), k = same.indexOf(a), t = 0.5 + (k - (same.length - 1) / 2) * 0.2;
+      const same = named.filter((x) => x.colors === a.colors), t = E.chordBadgeT(same.indexOf(a), same.length);
       bx = x1 + (x2 - x1) * t; by = y1 + (y2 - y1) * t;
     } else if (a.colors.length === 5) {
       const k = centre.indexOf(a); bx = cx + (k - (centre.length - 1) / 2) * 44; by = cy;
@@ -3191,14 +3200,18 @@ function renderOverview() {
     badges.push(`${g}<circle class="badge" cx="${bx}" cy="${by}" r="17" style="fill:var(--paper);stroke:${col}" stroke-width="2"/><text x="${bx}" y="${by + 4}" text-anchor="middle" font-size="12" font-weight="650" style="fill:var(--ink)">${cnt}</text>${st.warn ? `<circle cx="${bx + 13}" cy="${by - 13}" r="5" fill="#B66C00" style="stroke:var(--paper)" stroke-width="1.5"/>` : ""}</g>`);
   }
   svg += badges.join("");
-  // ally labels: names outside the pentagon edges
-  const labelled = new Set();
+  // ally labels: names outside the pentagon edges; enemy labels: along their diagonal (see src/star.ts)
+  const labelled = new Set(), measure = starMeasure();
   for (const a of named) {
     if (a.colors.length !== 2 || labelled.has(a.colors)) continue;
     labelled.add(a.colors);
     const group = named.filter((x) => x.colors === a.colors);
     const i = WUBRG.indexOf(a.colors[0]), j = WUBRG.indexOf(a.colors[1]);
-    if ((j - i + 5) % 5 !== 1 && (i - j + 5) % 5 !== 1) continue;
+    if ((j - i + 5) % 5 !== 1 && (i - j + 5) % 5 !== 1) {
+      const el = E.enemyLabel(a.colors, group.map(archLabel), { cx, cy, radius: RR, nodeRadius: 31, badgeRadius: 17 }, measure);
+      if (el) svg += `<text class="elbl" transform="translate(${el.x.toFixed(1)} ${el.y.toFixed(1)}) rotate(${el.angle.toFixed(1)})" text-anchor="middle" font-size="11.5" style="fill:var(--ink-2)" pointer-events="none">${el.lines.map((l) => `<tspan x="0" y="${l.dy}">${esc(l.text)}</tspan>`).join("")}</text>`;
+      continue;
+    }
     const mid = Math.atan2(Math.sin(ang(a.colors[0])) + Math.sin(ang(a.colors[1])), Math.cos(ang(a.colors[0])) + Math.cos(ang(a.colors[1])));
     const lx = cx + (RR * 0.81 + 40) * Math.cos(mid), ly = cy + (RR * 0.81 + 40) * Math.sin(mid);
     const anchor = Math.abs(Math.cos(mid)) < 0.3 ? "middle" : Math.cos(mid) > 0 ? "start" : "end";
@@ -3217,7 +3230,7 @@ function renderOverview() {
   const html = `<div class="ov">
     <div class="ov-star"><h2>${esc(S.config.cube.name || "Cube")}</h2>
       <p>Colours sit on the pentagon and two-colour archetypes are the chords between them. Three- and four-colour archetypes sit on the outer ring, five-colour ones in the centre. Ring colour is the health of the primary rules; the badge shows members${scaledOn() ? ", scaled to " + S.config.cube.targetSize : ""}. Click anything to open it.</p>
-      ${svg}
+      <div class="ov-starwrap">${svg}</div>
       <div class="ov-key"><span>${stGlyph("ok")}Pass</span><span>${stGlyph("near")}Close (off by 1)</span><span>${stGlyph("fail")}Fail</span><span>${stGlyph("none")}No target</span><span><svg width="10" height="10"><circle cx="5" cy="5" r="4.5" fill="#B66C00"/></svg>Secondary warning</span>${hiddenN ? `<span class="muted">${hiddenN} unnamed archetype${hiddenN > 1 ? "s" : ""} hidden: name ${hiddenN > 1 ? "them" : "it"} in the workbench.</span>` : ""}</div>
     </div>
     <div class="ov-side">
@@ -3229,6 +3242,8 @@ function renderOverview() {
     </div></div>
     <div class="ov-about" id="about"></div>`;
   $("#overview").innerHTML = html;
+  // Phones: the star keeps a readable size and scrolls sideways, starting centred.
+  const wrap = $("#overview .ov-starwrap"); wrap.scrollLeft = (wrap.scrollWidth - wrap.clientWidth) / 2;
   renderAbout();
 }
 function ovSharedRow(r, kind) {

@@ -22,3 +22,4 @@ export {
 } from "./workspace.ts";
 export { referenceCounts, type ReferenceCounts, type ReferenceState } from "./references.ts";
 export { SYNTAX_HELP } from "./syntax-help.ts";
+export { chordBadgeT, enemyLabel, fitLines, type ChordLabel, type StarGeometry } from "./star.ts";
