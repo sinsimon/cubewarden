@@ -135,6 +135,8 @@ vaadin-badge.counts{--vaadin-badge-font-size:12.5px;--vaadin-badge-padding:3px 9
 .drawer.wide.open{display:flex;flex-direction:column;overflow:hidden}
 .drawer.wide>.dr-h,.drawer.wide>.dr-f{flex:none}
 .drawer.wide>.dr-b{flex:1 1 auto;min-height:0;overflow:auto}
+/* the middle scrolls instead of squeezing its parts: an overflow:hidden part (the All | Maybeboard switch) would shrink to 0 */
+.drawer.wide>.dr-b>*{flex-shrink:0}
 .drawer.wide #findRes:has(.res-scroll){flex:1 0 auto;min-height:360px;display:flex;flex-direction:column}
 .drawer.wide #findRes>.res{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
 .drawer.wide #findRes .res-scroll{flex:1 1 0;min-height:0;max-height:none}
