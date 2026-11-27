@@ -133,12 +133,15 @@ export interface Card {
   text: string;
   keywords: string[];
   tags: string[];
+  /** The printing shown and exported: set, collector number, image, Scryfall id (see Printing). */
   set: string | null;
   number: string | null;
   rarity: string | null;
   printSets: string[];
   image: string | null;
   scryfallId?: string | null;
+  /** Printings the card data has for this card, newest set first (one per set file, plus the CubeCobra list's). */
+  printings?: Printing[];
   /**
    * WR Δ, in percentage points: the 17Lands adjusted WR minus the mean adjusted WR of the commons and uncommons of
    * the set the win rate comes from (wrSet). Comparable across sets; 0 = an average common or uncommon of its set.
@@ -152,4 +155,15 @@ export interface Card {
   ccCubes?: number | null;
   ccPicks?: number | null;
   ccTags?: string[];
+}
+
+/**
+ * One printing of a card: what a cube entry is shown and exported in. The card (oracle id) drives rules, filters
+ * and win rates; the printing is only the set, collector number, image and Scryfall id.
+ */
+export interface Printing {
+  set: string;
+  number: string | null;
+  scryfallId?: string | null;
+  image?: string | null;
 }

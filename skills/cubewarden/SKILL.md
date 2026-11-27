@@ -21,6 +21,10 @@ changes; otherwise use the CLI in the project folder.
 5. Show the person the swap and its effect. Run `cubewarden apply …` only after they agree.
    Cards the person wants to keep in view without counting them go to the maybeboard: `cubewarden maybeboard --add "<card>"`,
    or `cubewarden apply --remove "<card>" --to-maybeboard` for a cut.
+6. Printings: `cubewarden printings` lists cube and maybeboard cards shown in a set the cube's "every card" set rule
+   does not allow; `cubewarden printings fix` switches them to an allowed printing (ask first).
+   `cubewarden printing "<card>"` lists a card's printings, `cubewarden printing "<card>" <set> [<number>]` picks one.
+   A printing changes only what is shown and exported (CSV set and collector number), never what the rules count.
 
 ## Rules
 

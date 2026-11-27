@@ -2,12 +2,16 @@
  * The workspace: one cube project and the operations people and agents run on it. The CLI, the page's
  * window.cubewarden object and its WebMCP tools are thin doors onto these same functions.
  */
-import type { Card, Condition, Config, Constraint, Filter, Measure, Mechanic, Rule, Scope } from "./model.ts";
+import type { Card, Condition, Config, Constraint, Filter, Measure, Mechanic, Printing, Rule, Scope } from "./model.ts";
 import { WUBRG } from "./colors.ts";
 import { bucketLabel, formatConstraint, inConstraint, type Status } from "./constraint.ts";
 import { evaluate, measureMechanic, memberOf, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
 import { changelist, diff, type Diff } from "./export.ts";
 import { matches, metricOf, type MatchContext } from "./filter.ts";
+import {
+  allowedPrinting, allowedSets, choosePrinting, findPrinting, parsePrintingRef, printingChanges, printingIssues, printingLabel, printingsOf,
+  showPrintings, type PrintingChange, type PrintingIssue,
+} from "./printing.ts";
 import { parseFilter, parseRule, ruleToText } from "./syntax.ts";
 
 export interface Project {
@@ -22,6 +26,9 @@ export interface Project {
   originalMaybeboard?: string[];
   /** CubeCobra cube id, when the cube came from CubeCobra. */
   cubeId?: string | null;
+  /** The printing chosen for a cube or maybeboard entry, by card id. Without one, an entry shows the card data's
+   *  printing (the CubeCobra list's). */
+  printings?: Record<string, Printing>;
 }
 
 export interface Finding {
@@ -63,6 +70,15 @@ export interface RuleLine { id: string; name: string; scope: string; priority: "
 export interface RuleInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string; description?: string }
 export interface MechanicInput { id: string; name?: string; scope?: string; priority?: "primary" | "secondary"; text?: string }
 export interface Changes { add?: string[]; remove?: string[]; /** Put the removed cards in the maybeboard. */ toMaybeboard?: boolean }
+export interface PrintingOptions {
+  id: string; name: string; board: "cube" | "maybeboard";
+  shown: Printing;
+  /** The sets the cube's "every card" rules allow, or null when no rule limits them. */
+  allowedSets: string[] | null;
+  /** Every printing in the card data, the allowed sets first. allowed is null when no rule limits the sets. */
+  options: (Printing & { label: string; allowed: boolean | null; shown: boolean })[];
+}
+export interface PrintingSwitch { id: string; name: string; from: string; to: string }
 export interface Delta {
   size: { before: number; after: number };
   changed: { id: string; scope: string; name: string; before: { value: number | null; status: Status }; after: { value: number | null; status: Status } }[];
@@ -84,7 +100,9 @@ export function scopeToText(s: Scope): string {
 
 export function createWorkspace(project: Project, cardsById: Record<string, Card>, opts: EvaluateOptions = {}) {
   const listeners = new Set<(p: Project) => void>();
-  const notify = () => listeners.forEach((f) => f(project));
+  // Every view and export of cardsById shows each entry's chosen printing.
+  showPrintings(cardsById, project);
+  const notify = () => { showPrintings(cardsById, project); listeners.forEach((f) => f(project)); };
   const byName = new Map(Object.values(cardsById).map((c) => [c.name.toLowerCase(), c]));
 
   const report = (ids = project.current): Report => evaluate(project.config, ids, cardsById, opts);
@@ -141,12 +159,31 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
     ...(res.error ? { error: res.error } : {}),
   });
 
+  /** A card by id or name; "Name (SET)" or "Name (SET) 143" names the card too (see printingRef). */
   function resolve(ref: string): Card {
-    const c = cardsById[ref] ?? byName.get(ref.trim().toLowerCase());
+    const c = cardsById[ref] ?? byName.get(ref.trim().toLowerCase()) ?? printingRef(ref)?.card;
     if (c) return c;
     const q = ref.trim().toLowerCase();
     const near = [...byName.keys()].filter((n) => n.includes(q) || closeEnough(n, q)).slice(0, 5).map((n) => byName.get(n)!.name);
     throw new Error(`No card named "${ref}"${near.length ? ` (did you mean ${near.map((n) => `"${n}"`).join(", ")}?)` : ""}`);
+  }
+
+  /** "Name (SET) [number]": the card and the printing of it the data has (throws when it has none). */
+  function printingRef(ref: string): { card: Card; printing: Printing } | null {
+    if (cardsById[ref] || byName.has(ref.trim().toLowerCase())) return null;
+    const r = parsePrintingRef(ref);
+    const card = r && byName.get(r.name.toLowerCase());
+    return r && card ? { card, printing: findPrinting(card, r.set, r.number) } : null;
+  }
+  /** Checks the printings named in refs, then returns a function that chooses them once the cards are entries. */
+  function namedPrintings(refs: string[]): () => void {
+    const named = refs.map(printingRef).filter((x) => !!x);
+    return () => { for (const x of named) choosePrinting(project, cardsById, x.card.id, x.printing.set, x.printing.number); };
+  }
+  function entryOf(ref: string): Card {
+    const c = resolve(ref);
+    if (!project.current.includes(c.id) && !(project.maybeboard || []).includes(c.id)) throw new Error(`"${c.name}" is neither in the cube nor in the maybeboard`);
+    return c;
   }
 
   function nextList(ch: Changes): string[] {
@@ -226,19 +263,70 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       const before = report();
       const removed = (ch.remove || []).map((n) => resolve(n).id);
       const added = new Set((ch.add || []).map((n) => resolve(n).id));
+      const choose = namedPrintings(ch.add || []);
       project.current = nextList(ch);
       const mb = (project.maybeboard || []).filter((id) => !added.has(id));
       if (ch.toMaybeboard) for (const id of removed) if (!mb.includes(id)) mb.push(id);
       if (project.maybeboard || mb.length) project.maybeboard = mb;
+      choose();
       notify();
       return delta(before, report());
     },
 
-    changes(): Diff & { maybeboard: string[]; text: string } {
+    /** Adds and removes against the imported list, new maybeboard cards, and entries shown in another printing. */
+    changes(): Diff & { maybeboard: string[]; printings: PrintingChange[]; text: string } {
       const d = diff(project.original, project.current);
       const before = new Set(project.originalMaybeboard || []);
       const maybeboard = (project.maybeboard || []).filter((id) => !before.has(id));
-      return { ...d, maybeboard, text: changelist(d, cardsById, { maybeboard }) };
+      const printings = printingChanges(project, cardsById);
+      return { ...d, maybeboard, printings, text: changelist(d, cardsById, { maybeboard, printings }) };
+    },
+
+    /** The printings the card data has for a cube or maybeboard card, the cube's allowed sets first. */
+    printings(ref: string): PrintingOptions {
+      const c = entryOf(ref);
+      const sets = allowedSets(project.config);
+      const isAllowed = (p: Printing) => (sets ? sets.includes(p.set.toLowerCase()) : null);
+      const shown: Printing = { set: c.set ?? "", number: c.number, scryfallId: c.scryfallId ?? null, image: c.image };
+      const options = printingsOf(c)
+        .map((p) => ({ ...p, label: printingLabel(p), allowed: isAllowed(p), shown: p.set === c.set && String(p.number) === String(c.number) }))
+        .sort((a, b) => Number(b.allowed === true) - Number(a.allowed === true));
+      return { id: c.id, name: c.name, board: project.current.includes(c.id) ? "cube" : "maybeboard", shown, allowedSets: sets, options };
+    },
+
+    /** Shows and exports a cube or maybeboard card in another printing the data has: by set, and collector number. */
+    setPrinting(ref: string, set: string, number?: string | null): { id: string; name: string; printing: Printing; allowed: boolean | null } {
+      const c = entryOf(ref);
+      const p = choosePrinting(project, cardsById, c.id, set, number);
+      notify();
+      const sets = allowedSets(project.config);
+      return { id: c.id, name: c.name, printing: p, allowed: sets ? sets.includes(p.set.toLowerCase()) : null };
+    },
+
+    /** Cube and maybeboard cards shown in a printing outside the sets the cube's "every card" rules allow. */
+    printingIssues(): PrintingIssue[] {
+      return printingIssues(project, cardsById);
+    },
+
+    /**
+     * Switches cards to a printing in the allowed sets: the set the card's win rate comes from, else the newest
+     * allowed set. Without names: every card shown outside the allowed sets. skipped: no allowed printing in the data.
+     */
+    useAllowedPrintings(refs?: string[]): { changed: PrintingSwitch[]; skipped: PrintingSwitch[] } {
+      const sets = allowedSets(project.config);
+      if (!sets) throw new Error("The cube has no \"every card\" rule limiting the sets (e.g. every(s:fdn,tmt))");
+      const cards = refs ? refs.map(entryOf) : printingIssues(project, cardsById).map((x) => cardsById[x.id]);
+      const changed: PrintingSwitch[] = [], skipped: PrintingSwitch[] = [];
+      for (const c of cards) {
+        const from = printingLabel({ set: c.set ?? "", number: c.number });
+        if (c.set && sets.includes(c.set.toLowerCase())) continue;
+        const fix = allowedPrinting(c, sets);
+        if (!fix) { skipped.push({ id: c.id, name: c.name, from, to: "" }); continue; }
+        choosePrinting(project, cardsById, c.id, fix.set, fix.number);
+        changed.push({ id: c.id, name: c.name, from, to: printingLabel(fix) });
+      }
+      if (changed.length) notify();
+      return { changed, skipped };
     },
 
     /** Keep candidates aside without putting them in the cube, or drop them from the maybeboard. */
@@ -246,10 +334,12 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       const cur = new Set(project.current);
       const add = (ch.add || []).map(resolve);
       for (const c of add) if (cur.has(c.id)) throw new Error(`"${c.name}" is in the cube: remove it with toMaybeboard to move it`);
+      const choose = namedPrintings(ch.add || []);
       const drop = new Set((ch.remove || []).map((n) => resolve(n).id));
       const mb = (project.maybeboard || []).filter((id) => !drop.has(id));
       for (const c of add) if (!mb.includes(c.id)) mb.push(c.id);
       project.maybeboard = mb;
+      choose();
       if (add.length || drop.size) notify();
       return mb;
     },

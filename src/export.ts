@@ -10,7 +10,7 @@ export function diff(originalIds: string[], currentIds: string[]): Diff {
 }
 
 /** Plain changelist to apply by hand on CubeCobra. */
-export function changelist(d: Diff, cardsById: Record<string, Card>, opts: { maybeboard?: string[] } = {}): string {
+export function changelist(d: Diff, cardsById: Record<string, Card>, opts: { maybeboard?: string[]; printings?: { name: string; from: string; to: string }[] } = {}): string {
   const name = (id: string) => cardsById[id]?.name ?? id;
   const lines = [`Changes: ${d.adds.length} in, ${d.removes.length} out`, ""];
   if (d.removes.length) lines.push("Remove:", ...d.removes.map((id) => "- " + name(id)), "");
@@ -19,7 +19,9 @@ export function changelist(d: Diff, cardsById: Record<string, Card>, opts: { may
     return "+ " + name(id) + (c?.set ? ` (${c.set.toUpperCase()}) ${c.number || ""}`.trimEnd() : "");
   };
   if (d.adds.length) lines.push("Add:", ...d.adds.map(withPrint), "");
-  if (opts.maybeboard?.length) lines.push("Maybeboard:", ...opts.maybeboard.map(withPrint));
+  if (opts.maybeboard?.length) lines.push("Maybeboard:", ...opts.maybeboard.map(withPrint), "");
+  // A printing change is not an add or a remove: change the printing on CubeCobra, or upload the CSV.
+  if (opts.printings?.length) lines.push("Printings:", ...opts.printings.map((x) => `~ ${x.name}: ${x.from} → ${x.to}`));
   return lines.join("\n").trimEnd();
 }
 

@@ -18,8 +18,12 @@ export { changelist, diff, exportCsv, mechanicTags, type Diff } from "./export.t
 export { aboutMarkdown, REPO_URL, type AboutOptions } from "./about.ts";
 export {
   createWorkspace, cubeAllows, scopeToText, sortCards, summarizeCard, SEARCH_SOURCES, SORT_KEYS, type SearchSource,
-  type CardSummary, type Changes, type CheckResult, type Delta, type Explanation, type Finding, type MechanicInput, type Project, type RuleInput, type RuleLine, type SortKey, type Workspace,
+  type CardSummary, type Changes, type PrintingOptions, type PrintingSwitch, type CheckResult, type Delta, type Explanation, type Finding, type MechanicInput, type Project, type RuleInput, type RuleLine, type SortKey, type Workspace,
 } from "./workspace.ts";
+export {
+  allowedPrinting, allowedSets, basePrinting, choosePrinting, findPrinting, parsePrintingRef, printingChanges, printingIssues, printingLabel,
+  printingsOf, showPrintings, type PrintingChange, type PrintingIssue, type PrintingProject,
+} from "./printing.ts";
 export { referenceCounts, type ReferenceCounts, type ReferenceState } from "./references.ts";
 export { SYNTAX_HELP } from "./syntax-help.ts";
 export { chordBadgeT, enemyLabel, fitLines, type ChordLabel, type StarGeometry } from "./star.ts";

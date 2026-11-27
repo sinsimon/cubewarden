@@ -9,7 +9,7 @@ import type { Project } from "../workspace.ts";
 import { addDetails } from "./cubecobra-details.ts";
 import { createHttp, type Http, type HostStats } from "./http.ts";
 import {
-  allowedSets, cardFromPrintings, fetchSetDates, groupByOracle, isPoolPrinting, pickPrinting, searchAll, setsQuery, type ScryfallCard,
+  allowedSets, cardFromPrintings, fetchSetDates, groupByOracle, isPoolPrinting, pickPrinting, searchAll, setPrintings, setsQuery, type ScryfallCard,
 } from "./scryfall-cards.ts";
 import { fetch17Lands, readWinRateFile, setCentres, withWinRate, type WinRateTable } from "./winrates.ts";
 
@@ -50,7 +50,7 @@ function poolQueryOf(o: BuildOptions, sets: string[] | null): string {
 async function buildPool(http: Http, query: string) {
   const prints = (await searchAll(http, query)).filter(isPoolPrinting);
   const groups = groupByOracle(prints);
-  const cards = [...groups.values()].map((p) => cardFromPrintings(p));
+  const cards = [...groups.values()].map((p) => ({ ...cardFromPrintings(p), printings: setPrintings(p) }));
   const printIds = new Map([...groups].map(([id, p]) => [id, p.map((x) => x.id)]));
   return { cards, printIds, printings: prints.length };
 }
@@ -61,7 +61,7 @@ async function cardOutsidePool(http: Http, oracleId: string, cubePrinting: strin
   if (!prints.length) return null;
   const paper = prints.filter(isPoolPrinting);
   const shown = prints.find((p) => p.id === cubePrinting) ?? pickPrinting(paper.length ? paper : prints);
-  return { card: cardFromPrintings(prints, shown), prints };
+  return { card: { ...cardFromPrintings(prints, shown), printings: setPrintings(paper.length ? paper : prints) }, prints };
 }
 
 async function readCube(project: Project | null, http: Http, log?: (s: string) => void): Promise<CubeCobraCube | null> {
@@ -89,7 +89,7 @@ export async function buildCards(o: BuildOptions): Promise<BuildResult> {
   log(`Scryfall pool: ${query}`);
   const pool = await buildPool(http, query);
   log(`  ${pool.printings} printings, ${pool.cards.length} cards`);
-  const byId = new Map(pool.cards.map((c) => [c.id, c]));
+  const byId = new Map<string, Card>(pool.cards.map((c) => [c.id, c]));
   const printIds = pool.printIds;
 
   const cubeIds = [...new Set([...(o.project?.original || []), ...(o.project?.current || [])])];
@@ -110,7 +110,10 @@ export async function buildCards(o: BuildOptions): Promise<BuildResult> {
     if (!b) continue;
     const printing = c.scryfallId && c.scryfallId !== b.scryfallId
       ? { set: c.set, number: c.number, rarity: c.rarity ?? b.rarity, scryfallId: c.scryfallId, image: c.image ?? b.image,
-          printSets: [...new Set([...b.printSets, ...(c.set ? [c.set] : [])])].sort() }
+          printSets: [...new Set([...b.printSets, ...(c.set ? [c.set] : [])])].sort(),
+          // The list's printing is one the cube can switch back to.
+          printings: c.set ? [{ set: c.set, number: c.number, scryfallId: c.scryfallId, image: c.image ?? b.image },
+            ...(b.printings || []).filter((x) => x.set !== c.set || x.number !== c.number)] : b.printings }
       : {};
     byId.set(id, { ...b, ...printing, ...(c.ccTags?.length ? { ccTags: c.ccTags } : {}) });
   }

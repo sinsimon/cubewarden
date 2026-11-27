@@ -5,7 +5,7 @@
  *   - Scryfall's collection API for any card still missing (e.g. a pasted list).
  * The person's work stays in the browser (localStorage); this module only decides which cards to load.
  */
-import type { Card, Config } from "./model.ts";
+import type { Card, Config, Printing } from "./model.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
 import { cardFromPrintings, type ScryfallCard } from "./data/scryfall-cards.ts";
 import { SOURCES } from "./sources.ts";
@@ -18,8 +18,11 @@ interface SavedState { config?: Config; current?: string[]; original?: string[];
 const COLORS = ["W", "U", "B", "R", "G", "C", "L"] as const;
 export const EMPTY_CONFIG: Config = { version: 1, cube: { name: "My cube" }, colors: COLORS.map((code) => ({ code, mechanics: [] })), archetypes: [], rules: [] };
 
+const printingOf = (c: Card): Printing => ({ set: c.set!, number: c.number, scryfallId: c.scryfallId ?? null, image: c.image });
+
 /**
- * One card per oracle id from several set files. Win rates: the set the cube shows the card in when that set is
+ * One card per oracle id from several set files. printings: each set file's printing of the card, newest set first,
+ * after the CubeCobra list's. Win rates: the set the cube shows the card in when that set is
  * loaded, else the most recently released loaded set that has them. printSets: union. The WR Δ travels with its
  * wrSet: each set file has it centred on that set already.
  */
@@ -35,7 +38,8 @@ export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<
         wrBySet.get(c.id)!.set(sh.set, c);
       }
       const seen = out.get(c.id);
-      if (!seen) { out.set(c.id, { ...c }); continue; }
+      if (!seen) { out.set(c.id, { ...c, printings: c.set ? [printingOf(c)] : [] }); continue; }
+      if (c.set && !seen.printings!.some((x) => x.set === c.set && x.number === c.number)) seen.printings!.push(printingOf(c));
       seen.printSets = [...new Set([...seen.printSets, ...c.printSets])].sort();
       if (seen.wrDelta == null && seen.wrRaw == null && (c.wrDelta != null || c.wrRaw != null)) {
         Object.assign(seen, { wrDelta: c.wrDelta, wrRaw: c.wrRaw, games: c.games, wrSet: c.wrSet });
@@ -51,6 +55,8 @@ export function mergeCards(shards: Shard[], index: DataIndex, cubeCards: Record<
       set: cc.set ?? base.set, number: cc.number ?? base.number, rarity: cc.rarity ?? base.rarity,
       image: cc.image ?? base.image, scryfallId: cc.scryfallId ?? base.scryfallId,
       printSets: [...new Set([...base.printSets, ...(cc.set ? [cc.set] : [])])].sort(),
+      // The list's printing first (the one shown), then each set file's: the cube can switch between them.
+      printings: cc.set ? [printingOf({ ...base, ...cc, image: cc.image ?? base.image }), ...(base.printings || []).filter((x) => x.set !== cc.set || x.number !== cc.number)] : base.printings,
       ...(cc.ccTags?.length ? { ccTags: cc.ccTags } : {}),
       ...(own ? { wrDelta: own.wrDelta, wrRaw: own.wrRaw, games: own.games, wrSet: own.wrSet } : {}),
     });

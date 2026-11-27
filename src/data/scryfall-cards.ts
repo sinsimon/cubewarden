@@ -1,7 +1,7 @@
 /**
  * Card data from Scryfall's search API (read only): the pool of printings, grouped into one card per oracle id.
  */
-import type { Card, Config, Filter } from "../model.ts";
+import type { Card, Printing } from "../model.ts";
 import { colorSet } from "../colors.ts";
 import { isHybridCost } from "../cubecobra.ts";
 import type { Http } from "./http.ts";
@@ -91,6 +91,14 @@ export function cardFromPrintings(prints: ScryfallCard[], shown: ScryfallCard = 
   };
 }
 
+/** A card's printings for the cube to choose from: one per set (the regular frame), newest set first. */
+export function setPrintings(prints: ScryfallCard[]): Printing[] {
+  const bySet = new Map<string, ScryfallCard[]>();
+  for (const p of prints) bySet.set(p.set, [...(bySet.get(p.set) || []), p]);
+  return [...bySet.values()].map(pickPrinting).sort((a, b) => b.released_at.localeCompare(a.released_at))
+    .map((p) => ({ set: p.set, number: p.collector_number, scryfallId: p.id, image: imageOf(p) }));
+}
+
 /** Printings grouped by oracle id. */
 export function groupByOracle(prints: ScryfallCard[]): Map<string, ScryfallCard[]> {
   const by = new Map<string, ScryfallCard[]>();
@@ -104,24 +112,5 @@ export function groupByOracle(prints: ScryfallCard[]): Map<string, ScryfallCard[
 /** "(set:trk or set:fdn)", the Scryfall query for a list of sets. */
 export const setsQuery = (sets: string[]) => "(" + sets.map((s) => `set:${s}`).join(" or ") + ")";
 
-/** Set codes of a filter that are an allow-list: a non-negated set condition at the top level of an "and" (or of a one-item filter). */
-function allowListOf(filter: Filter | null | undefined): string[] | null {
-  if (!filter || filter.not || (filter.op !== "and" && filter.items.length !== 1)) return null;
-  for (const item of filter.items) {
-    if ("field" in item && item.field === "set" && !item.not && (item.op === "in" || item.op === "is")) {
-      return ([] as unknown[]).concat(item.value).map((s) => String(s).toLowerCase());
-    }
-  }
-  return null;
-}
-
-/** The sets every card of the cube must come from, from the cube's "every card" rules, or null when no rule limits them. */
-export function allowedSets(config: Config | null | undefined): string[] | null {
-  let out: string[] | null = null;
-  for (const r of config?.rules || []) {
-    if (r.scope.kind !== "cube" || r.measure.kind !== "every") continue;
-    const sets = allowListOf(r.filter);
-    if (sets) out = out ? out.filter((s) => sets.includes(s)) : sets;
-  }
-  return out;
-}
+/** The sets every card of the cube must come from (moved to the engine: the page needs it too). */
+export { allowedSets } from "../printing.ts";

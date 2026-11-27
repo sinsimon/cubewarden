@@ -16,8 +16,17 @@ The page exposes `window.cubewarden`, the same operations as the command line:
   `member:secondary` (that scope's mechanics); without a scope `member:` is an error. Once the project's reference
   cubes have loaded, each card carries `refs` (how many of them play it) and the result `refsOf` (how many loaded).
 - `cubewarden.tryChanges({ add: [names], remove: [names] })`: effect of a swap on every rule, nothing saved.
-- `cubewarden.applyChanges({ add, remove })`: make the swap; the page saves and redraws.
-- `cubewarden.changes()`: adds and removes against the imported list, with a changelist for CubeCobra.
+- `cubewarden.applyChanges({ add, remove })`: make the swap; the page saves and redraws. `add: ["Make Your Move (FDN)"]`
+  or `"Make Your Move (FDN) 143"` adds the card in that printing.
+- `cubewarden.changes()`: adds and removes against the imported list, new maybeboard cards and printing changes
+  (`printings`), with a changelist for CubeCobra.
+- Printings: each cube or maybeboard card is shown and exported (CSV: set, collector number) in one printing; the card
+  itself (rules, filters, win rates) does not change with it. `cubewarden.printings(card)` lists the printings the card
+  data has, the allowed sets first; `cubewarden.setPrinting(card, set, number?)` switches it, e.g.
+  `setPrinting("Make Your Move", "fdn")`. With an "every card" set rule (`every(s:fdn,tmt)`),
+  `cubewarden.printingIssues()` lists cards shown outside those sets and `cubewarden.useAllowedPrintings()` switches
+  them all (or `useAllowedPrintings([names])` some) to an allowed printing: the set their win rate comes from, else
+  the newest allowed set.
 - `cubewarden.maybeboard({ add, remove })`: cards kept aside (CubeCobra's maybeboard), listed with no arguments;
   `applyChanges({ remove, toMaybeboard: true })` moves cut cards there. They are not counted by any rule.
 - `cubewarden.rules()`, `cubewarden.setRule({ id, name, scope, text, priority })`, `cubewarden.removeRule(id)`.
@@ -28,9 +37,11 @@ The page exposes `window.cubewarden`, the same operations as the command line:
 Where the browser supports WebMCP (`document.modelContext`), the same operations are registered as tools named
 `cubewarden_check`, `cubewarden_explain`, `cubewarden_search`, `cubewarden_try_changes`, `cubewarden_apply_changes`,
 `cubewarden_rules`, `cubewarden_set_rule`, `cubewarden_mechanics`, `cubewarden_set_mechanic`, `cubewarden_changes`,
-`cubewarden_maybeboard`, `cubewarden_syntax`.
+`cubewarden_maybeboard`, `cubewarden_printings`, `cubewarden_set_printing`, `cubewarden_printing_issues`,
+`cubewarden_use_allowed_printings`, `cubewarden_syntax`.
 
-Ask the person before `applyChanges`, `setRule` or `removeRule`: they change the cube they are working on.
+Ask the person before `applyChanges`, `setPrinting`, `useAllowedPrintings`, `setRule` or `removeRule`: they change
+the cube they are working on.
 
 ## For agents in a terminal
 

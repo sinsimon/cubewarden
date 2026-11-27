@@ -145,6 +145,6 @@ describe("cubewarden CLI", () => {
   });
   it("prints help listing every command", async () => {
     const r = await cli(setup(), "help");
-    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set", "maybeboard [--add", "--maybeboard"]) expect(r.out).toContain(c);
+    for (const c of ["check", "explain", "search", "try", "apply", "rules", "rule set", "changes", "about", "export", "import", "syntax", "serve", "mechanic set", "maybeboard [--add", "--maybeboard", "printing <card>", "printings [fix"]) expect(r.out).toContain(c);
   });
 });

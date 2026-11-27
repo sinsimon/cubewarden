@@ -54,14 +54,23 @@ CubeCobra has no write API. Overview → "About for CubeCobra" builds the text t
 ends with one hidden line (`[cubewarden-v1]: cw:…`, a markdown link definition CubeCobra never displays) that holds
 your rules, so importing the cube again restores them.
 
+### Printings
+
+Each card in the cube or the maybeboard is shown and exported in one printing (set and collector number): the one
+in your CubeCobra list until you pick another. Click a card's set in the table, or "Printing: … ▾" with one card
+selected, to choose among the printings in the card data. With an "every card" set rule, cards shown in a set it does
+not allow (say a Commander reprint) are marked ⚠, and "⚠ n printings outside your sets" above the table switches them
+all to an allowed printing: the set their win rate comes from, else the newest allowed set. The printing never changes
+what the rules count. CubeCobra gets the new printings with "Replace with CSV" (Changes → Download CSV).
+
 ## For AI agents
 
 Every operation is available in three places, with the same names and results:
 
-- **Command line**: `cubewarden check | explain | search | try | apply | rules | rule set | changes | about | export`,
+- **Command line**: `cubewarden check | explain | search | try | apply | printing | printings | rules | rule set | changes | about | export`,
   with `--json` and exit codes (0 ok, 1 primary rules not met, 2 bad input).
 - **In the page**: `window.cubewarden` (`check()`, `explain(id)`, `search(filter)`, `tryChanges({add, remove})`,
-  `applyChanges(…)`, `rules()`, `setRule(…)`), for agents that drive a browser.
+  `applyChanges(…)`, `setPrinting(…)`, `useAllowedPrintings()`, `rules()`, `setRule(…)`), for agents that drive a browser.
 - **WebMCP**: where the browser supports it, the page registers the same operations as tools (`cubewarden_check`…).
 
 [`web/llms.txt`](web/llms.txt) is the agent-facing summary; [`skills/cubewarden/SKILL.md`](skills/cubewarden/SKILL.md)

@@ -315,6 +315,10 @@ vaadin-button.filtered{--vaadin-button-background:var(--hit-bg);--vaadin-button-
 #grid .nm.bad{background:linear-gradient(transparent 8%,var(--bad) 8%,var(--bad) 92%,transparent 92%);padding:0 3px;margin:0 -3px;border-radius:2px}
 #grid .dim{color:var(--ink-2)}
 #grid .setc{color:var(--ink-2);font-size:12px;text-transform:uppercase}
+#grid .setc.pr{cursor:pointer;white-space:nowrap;border-radius:4px;padding:2px 3px;margin:0 -3px}
+#grid .setc.pr:hover,#grid .setc.pr:focus-visible{background:var(--chrome-2);color:var(--ink)}
+#grid .setc.off,.cg .cap .off,.chg-row .set.off{color:var(--warn);font-weight:600}
+#btnPrintFix{--vaadin-button-text-color:var(--warn)}
 #grid .tags{font-size:12px;color:var(--ink-2)}
 .hinfo{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--line-2);font:600 9px/1 var(--sans);color:var(--ink-3);margin-left:4px;vertical-align:1px}
 .nd{color:var(--ink-3);font-size:11.5px;font-style:italic}
@@ -452,6 +456,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
 .chg-row .nm{font:600 13px/1 var(--serif);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chg-row .set{font-size:11.5px;color:var(--ink-3);text-transform:uppercase}
 .mb-details .chg-row{grid-template-columns:minmax(0,1fr) 44px auto auto}
+.chg-row.pr{grid-template-columns:minmax(0,1fr) auto auto}.chg-row.pr .set{white-space:nowrap}
 .chg-scroll{max-height:260px;overflow:auto}
 .state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
 .state.dirty{color:var(--accent-text)} .state.clean{color:var(--ok)}
@@ -671,6 +676,7 @@ body.drawer-overlay .drawer.wide.open{width:min(880px,100vw)}
         <div class="seg hidden" id="showSeg" role="group" aria-label="Show"></div>
         <vaadin-button id="btnCols">Columns</vaadin-button>
         <div class="seg" id="layoutSeg" role="group" aria-label="Layout (V)"><button data-layout="table">Table</button><button data-layout="cards">Cards</button></div>
+        <vaadin-button id="btnPrintFix" theme="small tertiary" class="hidden"></vaadin-button>
         <span class="tcount" id="tcount" aria-live="polite"></span>
       </div>
       <div class="tablewrap" id="tablewrap">
@@ -752,6 +758,7 @@ let find = null;
 
 function save() { B.save(); }
 function recompute() {
+  E.showPrintings(byId, S); // every cube and maybeboard card in its chosen printing (image, set, export)
   R = E.evaluate(S.config, S.current, byId, { scale: U.scale });
   if (draft) { RDC = draftConfig(); RD = E.evaluate(RDC, S.current, byId, { scale: U.scale }); }
   evalRefs(false);
@@ -1105,17 +1112,19 @@ function cleanObj(obj, type) {
   return o;
 }
 function diffNow() { return E.diff(S.original, S.current); }
-function diffSig(d) { return d.adds.slice().sort().join(",") + "|" + d.removes.slice().sort().join(","); }
-function isDirty() { const d = diffNow(); return (d.adds.length + d.removes.length) > 0 && diffSig(d) !== S.exportedSig; }
+function printingSig() { return Object.entries(S.printings || {}).map(([id, p]) => `${id}=${p.set}:${p.number}`).sort().join(","); }
+function diffSig(d) { const pr = printingSig(); return d.adds.slice().sort().join(",") + "|" + d.removes.slice().sort().join(",") + (pr ? "|" + pr : ""); }
+function isDirty() { const d = diffNow(); return (d.adds.length + d.removes.length + E.printingChanges(S, byId).length) > 0 && diffSig(d) !== S.exportedSig; }
 
 /** Undo keeps the card list and the rules as they were, so it also undoes rule edits and changes made by an agent. */
-function pushUndo(label) { undoStack.push({ current: S.current.slice(), config: clone(S.config), maybeboard: S.maybeboard ? S.maybeboard.slice() : undefined, label }); if (undoStack.length > 50) undoStack.shift(); }
+function pushUndo(label) { undoStack.push({ current: S.current.slice(), config: clone(S.config), maybeboard: S.maybeboard ? S.maybeboard.slice() : undefined, printings: S.printings ? clone(S.printings) : undefined, label }); if (undoStack.length > 50) undoStack.shift(); }
 function undo() {
   const u = undoStack.pop();
   if (!u) { toast("Nothing to undo"); return; }
   S.current = u.current;
   if (u.config) S.config = u.config;
   if (u.maybeboard) S.maybeboard = u.maybeboard; else delete S.maybeboard;
+  if (u.printings) S.printings = u.printings; else delete S.printings;
   afterChange("Undid: " + u.label, false);
 }
 function afterChange(msg, undoable = true) {
@@ -1181,7 +1190,7 @@ function renderTop() {
   const vi = U.view === "overview" ? 1 : 0;
   if (viewTabs.selected !== vi) viewTabs.selected = vi;
   uiSync = false;
-  const d = diffNow(), n = d.adds.length + d.removes.length;
+  const d = diffNow(), n = d.adds.length + d.removes.length + E.printingChanges(S, byId).length;
   const bd = $("#chgBadge"); bd.textContent = n; bd.setAttribute("theme", isDirty() ? "small filled" : "small");
   $("#btnChanges").setAttribute("aria-label", `Changes: ${n}${isDirty() ? ", not exported yet" : n ? ", all exported" : ""}`);
   renderJump();
@@ -1677,6 +1686,64 @@ function bucketsSvg(res) {
   return s + "</svg>";
 }
 
+/* ================= printings ================= */
+/* Each cube and maybeboard card is shown and exported in one printing (set + collector number). The card itself
+   (rules, filters, win rates) does not change with it. The engine writes the chosen printing on byId's cards. */
+function setsAllowed() { return E.allowedSets(S.config); }
+/** The card is shown in a printing outside the sets the cube's "every card" set rule allows. */
+function offPrinting(c) { const s = setsAllowed(); return !!(s && c && c.set && !s.includes(String(c.set).toLowerCase())); }
+function printLabel(c) { return c && c.set ? E.printingLabel({ set: c.set, number: c.number }) : ""; }
+function printingTitle(c) {
+  const s = setsAllowed();
+  return `Printing ${printLabel(c)}.${offPrinting(c) ? ` Outside the sets your cube allows (${s.join(", ").toUpperCase()}).` : ""} Printed in: ${(c.printSets || [c.set]).join(", ").toUpperCase()}. Click to choose the printing.`;
+}
+function printingButton(ids) {
+  if (ids.length !== 1) return "";
+  const c = byId[ids[0]], off = offPrinting(c);
+  return `<vaadin-button theme="small" data-act="printing" data-id="${esc(ids[0])}" aria-haspopup="menu" title="${esc(printingTitle(c))}">Printing: ${esc(printLabel(c))}${off ? " ⚠" : ""} ▾</vaadin-button>`;
+}
+/** The printings the card data has for a card, the allowed sets first; one click shows and exports it in that one. */
+function openPrintingMenu(btn, e, id) {
+  const c = byId[id]; if (!c) return;
+  const sets = setsAllowed(), ok = (p) => !sets || sets.includes(p.set.toLowerCase());
+  const opts = E.printingsOf(c).slice().sort((a, b) => Number(ok(b)) - Number(ok(a)));
+  const fix = sets && offPrinting(c) ? E.allowedPrinting(c, sets) : null;
+  const shown = (p) => p.set === c.set && String(p.number) === String(c.number);
+  sibMenu.items = [
+    ...(fix ? [{ text: `Use an allowed printing (${E.printingLabel(fix)})`, go: () => pickPrinting(id, fix) }, { component: "hr" }] : []),
+    ...opts.map((p) => ({ text: `${shown(p) ? "✓ " : ""}${E.printingLabel(p)}${sets && !ok(p) ? " · outside your sets" : ""}`, go: () => pickPrinting(id, p) })),
+    ...(opts.length < 2 ? [{ text: "No other printing in the card data", disabled: true }] : []),
+  ];
+  sibMenu.close && sibMenu.close();
+  sibMenu.listenOn = btn;
+  sibMenu.open(e);
+}
+function pickPrinting(id, p) {
+  const c = byId[id]; if (!c || (c.set === p.set && String(c.number) === String(p.number))) return;
+  const from = printLabel(c);
+  pushUndo("printing of " + c.name);
+  try { E.choosePrinting(S, byId, id, p.set, p.number); } catch (err) { undoStack.pop(); toast(err.message); return; }
+  afterChange(`${c.name}: ${from} → ${E.printingLabel(p)}`);
+}
+/** One click: every card shown outside the allowed sets that has an allowed printing switches to it. */
+function fixAllPrintings() {
+  const issues = E.printingIssues(S, byId), fix = issues.filter((x) => x.fix);
+  if (!fix.length) { toast(`No printing in an allowed set in the card data for ${issues.map((x) => x.name).join(", ")}`); return; }
+  pushUndo("allowed printings");
+  for (const x of fix) E.choosePrinting(S, byId, x.id, x.fix.set, x.fix.number);
+  const left = issues.length - fix.length;
+  afterChange(`${fix.length} card${fix.length > 1 ? "s" : ""} switched to an allowed printing${left ? `, ${left} with none in the card data` : ""}`);
+}
+function renderPrintFix() {
+  const b = $("#btnPrintFix"), issues = E.printingIssues(S, byId), n = issues.length;
+  b.classList.toggle("hidden", !n);
+  if (!n) return;
+  const fix = issues.filter((x) => x.fix).length;
+  const text = `⚠ ${n} printing${n > 1 ? "s" : ""} outside your sets`;
+  if (b.textContent !== text) b.textContent = text;
+  b.title = `Shown in a set your cube's "every card" rule does not allow:\n${issues.slice(0, 20).map((x) => `${x.name} (${E.printingLabel(x.printing)}${x.fix ? " → " + E.printingLabel(x.fix) : ", no allowed printing"})${x.board === "maybeboard" ? " in the maybeboard" : ""}`).join("\n")}${n > 20 ? "\n…" : ""}\n\n${fix ? `Click: switch ${fix === n ? "them" : `the ${fix} that have one`} to an allowed printing (the set of their win rate, else the newest allowed set).` : "None of them has an allowed printing in the card data."}`;
+}
+
 /* ================= card table: vaadin-grid ================= */
 const COLS = [
   { key: "name", label: "Name", w: 210, grow: 2, get: (c) => c.name.toLowerCase(), cell: (c, id, hl) => `<span class="nm ${hl}" data-card="${id}">${esc(c.name)}</span>` },
@@ -1684,7 +1751,7 @@ const COLS = [
   { key: "type", label: "Type", w: 170, grow: 1, hide: "s", get: (c) => c.type.toLowerCase(), cell: (c) => `<span class="dim" title="${esc(c.type)}">${esc(c.type)}</span>` },
   { key: "mv", label: "MV", num: true, w: 58, hide: "xs", get: (c) => c.mv, cell: (c) => c.mv },
   { key: "colors", label: "Colours", w: 84, hide: "m", get: (c) => (c.colors.length ? c.colors.length * 10 + "WUBRG".indexOf(c.colors[0]) : 99), cell: (c) => colorPips(c.colors) },
-  { key: "set", label: "Set", w: 64, hide: "m", get: (c) => c.set, cell: (c) => `<span class="setc" title="Printed in: ${esc((c.printSets || [c.set]).join(", ").toUpperCase())}">${esc(c.set)}</span>` },
+  { key: "set", label: "Set", w: 112, hide: "m", get: (c) => c.set, cell: (c, id) => { const off = offPrinting(c); return `<span class="setc pr${off ? " off" : ""}" data-printing="${id}" role="button" tabindex="0" aria-haspopup="menu" title="${esc(printingTitle(c))}">${esc(printLabel(c))}${off ? " ⚠" : ""} ▾</span>`; } },
   { key: "wrDelta", label: "WR Δ", num: true, w: 92, src: "wrDelta", get: (c) => c.wrDelta, cell: (c) => (c.wrDelta == null ? '<span class="nd">no data</span>' : wrd(c.wrDelta)) },
   { key: "wrRaw", label: "Raw WR", num: true, w: 92, hide: "s", src: "wrRaw", get: (c) => c.wrRaw, cell: (c) => (c.wrRaw == null ? '<span class="nd">no data</span>' : E.pct(c.wrRaw)) },
   { key: "ccElo", label: "ELO", num: true, w: 76, hide: "m", src: "cubecobra", opt: true, get: (c) => c.ccElo, cell: (c) => (c.ccElo == null ? '<span class="nd">no data</span>' : Math.round(c.ccElo).toLocaleString("en")) },
@@ -1782,6 +1849,8 @@ grid.addEventListener("click", (e) => {
   const id = ctx.item.id;
   if (ctx.column === selCol) { anchor = id; focusId = id; grid.generateCellPartNames(); return; }
   if (e.target.closest && e.target.closest("a")) return;
+  const pr = e.target.closest && e.target.closest("[data-printing]");
+  if (pr) { openPrintingMenu(pr, e, pr.dataset.printing); return; }
   if (e.shiftKey && anchor && visibleIds.includes(anchor)) rangeSelect(anchor, id);
   else if (e.metaKey || e.ctrlKey || e.detail === 0) { selected.has(id) ? selected.delete(id) : selected.add(id); anchor = id; } // detail 0: Space in the grid toggles
   else { selected = new Set([id]); anchor = id; }
@@ -1838,7 +1907,7 @@ let cardsKey = "";
 function renderCards(ids, hit, res) {
   const g = $("#cardgrid");
   const m = res && (res.measure || { kind: "count" });
-  const key = ids.join(",") + "|" + (res ? res.id + ids.map((id) => cardMark(res, id, hit)).join("") + JSON.stringify(res.value) : "");
+  const key = ids.join(",") + "|" + ids.map((id) => byId[id].scryfallId || byId[id].set).join(",") + "|" + (setsAllowed() || []).join(",") + "|" + (res ? res.id + ids.map((id) => cardMark(res, id, hit)).join("") + JSON.stringify(res.value) : "");
   if (key === cardsKey && g.children.length === ids.length) {
     for (const el of g.children) { el.classList.toggle("sel", selected.has(el.dataset.id)); el.classList.toggle("focus", focusId === el.dataset.id); el.setAttribute("aria-selected", String(selected.has(el.dataset.id))); }
     return;
@@ -1849,10 +1918,11 @@ function renderCards(ids, hit, res) {
     const tag0 = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
     const tag = tag0 && onMb() ? "would " + ({ breaks: "break", passes: "pass", averaged: "be averaged", counts: "count" }[tag0] || "be " + tag0) : tag0;
     const img = c.image ? c.image.replace("/normal/", "/small/") : "";
-    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
+    return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span class="${offPrinting(c) ? "off" : ""}" title="${esc(printingTitle(c))}">${esc(printLabel(c))}${offPrinting(c) ? " ⚠" : ""}</span>`}</div></div>`;
   }).join("");
 }
 function renderTable() {
+  renderPrintFix();
   const { ids, hit, res, scopeTotal } = computeRows();
   visibleIds = ids;
   const every = !!(res && res.measure && res.measure.kind === "every");
@@ -1928,6 +1998,7 @@ function renderActionBar() {
     bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">in the maybeboard, ${wrPair(avg, meanOf(ids.map((id) => byId[id]), "wrRaw"), false)}</span>
     <vaadin-button theme="small primary" data-act="mb-put">Put in cube <kbd>P</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="mb-drop" aria-label="Remove from maybeboard"><span class="xl">Remove from maybeboard</span><span class="xs">Remove</span> <kbd>⌫</kbd></vaadin-button>
+    ${printingButton(ids)}
     <vaadin-button theme="small" data-act="clear-selection">Clear <kbd>Esc</kbd></vaadin-button>`;
     document.body.classList.add("has-actionbar");
     return;
@@ -1937,6 +2008,7 @@ function renderActionBar() {
     <vaadin-button theme="small" data-act="remove-mb" aria-label="Remove to maybeboard"><span class="xl">Remove to maybeboard</span><span class="xs">To maybeboard</span> <kbd>⇧⌫</kbd></vaadin-button>
     <vaadin-button theme="small primary" data-act="replace">Replace… <kbd>R</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="add">Add cards… <kbd>A</kbd></vaadin-button>
+    ${printingButton(ids)}
     <vaadin-button theme="small" data-act="clear-selection">Clear <kbd>Esc</kbd></vaadin-button>`;
   document.body.classList.add("has-actionbar");
 }
@@ -2034,7 +2106,12 @@ $("#rulepanel").addEventListener("click", headClick);
 $("#shead").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches(".desc[data-act]")) { e.preventDefault(); startDescEdit(); } });
 $("#layoutSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-layout]"); if (b) { U.layout = b.dataset.layout; save(); renderTable(); } });
 function gridCols() { const g = $("#cardgrid"); return Math.max(1, getComputedStyle(g).gridTemplateColumns.split(" ").length); }
-$("#actionbar").addEventListener("click", (e) => { const a = e.target.closest("[data-act]"); if (a) handleAct(a.dataset.act); });
+$("#actionbar").addEventListener("click", (e) => {
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  if (a.dataset.act === "printing") { openPrintingMenu(a, e, a.dataset.id); return; }
+  handleAct(a.dataset.act);
+});
+$("#btnPrintFix").addEventListener("click", fixAllPrintings);
 function handleAct(a) {
   switch (a) {
     case "new-arch": openArchModal(null); break;
@@ -2906,17 +2983,18 @@ function commitFind() {
 /* ================= changes ================= */
 let mbOpen = false;
 function renderChanges() {
-  const d = diffNow(), dirty = isDirty();
+  const d = diffNow(), dirty = isDirty(), prc = E.printingChanges(S, byId);
   const body = h("div", { class: "dr-b" });
   body.append(h("div", { class: "help muted", style: "font-size:12.5px" }, `Compared with the cube as imported (${S.original.length} cards). CubeCobra has no write API: copy the changelist and apply it there by hand, or upload the full CSV with "Replace with CSV".`));
   body.append(h("div", { class: "chg-sum" },
     h("div", { class: "stat" }, h("b", null, "+" + d.adds.length), h("span", null, "in")),
     h("div", { class: "stat" }, h("b", null, "−" + d.removes.length), h("span", null, "out")),
     h("div", { class: "stat" }, h("b", null, String(S.current.length)), h("span", null, "cards now")),
-    h("span", { class: "state " + (dirty ? "dirty" : "clean"), style: "margin-left:auto;align-self:center" }, d.adds.length + d.removes.length === 0 ? "No changes" : dirty ? "Not exported yet" : "Exported")));
+    ...(prc.length ? [h("div", { class: "stat" }, h("b", null, "~" + prc.length), h("span", null, "printing" + (prc.length > 1 ? "s" : "")))] : []),
+    h("span", { class: "state " + (dirty ? "dirty" : "clean"), style: "margin-left:auto;align-self:center" }, d.adds.length + d.removes.length + prc.length === 0 ? "No changes" : dirty ? "Not exported yet" : "Exported")));
   const ta = h("textarea", { class: "txt hidden", rows: "8", readonly: true, "aria-label": "Changelist text" });
   body.append(h("div", { class: "row" },
-    h("button", { class: "btn primary", type: "button", disabled: !(d.adds.length + d.removes.length + (S.maybeboard || []).filter((id) => !(S.originalMaybeboard || []).includes(id)).length), onclick: () => {
+    h("button", { class: "btn primary", type: "button", disabled: !(d.adds.length + d.removes.length + prc.length + (S.maybeboard || []).filter((id) => !(S.originalMaybeboard || []).includes(id)).length), onclick: () => {
       const text = cubewarden.changes().text;
       ta.value = text;
       const done = (ok) => { S.exportedSig = diffSig(diffNow()); save(); renderTop(); renderDrawer(); toast(ok ? "Changelist copied" : "Copy blocked: select the text below and copy it"); if (!ok) { const t2 = $("#drawer textarea"); if (t2) { t2.value = text; t2.classList.remove("hidden"); t2.select(); } } };
@@ -2929,7 +3007,7 @@ function renderChanges() {
       S.exportedSig = diffSig(diffNow()); save(); renderTop(); renderDrawer(); toast(`Downloaded CSV with ${S.current.length} cards`);
     } }, "Download CSV"),
     h("button", { class: "btn", type: "button", title: "Rules and card list as cubewarden.json: the file the cubewarden command line (and agents in a terminal) work on", onclick: () => {
-      const project = { version: 1, config: S.config, original: S.original, current: S.current, maybeboard: S.maybeboard || [], originalMaybeboard: S.originalMaybeboard || [], cubeId: S.config.cube.cubeCobraId || (S.source && S.source.id) || null };
+      const project = { version: 1, config: S.config, original: S.original, current: S.current, maybeboard: S.maybeboard || [], originalMaybeboard: S.originalMaybeboard || [], cubeId: S.config.cube.cubeCobraId || (S.source && S.source.id) || null, ...(S.printings ? { printings: S.printings } : {}) };
       const a = h("a", { href: URL.createObjectURL(new Blob([JSON.stringify(project, null, 1)], { type: "application/json" })), download: "cubewarden.json" });
       document.body.append(a); a.click(); a.remove(); toast("Downloaded cubewarden.json");
     } }, "Download project file"),
@@ -2943,7 +3021,8 @@ function renderChanges() {
         const unknown = p.current.concat(p.original).filter((id) => !byId[id]);
         if (!confirm(`Replace the rules and the ${S.current.length}-card list in this browser with ${f.name} (${p.current.length} cards)?${unknown.length ? `\n${new Set(unknown).size} card(s) are not in this page's card data and will be left out.` : ""}`)) return;
         const cfg = clone(p.config); normaliseConfig(cfg);
-        Object.assign(S, { version: 1, config: cfg, original: p.original.filter((id) => byId[id]), current: p.current.filter((id) => byId[id]), maybeboard: (p.maybeboard || []).filter((id) => byId[id]), originalMaybeboard: (p.originalMaybeboard || []).filter((id) => byId[id]), started: true, exportedSig: null });
+        Object.assign(S, { version: 1, config: cfg, original: p.original.filter((id) => byId[id]), current: p.current.filter((id) => byId[id]), maybeboard: (p.maybeboard || []).filter((id) => byId[id]), originalMaybeboard: (p.originalMaybeboard || []).filter((id) => byId[id]), started: true, exportedSig: null,
+          printings: p.printings && typeof p.printings === "object" ? Object.fromEntries(Object.entries(p.printings).filter(([id]) => byId[id])) : undefined });
         save(); recompute(); renderAll(); toast(`Opened ${f.name}`);
       });
       inp.click();
@@ -2958,6 +3037,11 @@ function renderChanges() {
       btn2 ? h("button", { class: "btn sm ghost", type: "button", onclick: () => fn2(id) }, btn2) : null))) : h("div", { class: "kempty", style: "padding:8px 10px" }, "None"));
   body.append(list("Out of the cube", d.removes, "Put back", (id) => { pushUndo("put back " + byId[id].name); S.current.push(id); if (S.maybeboard) S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Put back " + byId[id].name); }));
   body.append(list("Into the cube", d.adds, "Take out", (id) => { pushUndo("take out " + byId[id].name); S.current = S.current.filter((x) => x !== id); afterChange("Took out " + byId[id].name); }));
+  // Printings changed against the imported list: CubeCobra gets them with "Replace with CSV", or by hand.
+  if (prc.length) body.append(h("div", { class: "chg-list" }, h("h3", null, h("span", null, "Printing changed"), h("span", null, String(prc.length))),
+    h("div", { class: "chg-scroll" }, ...prc.map((x) => h("div", { class: "chg-row pr" },
+      h("span", { class: "nm", "data-card": x.id }, x.name), h("span", { class: "set" + (offPrinting(byId[x.id]) ? " off" : "") }, `${x.from} → ${x.to}`),
+      h("button", { class: "btn sm ghost", type: "button", title: "Back to " + x.from, onclick: () => pickPrinting(x.id, E.basePrinting(byId[x.id])) }, "Revert"))))));
   // Maybeboard: a secondary list, closed by default.
   const mb = (S.maybeboard || []).filter((id) => byId[id]);
   if (mb.length) {
@@ -3458,7 +3542,7 @@ function renderFirstRun(step, payload, autoImport) {
       if ($("#frTagMech") && $("#frTagMech").checked) mechanicsFromTags(cfg, p.tags);
       cfg.cube.name = $("#frName").value.trim() || "My cube";
       const t = Number($("#frTarget").value); if (t > 0) cfg.cube.targetSize = t; else delete cfg.cube.targetSize;
-      Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), maybeboard: (p.maybeboard || []).slice(), originalMaybeboard: (p.maybeboard || []).slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {} });
+      Object.assign(S, { version: 1, config: cfg, original: p.ids.slice(), current: p.ids.slice(), maybeboard: (p.maybeboard || []).slice(), originalMaybeboard: (p.maybeboard || []).slice(), started: true, exportedSig: null, source: p.source || null, ccTags: p.tags || {}, printings: undefined });
       U.scope = { kind: "cube" }; U.sel = null; U.view = "work";
       if (D.hosted) { save(); location.reload(); return; } // the loader fetches this cube's cards
       applyCcTags();
@@ -3566,7 +3650,7 @@ async function importFromCubeCobra(text) {
     const cfg = clone(cc.config); normaliseConfig(cfg);
     if (!cfg.cube.name) cfg.cube.name = cc.name;
     cfg.cube.cubeCobraId = cfg.cube.cubeCobraId || cc.id;
-    Object.assign(S, { version: 1, config: cfg, original: ids.slice(), current: ids.slice(), maybeboard: mbIds.slice(), originalMaybeboard: mbIds.slice(), started: true, exportedSig: null, source: src, ccTags: tagsKnown });
+    Object.assign(S, { version: 1, config: cfg, original: ids.slice(), current: ids.slice(), maybeboard: mbIds.slice(), originalMaybeboard: mbIds.slice(), started: true, exportedSig: null, source: src, ccTags: tagsKnown, printings: undefined });
     if (D.hosted) { U.scope = { kind: "cube" }; U.sel = null; U.view = "work"; save(); location.reload(); return; } // the loader fetches this cube's cards
     applyCcTags();
     U.scope = { kind: "cube" }; U.sel = null; U.view = "work";

@@ -15,6 +15,7 @@ import { archetypePool, evaluate, evaluateMaybeboard, scopeCards } from "./evalu
 import { changelist, diff, exportCsv, mechanicTags } from "./export.ts";
 import { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
 import { FilterError, isCreature, isLand, matches, metricOf, validateFilter, type MatchContext } from "./filter.ts";
+import { allowedPrinting, allowedSets, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings } from "./printing.ts";
 import { toScryfall } from "./scryfall.ts";
 import { slug } from "./slug.ts";
 import { spellCosts } from "./spell-costs.ts";
@@ -74,6 +75,8 @@ function boot(storageKey: string) {
   const saved = store.load();
   const state = saved && saved.version === 1 ? saved
     : { version: 1, config: structuredClone(D.seed), original: D.cube.original.slice(), current: D.cube.current.slice() };
+  // Cube and maybeboard entries show their chosen printing from the first paint.
+  if (Array.isArray(state.current)) showPrintings(cardsById, state);
   return { data: D, cardsById, state, store, save: () => store.save(state), reset: () => { store.clear(); location.reload(); } };
 }
 
@@ -87,6 +90,7 @@ W.CubeEngine = {
   REPO_URL, SYNTAX_HELP, SOURCES, resolveNames, spellCosts,
   linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic, referenceCounts,
   chordBadgeT, enemyLabel,
+  allowedSets, allowedPrinting, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings,
 };
 
 /** Hosted page: assemble the card data before the page's own scripts run. */
@@ -141,6 +145,10 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
     tryChanges: (ch: Parameters<typeof ws.tryChanges>[0]) => ws.tryChanges(ch),
     applyChanges: (ch: Parameters<typeof ws.applyChanges>[0]) => undoable(names(ch), () => ws.applyChanges(ch)),
     changes: () => ws.changes(),
+    printings: (card: string) => ws.printings(card),
+    setPrinting: (card: string, set: string, number?: string) => undoable(`printing of ${card}`, () => ws.setPrinting(card, set, number)),
+    printingIssues: () => ws.printingIssues(),
+    useAllowedPrintings: (cards?: string[]) => undoable(cards?.length ? `allowed printing of ${cards.join(", ")}` : "allowed printings", () => ws.useAllowedPrintings(cards)),
     maybeboard: (ch?: Parameters<typeof ws.maybeboard>[0]) => (ch && (ch.add?.length || ch.remove?.length) ? undoable("maybeboard", () => ws.maybeboard(ch)) : ws.maybeboard()),
     rules: () => ws.rules(),
     setRule: (r: Parameters<typeof ws.setRule>[0]) => undoable(`rule ${r.id}`, () => ws.setRule(r)),
@@ -162,7 +170,13 @@ const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same o
   wr = WR Δ: 17Lands adjusted WR in points above (+) or below (−) the average common/uncommon of the card's set
        (wr>=1.5, avg(wr, member:any) in 1..3.5); wrraw = raw GIH WR in percent (wrraw>=55%)
   tryChanges({add:[names], remove:[names]})   effect of a swap, nothing saved
-  applyChanges({add, remove, toMaybeboard})   make the swap (the page saves and redraws); toMaybeboard keeps the removed cards aside
+  applyChanges({add, remove, toMaybeboard})   make the swap (the page saves and redraws); toMaybeboard keeps the removed cards aside;
+                                  add "Name (SET)" or "Name (SET) 143" to add a card in that printing
+  printings(card)                 a cube or maybeboard card's printings in the card data, the allowed sets first
+  setPrinting(card, set, number?) show and export the card in that printing (e.g. setPrinting("Make Your Move", "fdn"))
+  printingIssues()                cards shown in a printing outside the sets of the cube's "every card" set rule
+  useAllowedPrintings([cards])    switch those cards (or the ones named) to an allowed printing: the set their win
+                                  rate comes from, else the newest allowed set
   maybeboard({add, remove})       candidates kept aside (CubeCobra's maybeboard)
   changes()                       adds/removes against the imported list, with a changelist
   rules() / setRule({id, name, scope, text, priority}) / removeRule(id)
@@ -196,6 +210,10 @@ function registerWebMcp(api: ReturnType<typeof pick> & { syntax: () => string })
     { name: "cubewarden_mechanics", description: "Every mechanic of the colours and archetypes as text", inputSchema: { type: "object", properties: {} }, run: () => api.mechanics() },
     { name: "cubewarden_set_mechanic", description: "Add or change a colour or archetype mechanic written as text", inputSchema: { type: "object", properties: { id: str, name: str, scope: str, text: str, priority: str }, required: ["id"] },
       run: (a: Parameters<typeof api.setMechanic>[0]) => api.setMechanic(a) },
+    { name: "cubewarden_printings", description: "The printings (set and collector number) the card data has for a cube or maybeboard card, the cube's allowed sets first", inputSchema: { type: "object", properties: { card: str }, required: ["card"] }, run: (a: { card: string }) => api.printings(a.card) },
+    { name: "cubewarden_set_printing", description: "Show and export a cube or maybeboard card in another printing: set code, optionally collector number", inputSchema: { type: "object", properties: { card: str, set: str, number: str }, required: ["card", "set"] }, run: (a: { card: string; set: string; number?: string }) => api.setPrinting(a.card, a.set, a.number) },
+    { name: "cubewarden_printing_issues", description: "Cube and maybeboard cards shown in a printing outside the sets the cube's \"every card\" set rule allows, with the allowed printing to use", inputSchema: { type: "object", properties: {} }, run: () => api.printingIssues() },
+    { name: "cubewarden_use_allowed_printings", description: "Switch cards to a printing in the allowed sets (the set their win rate comes from, else the newest allowed set): the named cards, or every card shown outside them", inputSchema: { type: "object", properties: { cards: names } }, run: (a: { cards?: string[] }) => api.useAllowedPrintings(a.cards) },
     { name: "cubewarden_changes", description: "Cards added and removed against the imported list", inputSchema: { type: "object", properties: {} }, run: () => api.changes() },
     { name: "cubewarden_syntax", description: "Filter and rule syntax", inputSchema: { type: "object", properties: {} }, run: () => api.syntax() },
   ];

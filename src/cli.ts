@@ -11,6 +11,7 @@ import { aboutMarkdown } from "./about.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
 import { exportCsv, mechanicTags } from "./export.ts";
 import { points } from "./fields.ts";
+import { printingLabel } from "./printing.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { createWorkspace, type Finding, type Project, type SortKey } from "./workspace.ts";
 
@@ -28,7 +29,12 @@ Usage: cubewarden <command> [options]   (--project cubewarden.json --cards cards
                                 --maybeboard to look only at the cards kept aside);
                                 member:<mechanic>|any|primary|secondary needs --scope
   try --add <card> --remove <card>    effect of a swap on every rule, without saving
-  apply --add <card> --remove <card> [--to-maybeboard]  make the swap and save the project
+  apply --add <card> --remove <card> [--to-maybeboard]  make the swap and save the project; --add "Name (SET)"
+                                or "Name (SET) 143" adds the card in that printing
+  printing <card> [<set> [<number>]]  a cube or maybeboard card's printings (allowed sets first), or show and
+                                export it in another printing the card data has
+  printings [fix [<card>…]]     cards shown in a printing outside the sets your "every card" rule allows; fix
+                                switches them to an allowed one (the set of their win rate, else the newest)
   rules                         every rule as text
   rule set <id> --text "<rule>" [--scope color:W] [--name "…"] [--priority secondary]
   rule rm <id>
@@ -157,6 +163,36 @@ export async function run(argv: string[], io: Io): Promise<number> {
       case "changes": {
         const c = (await load()).changes();
         out(c, c.text);
+        return 0;
+      }
+      case "printing": {
+        if (!rest[0]) throw new UsageError("use: printing <card> [<set> [<number>]]");
+        const w = await load();
+        if (rest[1]) {
+          const r = w.setPrinting(rest[0], rest[1], rest[2]);
+          await save(w.project);
+          out(r, `${r.name}: ${printingLabel(r.printing)}${r.allowed === false ? " (outside the allowed sets)" : ""} (saved)`);
+          return 0;
+        }
+        const o = w.printings(rest[0]);
+        out(o, [`${o.name} (${o.board}):`, ...o.options.map((x) => `  ${x.label.padEnd(10)} ${x.allowed === true ? "allowed" : x.allowed === false ? "outside the allowed sets" : ""}${x.shown ? "  shown" : ""}`.trimEnd())].join("\n"));
+        return 0;
+      }
+      case "printings": {
+        const w = await load();
+        const none = (x: { name: string; from: string }) => `  ${x.name}: ${x.from}, no printing in an allowed set`;
+        if (rest[0] === "fix") {
+          const r = w.useAllowedPrintings(rest.length > 1 ? rest.slice(1) : undefined);
+          if (r.changed.length) await save(w.project);
+          out(r, [`${r.changed.length} card(s) switched to an allowed printing${r.changed.length ? " (saved)" : ""}`,
+            ...r.changed.map((x) => `  ${x.name}: ${x.from} → ${x.to}`), ...r.skipped.map(none)].join("\n"));
+          return 0;
+        }
+        if (rest[0]) throw new UsageError("use: printings [fix [<card>…]]");
+        const issues = w.printingIssues();
+        out(issues, [`${issues.length} card(s) shown outside the allowed sets`, ...issues.map((x) => x.fix
+          ? `  ${x.name}: ${printingLabel(x.printing)} → ${printingLabel(x.fix)}${x.board === "maybeboard" ? " (maybeboard)" : ""}`
+          : none({ name: x.name, from: printingLabel(x.printing) }))].join("\n"));
         return 0;
       }
       case "maybeboard": {
