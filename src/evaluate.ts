@@ -246,4 +246,16 @@ export function evaluate(config: Config, cubeIds: string[], cardsById: Record<st
   };
 }
 
+/**
+ * The maybeboard read with the cube's rules: the config evaluated over the cards kept aside (known, not in the cube,
+ * each once), never scaled. Each scope's cards are the maybeboard cards of its pool (a colour: its mono-coloured
+ * nonland cards; an archetype: nonland cards in its colours plus colourless; L: lands), and each result's perCard
+ * says what a card would do if it went into the cube: count for a mechanic, break an "every card" rule…
+ */
+export function evaluateMaybeboard(config: Config, cubeIds: string[], maybeboard: string[] | undefined, cardsById: Record<string, Card>): Report {
+  const inCube = new Set(cubeIds);
+  const ids = [...new Set(maybeboard || [])].filter((id) => cardsById[id] && !inCube.has(id));
+  return evaluate(config, ids, cardsById, { scale: false });
+}
+
 export type { Mechanic };

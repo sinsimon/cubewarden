@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluate, formatConstraint, parseFilter, ruleToText, validateFilter, type Rule } from "../src/index.ts";
+import { evaluate, evaluateMaybeboard, formatConstraint, parseFilter, ruleToText, validateFilter, type Rule } from "../src/index.ts";
 import { ALL, BY_ID, card, config, rule } from "./fixtures/cards.ts";
 
 const cube = { kind: "cube" } as const;
@@ -245,5 +245,37 @@ describe("curve rules", () => {
   it("runs as a shared rule in each colour", () => {
     const r = evaluate(config({ rules: [rule("c", { kind: "allColors" }, "curve(t:creature) 2:1")] }), ALL, BY_ID);
     expect(r.allColors.rules[0].counts).toEqual({ ok: 2, near: 3, fail: 0, error: 0 });
+  });
+});
+
+describe("the maybeboard read with the cube's rules", () => {
+  // The cube holds W1 U1 C1; the maybeboard keeps W2 W3 U2 WU1 L1 G1 aside, plus W1 (back in the cube) and a card
+  // the data does not know.
+  const cfg = () => config({
+    archetypes: [WU],
+    colors: config().colors.map((c) => (c.code === "W" ? { ...c, mechanics: [{ id: "wfly", name: "Flyers", filter: parseFilter("kw:flying") }] } : c)),
+    rules: [rule("sets", cube, "every(s:fdn)"), rule("size", cube, "count() <= 3")],
+  });
+  const mb = ["W2", "W3", "U2", "WU1", "L1", "G1", "W1", "XX9"];
+  const r = () => evaluateMaybeboard(cfg(), ["W1", "U1", "C1"], mb, BY_ID);
+
+  it("gives each scope the maybeboard cards of its pool: mono-coloured nonland, archetype colours, lands", () => {
+    const x = r();
+    expect(x.cube.cards.sort()).toEqual(["G1", "L1", "U2", "W2", "W3", "WU1"]);
+    expect(x.colors.W.cards.sort()).toEqual(["W2", "W3"]);
+    expect(x.colors.U.cards).toEqual(["U2"]);
+    expect(x.colors.L.cards).toEqual(["L1"]);
+    expect(x.colors.C.cards).toEqual([]);
+    expect(x.archetypes.wu.cards.sort()).toEqual(["U2", "W2", "W3", "WU1"]);
+  });
+  it("says per card what it would do in the cube: count for a mechanic, break an 'every card' rule", () => {
+    const x = r();
+    expect(x.colors.W.mechanics[0].perCard).toEqual({ W2: true, W3: false });
+    expect(x.cube.rules[0].cards).toEqual(["W3"]);
+    expect(x.cube.rules[0].perCard.W2).toBe(true);
+    expect(x.archetypes.wu.members.sort()).toEqual(["W2", "W3"]);
+  });
+  it("is empty without a maybeboard", () => {
+    expect(evaluateMaybeboard(cfg(), ["W1"], undefined, BY_ID).cube.cards).toEqual([]);
   });
 });

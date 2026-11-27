@@ -662,6 +662,7 @@ body.drawer-overlay .drawer.wide.open{width:min(880px,100vw)}
       <div class="toolbar" id="toolbar">
         <vaadin-text-field id="q" type="search" placeholder="Search, or filter: otag:removal t:creature mv<=3" aria-label="Search cards" clear-button-visible><kbd slot="suffix">/</kbd></vaadin-text-field>
         <vaadin-button id="btnFilter">Filter</vaadin-button>
+        <div class="seg hidden" id="boardSeg" role="group" aria-label="Cards from (M)"></div>
         <div class="seg hidden" id="showSeg" role="group" aria-label="Show"></div>
         <vaadin-button id="btnCols">Columns</vaadin-button>
         <div class="seg" id="layoutSeg" role="group" aria-label="Layout (V)"><button data-layout="table">Table</button><button data-layout="cards">Cards</button></div>
@@ -712,6 +713,9 @@ const ST_LABEL = { ok: "Pass", near: "Almost", fail: "Fail", none: "No target", 
 S.ui = Object.assign({ scope: { kind: "cube" }, sel: null, scale: true, sort: null, show: "all", layout: "table" }, S.ui || {});
 const U = S.ui;
 U.view = "work"; // the workbench is the main view; the overview is secondary
+// The card table shows the cube or the maybeboard (M). It holds across scopes; each page load starts on the cube, so
+// a reload never shows the cards kept aside as if they were the cube.
+U.board = "cube";
 // Configs saved before the colourless and lands scopes existed: add the missing colours from the seed.
 function addMissingColours(cfg) {
   for (const c of D.seed.colors) if (!cfg.colors.some((x) => x.code === c.code)) cfg.colors.push(clone(c));
@@ -798,6 +802,18 @@ function refsBlock(sc, sel, useDraft, ours) {
   return `<span class="refs">ours <b>${esc(ours)}</b>${v.map((x) => ` · ${url(x.name) ? `<a href="${esc(url(x.name))}" target="_blank" rel="noopener" style="color:inherit" title="${esc(x.title)} (open on CubeCobra)">` : `<span title="${esc(x.title)}">`}${esc(x.name)} <b>${esc(x.text)}</b>${url(x.name) ? "</a>" : "</span>"}`).join("")}</span>`;
 }
 const curR = () => RD || R;
+/** The maybeboard read with the rules (the draft's while one is open): what the card table shows in Maybeboard mode.
+ *  Rebuilt whenever the evaluation it comes from changes (every change recomputes R). */
+let RMB = null, RMBof = null;
+function mbR() {
+  const r = curR();
+  if (!RMB || RMBof !== r) { RMB = E.evaluateMaybeboard(cfgOf(r), S.current, S.maybeboard, byId); RMBof = r; }
+  return RMB;
+}
+const onMb = () => U.board === "maybeboard";
+/** The evaluation the card table reads, and its result for the selected rule or mechanic. */
+const tableR = () => (onMb() ? mbR() : curR());
+const tableSel = () => (onMb() ? resIn(mbR(), cfgOf(curR()), U.scope, U.sel) : selResult(curR()));
 
 /* ================= small helpers ================= */
 /** Small markdown subset: paragraphs, "- " lists, # headings, **bold**, *italic*, `code`, [links](http…), {W} mana symbols. */
@@ -1098,8 +1114,9 @@ function undo() {
   afterChange("Undid: " + u.label, false);
 }
 function afterChange(msg, undoable = true) {
-  const inCube = new Set(S.current);
-  selected = new Set([...selected].filter((id) => inCube.has(id)));
+  // The selection keeps the cards still on the board the table shows: the cube, or the maybeboard outside it.
+  const inCube = new Set(S.current), inMb = new Set(S.maybeboard || []);
+  selected = new Set([...selected].filter((id) => (onMb() ? inMb.has(id) && !inCube.has(id) : inCube.has(id))));
   save(); recompute(); renderAll();
   if (drawerKind === "changes") renderDrawer();
   if (msg) toast(msg, undoable ? undo : null);
@@ -1679,11 +1696,12 @@ function valueCell(res, id) {
   if (!res) return "";
   if (res.status === "error" || !res.perCard) return `<span class="v-err">error</span>`;
   const m = res.measure || { kind: "count" }, pc = res.perCard;
-  if (m.kind === "count") return pc[id] ? `<span class="v-yes">✓ counts</span>` : `<span class="v-no">–</span>`;
+  const would = onMb() ? "would " : ""; // maybeboard cards: what they would do in the cube
+  if (m.kind === "count") return pc[id] ? `<span class="v-yes">✓ ${would}count${would ? "" : "s"}</span>` : `<span class="v-no">–</span>`;
   if (m.kind === "curve") return id in pc ? `<span class="v-yes">MV ${Math.floor(pc[id])}</span>` : `<span class="v-no">–</span>`;
   if (m.kind === "avg") { if (!(id in pc)) return `<span class="v-no">not in filter</span>`; return pc[id] == null ? `<span class="nd">no data</span>` : fmtMetric(m.metric, pc[id]); }
   if (m.metric) { if (!(id in pc)) return `<span class="v-no">not checked</span>`; const v = pc[id]; if (v == null) return `<span class="nd">no data</span>`; const ok = E.inConstraint(v, res.constraint); return `<span class="${ok ? "v-yes" : "v-bad"}">${fmtMetric(m.metric, v)} ${ok ? "✓" : "✗"}</span>`; }
-  return pc[id] ? `<span class="v-yes">✓ passes</span>` : `<span class="v-bad">✗ breaks</span>`;
+  return pc[id] ? `<span class="v-yes">✓ ${would ? "would pass" : "passes"}</span>` : `<span class="v-bad">✗ ${would ? "would break" : "breaks"}</span>`;
 }
 const grid = $("#grid"), ROWS = new Map();
 /** One stable row object per card: the grid keeps selection by reference, and `k` carries our sort order. */
@@ -1777,7 +1795,7 @@ function sizeTable() {
 function matchQ(c, q) { return c.name.toLowerCase().includes(q) || c.type.toLowerCase().includes(q) || c.text.toLowerCase().includes(q); }
 let vfError = null;
 function computeRows() {
-  const r = curR(), sr = scopeRes(r, U.scope), res = selResult(r);
+  const r = tableR(), sr = scopeRes(r, U.scope), res = tableSel();
   let ids = sr.cards.slice();
   const qRaw = String($("#q").value || "").trim(), q = qRaw.toLowerCase();
   vfError = null;
@@ -1822,7 +1840,8 @@ function renderCards(ids, hit, res) {
   cardsKey = key;
   g.innerHTML = ids.map((id) => {
     const c = byId[id], mk = res ? cardMark(res, id, hit) : "";
-    const tag = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
+    const tag0 = mk === "cut" ? "breaks" : mk === "pass" ? (m.kind === "every" ? "passes" : m.kind === "avg" ? "averaged" : m.kind === "curve" ? "MV " + Math.floor(res.perCard[id]) : "counts") : "";
+    const tag = tag0 && onMb() ? "would " + ({ breaks: "break", passes: "pass", averaged: "be averaged", counts: "count" }[tag0] || "be " + tag0) : tag0;
     const img = c.image ? c.image.replace("/normal/", "/small/") : "";
     return `<div class="cg ${mk} ${selected.has(id) ? "sel" : ""} ${focusId === id ? "focus" : ""}" data-id="${id}" role="option" aria-selected="${selected.has(id)}"><img loading="lazy" src="${esc(img)}" alt="${esc(c.name)}"><span class="ring"></span><span class="chk" aria-hidden="true">✓</span><div class="cap"><span>${c.wrDelta == null ? "no data" : "WR Δ " + wrd(c.wrDelta)}${res && m.kind !== "count" && m.kind !== "curve" && m.metric !== "wrDelta" && id in (res.perCard || {}) && typeof res.perCard[id] === "number" ? ", " + fmtMetric(m.metric, res.perCard[id]) : ""}</span>${tag ? `<span class="tag">${tag}</span>` : `<span>${esc(c.set.toUpperCase())}</span>`}</div></div>`;
   }).join("");
@@ -1838,7 +1857,10 @@ function renderTable() {
   const cardsMode = U.layout === "cards";
   grid.classList.toggle("hidden", cardsMode || !ids.length);
   $("#cardgrid").classList.toggle("hidden", !cardsMode || !ids.length);
-  $("#cardgrid").setAttribute("role", "listbox"); $("#cardgrid").setAttribute("aria-label", "Cards in this scope"); $("#cardgrid").setAttribute("aria-multiselectable", "true");
+  const mbMode = onMb(), what = mbMode ? "Maybeboard cards in this scope" : "Cards in this scope";
+  $("#cardgrid").setAttribute("role", "listbox"); $("#cardgrid").setAttribute("aria-label", what); $("#cardgrid").setAttribute("aria-multiselectable", "true");
+  grid.setAttribute("aria-label", what);
+  renderBoardSeg();
   $("#layoutSeg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.layout === (cardsMode ? "cards" : "table"))));
   if (cardsMode) { grid.items = []; renderCards(ids, hit || new Set(), res); }
   else {
@@ -1850,13 +1872,17 @@ function renderTable() {
   const em = $("#emptyMsg");
   if (!ids.length) {
     em.classList.remove("hidden");
-    em.innerHTML = vfError ? `<b>The filter has an error</b>${esc(vfError)}` : scopeTotal === 0 ? `<b>No cards in this scope yet</b>Use Add cards to search the pool.` : `<b>No cards match</b>Clear the search or the filter to see all ${scopeTotal} cards in this scope.`;
+    em.innerHTML = vfError ? `<b>The filter has an error</b>${esc(vfError)}`
+      : mbMode ? (scopeTotal === 0 ? `<b>No maybeboard cards in this scope</b>${mbR().cube.cards.length ? "The cards kept aside belong to other colours or archetypes." : "The maybeboard is empty: select cards in the cube and press ⇧⌫ to keep them aside."}` : `<b>No cards match</b>Clear the search or the filter to see all ${scopeTotal} maybeboard cards in this scope.`)
+      : scopeTotal === 0 ? `<b>No cards in this scope yet</b>Use Add cards to search the pool.` : `<b>No cards match</b>Clear the search or the filter to see all ${scopeTotal} cards in this scope.`;
   } else em.classList.add("hidden");
   const seg = $("#showSeg");
   if (hit) {
     seg.classList.remove("hidden");
     const n = hit.size;
-    const labels = every ? [["all", "All"], ["match", `Breaking (${n})`], ["miss", "Passing"]] : [["all", "All"], ["match", `Counted (${n})`], ["miss", "Not counted"]];
+    const labels = mbMode
+      ? (every ? [["all", "All"], ["match", `Would break (${n})`], ["miss", "Would pass"]] : [["all", "All"], ["match", `Would count (${n})`], ["miss", "Wouldn't count"]])
+      : every ? [["all", "All"], ["match", `Breaking (${n})`], ["miss", "Passing"]] : [["all", "All"], ["match", `Counted (${n})`], ["miss", "Not counted"]];
     seg.innerHTML = labels.map(([k, l]) => `<button type="button" data-show="${k}" aria-pressed="${U.show === k}">${l}</button>`).join("");
   } else seg.classList.add("hidden");
   const fb = $("#btnFilter"), nCond = countConds(viewFilter);
@@ -1864,8 +1890,21 @@ function renderTable() {
   fb.classList.toggle("filtered", !!nCond);
   renderSelectionBits();
 }
+/** Cube | Maybeboard: which cards the table lists. Shown once something is kept aside (or while on the maybeboard). */
+function renderBoardSeg() {
+  const seg = $("#boardSeg"), mb = mbR(), n = scopeRes(mb, U.scope).cards.length;
+  seg.classList.toggle("hidden", !onMb() && !mb.cube.cards.length);
+  const html = [["cube", "Cube", "The cards in the cube (M)"], ["maybeboard", `Maybeboard (${n})`, "Cards kept aside (CubeCobra's maybeboard) that belong to this scope, and what each would do in the cube (M)"]]
+    .map(([k, l, t]) => `<button type="button" data-board="${k}" title="${esc(t)}" aria-pressed="${U.board === k}">${esc(l)}</button>`).join("");
+  if (seg.__html !== html) { seg.innerHTML = html; seg.__html = html; }
+}
+function setBoard(b) {
+  if (U.board === b) return;
+  U.board = b; selected.clear(); anchor = null; focusId = null;
+  save(); renderTable();
+}
 function renderSelectionBits() {
-  $("#tcount").textContent = `${visibleIds.length} of ${scopeRes(curR(), U.scope).cards.length} cards` + (selected.size ? `, ${selected.size} selected` : "");
+  $("#tcount").textContent = `${visibleIds.length} of ${scopeRes(tableR(), U.scope).cards.length} cards${onMb() ? " in the maybeboard" : ""}` + (selected.size ? `, ${selected.size} selected` : "");
   renderActionBar();
   if (U.layout === "cards") renderCards(visibleIds, tableInfo.hit || new Set(), tableInfo.res);
 }
@@ -1879,6 +1918,14 @@ function renderActionBar() {
   const known = ids.map((id) => byId[id].wrDelta).filter((v) => v != null);
   const avg = known.length ? known.reduce((s, v) => s + v, 0) / known.length : null;
   bar.classList.add("on");
+  if (onMb()) {
+    bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">in the maybeboard, ${wrPair(avg, meanOf(ids.map((id) => byId[id]), "wrRaw"), false)}</span>
+    <vaadin-button theme="small primary" data-act="mb-put">Put in cube <kbd>P</kbd></vaadin-button>
+    <vaadin-button theme="small" data-act="mb-drop" aria-label="Remove from maybeboard"><span class="xl">Remove from maybeboard</span><span class="xs">Remove</span> <kbd>⌫</kbd></vaadin-button>
+    <vaadin-button theme="small" data-act="clear-selection">Clear <kbd>Esc</kbd></vaadin-button>`;
+    document.body.classList.add("has-actionbar");
+    return;
+  }
   bar.innerHTML = `<span class="n">${ids.length} selected</span><span class="sub">${wrPair(avg, meanOf(ids.map((id) => byId[id]), "wrRaw"), false)}${known.length < ids.length ? `, <span title="${esc(TIP.noData)}">${ids.length - known.length} no data</span>` : ""}</span>
     <vaadin-button theme="small" data-act="remove">Remove <kbd>⌫</kbd></vaadin-button>
     <vaadin-button theme="small" data-act="remove-mb" aria-label="Remove to maybeboard"><span class="xl">Remove to maybeboard</span><span class="xs">To maybeboard</span> <kbd>⇧⌫</kbd></vaadin-button>
@@ -1890,6 +1937,7 @@ function renderActionBar() {
 new ResizeObserver(() => document.documentElement.style.setProperty("--actionbar-h", $("#actionbar").offsetHeight + "px")).observe($("#actionbar"));
 function removeSelected() {
   if (!selected.size) return;
+  if (onMb()) { dropFromMaybeboard([...selected]); return; }
   const n = selected.size;
   const names = [...selected].slice(0, 2).map((id) => byId[id].name).join(", ");
   pushUndo(`remove ${n} card${n > 1 ? "s" : ""}`);
@@ -1900,12 +1948,32 @@ function removeSelected() {
 /** Out of the cube, kept in the maybeboard (as applyChanges({ remove, toMaybeboard: true }) does): one undo step. */
 function removeToMaybeboard() {
   if (!selected.size) return;
+  if (onMb()) { dropFromMaybeboard([...selected]); return; }
   const ids = [...selected], n = ids.length;
   pushUndo(`move ${n} card${n > 1 ? "s" : ""} to the maybeboard`);
   S.current = S.current.filter((id) => !selected.has(id));
   S.maybeboard = [...new Set([...(S.maybeboard || []), ...ids])];
   selected.clear(); anchor = null;
   afterChange(`Moved ${n === 1 ? byId[ids[0]].name : n + " cards"} to the maybeboard`);
+}
+/** Maybeboard cards into the cube; they leave the maybeboard (as applyChanges({ add }) does): one undo step. */
+function putInCube(ids) {
+  ids = [...new Set(ids)].filter((id) => byId[id] && !S.current.includes(id));
+  if (!ids.length) return;
+  const one = ids.length === 1 ? byId[ids[0]].name : ids.length + " cards";
+  pushUndo("put in cube " + one);
+  S.current = S.current.concat(ids);
+  if (S.maybeboard) S.maybeboard = S.maybeboard.filter((x) => !ids.includes(x));
+  afterChange(`Put ${one} in the cube`);
+}
+/** Cards out of the maybeboard altogether (as maybeboard({ remove }) does): one undo step. */
+function dropFromMaybeboard(ids) {
+  ids = ids.filter((id) => (S.maybeboard || []).includes(id));
+  if (!ids.length) return;
+  const one = ids.length === 1 ? byId[ids[0]].name : ids.length + " cards";
+  pushUndo("drop " + one + " from the maybeboard");
+  S.maybeboard = S.maybeboard.filter((x) => !ids.includes(x));
+  afterChange(`Dropped ${one} from the maybeboard`);
 }
 
 /* ================= render all ================= */
@@ -1975,6 +2043,8 @@ function handleAct(a) {
     case "find-rule": openFind("add", true); break;
     case "remove": removeSelected(); break;
     case "remove-mb": removeToMaybeboard(); break;
+    case "mb-put": putInCube([...selected]); break;
+    case "mb-drop": dropFromMaybeboard([...selected]); break;
     case "replace": openFind("replace", true); break;
     case "add": openFind("add", false); break;
     case "clear-selection": selected.clear(); renderTable(); break;
@@ -1995,6 +2065,7 @@ $("#btnCols").addEventListener("click", () => {
     h("div", { class: "dr-f" }, h("button", { class: "btn primary", type: "button", onclick: closeModal }, "Done"))], "Columns");
 });
 $("#q").addEventListener("input", debounce(() => renderTable(), 80));
+$("#boardSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-board]"); if (b) setBoard(b.dataset.board); });
 $("#showSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-show]"); if (b) { U.show = b.dataset.show; save(); renderTable(); } });
 $("#cardgrid").addEventListener("mousedown", (e) => { if (e.shiftKey) e.preventDefault(); });
 $("#cardgrid").addEventListener("click", (e) => {
@@ -2102,7 +2173,9 @@ document.addEventListener("keydown", (e) => {
     case "v": U.layout = U.layout === "cards" ? "table" : "cards"; save(); renderTable(); break;
     case " ": case "x": e.preventDefault(); if (focusId) { selected.has(focusId) ? selected.delete(focusId) : selected.add(focusId); anchor = focusId; syncGridSelection(); renderSelectionBits(); } break;
     case "Delete": case "Backspace": e.preventDefault(); e.shiftKey ? removeToMaybeboard() : removeSelected(); break;
-    case "r": if (selected.size) openFind("replace", true); else toast("Select cards to replace first"); break;
+    case "r": if (onMb()) toast("Replace works on cube cards: switch to Cube (M)"); else if (selected.size) openFind("replace", true); else toast("Select cards to replace first"); break;
+    case "m": setBoard(onMb() ? "cube" : "maybeboard"); break;
+    case "p": if (onMb() && selected.size) putInCube([...selected]); break;
     case "a": openFind("add", false); break;
     case "/": e.preventDefault(); $("#q").focus(); break;
     case "f": openDrawer("filter"); break;
@@ -2819,7 +2892,7 @@ function commitFind() {
   selected = new Set(f.picked); focusId = f.picked[0];
   find = null; drawerKind = null; $("#drawer").classList.remove("open");
   afterChange(msg);
-  const inScope = new Set(scopeRes(R, U.scope).cards);
+  const inScope = new Set(scopeRes(tableR(), U.scope).cards);
   selected = new Set([...selected].filter((id) => inScope.has(id))); if (!inScope.has(focusId)) focusId = null;
   renderTable();
 }
@@ -2885,8 +2958,7 @@ function renderChanges() {
     const det = h("details", { class: "mb-details" }, h("summary", null, `Maybeboard (${mb.length})`));
     if (mbOpen) det.open = true; // closed by default; stays open across redraws once opened
     det.addEventListener("toggle", () => { mbOpen = det.open; });
-    det.append(list("Kept aside", mb, "Put in cube", (id) => { pushUndo("put in cube " + byId[id].name); S.current.push(id); S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Put " + byId[id].name + " in the cube"); },
-      "Drop", (id) => { pushUndo("drop " + byId[id].name + " from the maybeboard"); S.maybeboard = S.maybeboard.filter((x) => x !== id); afterChange("Dropped " + byId[id].name + " from the maybeboard"); }));
+    det.append(list("Kept aside", mb, "Put in cube", (id) => putInCube([id]), "Drop", (id) => dropFromMaybeboard([id])));
     body.append(det);
   }
   /** A button that asks for a second click before doing something that loses work. */
@@ -2941,7 +3013,7 @@ function renderData() {
   return [drawerHead("Where the numbers come from"), body];
 }
 function renderKeys() {
-  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["Shift + ⌫", "Remove them and keep them in the maybeboard"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule or mechanic"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
+  const K = [["↑ ↓ or J K", "Move through the list"], ["Shift + ↑ ↓", "Extend the selection"], ["Space or X", "Select the focused card"], ["Click / ⌘-click / Shift-click", "Select one / toggle / select a range"], ["⌘A", "Select every visible card"], ["⌫", "Remove the selected cards"], ["Shift + ⌫", "Remove them and keep them in the maybeboard"], ["M", "List the cube / the maybeboard"], ["P", "Maybeboard: put the selected cards in the cube"], ["R", "Replace the selected cards"], ["A", "Add cards"], ["/", "Search the list"], ["F", "Filter the list"], ["[ ]", "Previous / next rule or mechanic"], ["{ }", "Previous / next scope"], ["G / ⌘K", "Jump to a scope, rule or mechanic"], ["N", "Navigator: focus it, or open it on small screens"], ["E", "Edit the selected rule or mechanic"], ["S", "Scaled / actual counts"], ["V", "Table / card images"], ["O", "Workbench / overview"], ["C", "Changes"], ["⌘Z", "Undo the last change"], ["Esc", "Close panel, clear selection, clear rule"]];
   return [drawerHead("Help"), h("div", { class: "dr-b" },
     h("div", { class: "row" }, h("button", { class: "btn sm", type: "button", onclick: () => openDrawer("data") }, "Where the numbers come from")),
     h("h3", { class: "help-h" }, "Appearance"), themePicker(),

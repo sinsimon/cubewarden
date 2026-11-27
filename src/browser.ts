@@ -11,7 +11,7 @@ import { colorSet } from "./colors.ts";
 import { bucketLabel, formatConstraint, gap, inConstraint, statusOf } from "./constraint.ts";
 import { cubeCobraListUrl, decodeRules, encodeRules, fetchCubeCobra, readCubeCobra } from "./cubecobra.ts";
 import { describeFilter } from "./describe.ts";
-import { archetypePool, evaluate, scopeCards } from "./evaluate.ts";
+import { archetypePool, evaluate, evaluateMaybeboard, scopeCards } from "./evaluate.ts";
 import { changelist, diff, exportCsv, mechanicTags } from "./export.ts";
 import { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
 import { FilterError, isCreature, isLand, matches, metricOf, validateFilter, type MatchContext } from "./filter.ts";
@@ -79,7 +79,7 @@ function boot(storageKey: string) {
 W.CubeEngine = {
   FIELDS, FIELD, METRICS, FilterError, pct, slug, isLand, isCreature, metricOf, colorSet,
   matches, validateFilter, describeFilter, inConstraint, gap, formatConstraint, bucketLabel, statusOf,
-  scopeCards, archetypePool, evaluate, candidates, cubeGateRules, sortCards,
+  scopeCards, archetypePool, evaluate, evaluateMaybeboard, candidates, cubeGateRules, sortCards,
   diff, exportChangelist: changelist, exportCsv, storage, boot,
   encodeConfig: encodeRules, decodeConfig: decodeRules, readCubeCobra, referenceCube, mechanicTags, cubeCobraListUrl,
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
