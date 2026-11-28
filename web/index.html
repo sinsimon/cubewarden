@@ -657,6 +657,7 @@ body.drawer-overlay .drawer.wide.open{width:min(880px,100vw)}
     <vaadin-tooltip for="btnChanges" text="Changes and export (C)"></vaadin-tooltip>
     <vaadin-tooltip for="btnData" text="Where the numbers come from"></vaadin-tooltip>
     <vaadin-tooltip for="btnKeys" text="Keyboard shortcuts, and how AI agents can use this page (?)"></vaadin-tooltip>
+    <vaadin-tooltip for="othersBox" text="Also list the cards this mechanic or rule doesn't count, with a column saying which ones count"></vaadin-tooltip>
     <vaadin-tooltip for="scaleSeg" text="On: counts at colour and archetype scope are scaled to the target size. Off: counts as they are now (S)"></vaadin-tooltip>
   </header>
   <div class="body">
@@ -674,6 +675,7 @@ body.drawer-overlay .drawer.wide.open{width:min(880px,100vw)}
         <vaadin-button id="btnFilter">Filter</vaadin-button>
         <div class="seg hidden" id="boardSeg" role="group" aria-label="Cards from (M)"></div>
         <div class="seg hidden" id="showSeg" role="group" aria-label="Show"></div>
+        <vaadin-checkbox id="othersBox" class="hidden" label="Show others"></vaadin-checkbox>
         <vaadin-button id="btnCols">Columns</vaadin-button>
         <div class="seg" id="layoutSeg" role="group" aria-label="Layout (V)"><button data-layout="table">Table</button><button data-layout="cards">Cards</button></div>
         <vaadin-button id="btnPrintFix" theme="small tertiary" class="hidden"></vaadin-button>
@@ -721,7 +723,7 @@ const clone = (o) => (o == null ? o : JSON.parse(JSON.stringify(o)));
 const ORD = { error: 5, fail: 4, near: 3, nodata: 2, ok: 1, none: 0 };
 const ST_LABEL = { ok: "Pass", near: "Almost", fail: "Fail", none: "No target", nodata: "No data", error: "Error", warn: "Warning" };
 
-S.ui = Object.assign({ scope: { kind: "cube" }, sel: null, scale: true, sort: null, show: "all", layout: "table" }, S.ui || {});
+S.ui = Object.assign({ scope: { kind: "cube" }, sel: null, scale: true, sort: null, show: "all", layout: "table", others: false }, S.ui || {});
 const U = S.ui;
 U.view = "work"; // the workbench is the main view; the overview is secondary
 // The card table shows the cube or the maybeboard (M). It holds across scopes; each page load starts on the cube, so
@@ -1779,7 +1781,7 @@ function valueCell(res, id) {
 const grid = $("#grid"), ROWS = new Map();
 /** One stable row object per card: the grid keeps selection by reference, and `k` carries our sort order. */
 const rowOf = (id) => { let r = ROWS.get(id); if (!r) ROWS.set(id, (r = { id, k: 0 })); return r; };
-let tableInfo = { hit: null, every: false, res: null }, colEls = {}, selCol = null;
+let tableInfo = { hit: null, every: false, res: null, valueColumn: true }, colEls = {}, selCol = null;
 function headerHtml(c) {
   if (c.key === "value") { const res = tableInfo.res; return res ? esc(res.name) : '<span class="muted">Rule value</span>'; }
   return c.label + (c.src ? `<span class="hinfo" title="${esc(D.sources[c.src] || "")}" aria-hidden="true">i</span>` : "");
@@ -1862,7 +1864,7 @@ const HIDE_ORDER = ["ccTags", "ccPicks", "ccCubes", "ccElo", "set", "colors", "w
 function sizeTable() {
   const w = ($("#tablewrap").clientWidth || innerWidth) - 4;
   U.cols = U.cols || {};
-  const on = new Set(COLS.filter((c) => !c.opt || U.cols[c.key]).map((c) => c.key));
+  const on = new Set(COLS.filter((c) => (!c.opt || U.cols[c.key]) && (c.key !== "value" || tableInfo.valueColumn)).map((c) => c.key));
   let total = 46 + COLS.filter((c) => on.has(c.key)).reduce((s, c) => s + c.w, 0);
   for (const k of HIDE_ORDER) { if (total <= w) break; if (on.has(k)) { on.delete(k); total -= COLS.find((c) => c.key === k).w; } }
   for (const c of COLS) { const col = colEls[c.key]; if (col && col.hidden !== !on.has(c.key)) col.hidden = !on.has(c.key); }
@@ -1881,10 +1883,9 @@ function computeRows() {
   if (viewFilter.items.length) {
     try { ids = ids.filter((id) => E.matches(byId[id], viewFilter, ctxQ)); } catch (e) { vfError = e.message; }
   }
-  const hit = res && res.cards && res.status !== "error" ? new Set(res.cards) : null;
-  const total = ids.length;
-  if (hit && U.show === "match") ids = ids.filter((id) => hit.has(id));
-  else if (hit && U.show === "miss") ids = ids.filter((id) => !hit.has(id));
+  // A mechanic or count rule lists only its cards unless Show others is on (E.cardTableView decides).
+  const view = E.cardTableView(ids, res, { show: U.show, showOthers: !!U.others }), hit = view.marked;
+  ids = view.ids;
   const col = U.sort && COLS.find((c) => c.key === U.sort.key);
   if (col) {
     const dir = U.sort.dir, get = col.key === "value" ? (id) => valueKey(res, id) : (id) => col.get(byId[id]);
@@ -1893,7 +1894,7 @@ function computeRows() {
       return (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0) * dir;
     }).map((x) => x[0]);
   } else if (hit) ids = ids.filter((id) => hit.has(id)).concat(ids.filter((id) => !hit.has(id)));
-  return { ids, hit, res, total, scopeTotal: sr.cards.length };
+  return { ids, hit, res, view, scopeTotal: sr.cards.length };
 }
 /** Border for the card view: "pass" (counted / passes), "cut" (the card itself breaks an "every" rule). */
 function cardMark(res, id, hit) {
@@ -1923,10 +1924,11 @@ function renderCards(ids, hit, res) {
 }
 function renderTable() {
   renderPrintFix();
-  const { ids, hit, res, scopeTotal } = computeRows();
+  const { ids, hit, res, view, scopeTotal } = computeRows();
   visibleIds = ids;
   const every = !!(res && res.measure && res.measure.kind === "every");
-  tableInfo = { hit, every, res };
+  tableInfo = { hit, every, res, valueColumn: view.valueColumn };
+  const onlyCounted = view.othersToggle && !U.others;
   const dir = U.sort ? U.sort.dir : 1;
   ids.forEach((id, i) => { rowOf(id).k = dir > 0 ? i : ids.length - i; });
   sizeTable();
@@ -1949,11 +1951,15 @@ function renderTable() {
   if (!ids.length) {
     em.classList.remove("hidden");
     em.innerHTML = vfError ? `<b>The filter has an error</b>${esc(vfError)}`
+      : onlyCounted && scopeTotal > 0 ? `<b>No ${mbMode ? "maybeboard cards would count" : "cards count"} for ${esc(res.name)}${String($("#q").value || "").trim() || viewFilter.items.length ? " with this search or filter" : ""}</b>Turn on Show others to see the ${mbMode ? "maybeboard " : ""}cards in this scope that ${mbMode ? "wouldn't" : "don't"} count.`
       : mbMode ? (scopeTotal === 0 ? `<b>No maybeboard cards in this scope</b>${mbR().cube.cards.length ? "The cards kept aside belong to other colours or archetypes." : "The maybeboard is empty: select cards in the cube and press ⇧⌫ to keep them aside."}` : `<b>No cards match</b>Clear the search or the filter to see all ${scopeTotal} maybeboard cards in this scope.`)
       : scopeTotal === 0 ? `<b>No cards in this scope yet</b>Use Add cards to search the pool.` : `<b>No cards match</b>Clear the search or the filter to see all ${scopeTotal} cards in this scope.`;
   } else em.classList.add("hidden");
+  const ob = $("#othersBox");
+  ob.classList.toggle("hidden", !view.othersToggle);
+  if (ob.checked !== !!U.others) ob.checked = !!U.others;
   const seg = $("#showSeg");
-  if (hit) {
+  if (view.showControl) {
     seg.classList.remove("hidden");
     const n = hit.size;
     const labels = mbMode
@@ -2150,6 +2156,8 @@ $("#btnCols").addEventListener("click", () => {
 $("#q").addEventListener("input", debounce(() => renderTable(), 80));
 $("#boardSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-board]"); if (b) setBoard(b.dataset.board); });
 $("#showSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-show]"); if (b) { U.show = b.dataset.show; save(); renderTable(); } });
+// "change" comes from the viewer only (renderTable sets `checked` without it). Turning it on starts on All, as before.
+$("#othersBox").addEventListener("change", (e) => { U.others = e.target.checked; U.show = "all"; save(); renderTable(); });
 $("#cardgrid").addEventListener("mousedown", (e) => { if (e.shiftKey) e.preventDefault(); });
 $("#cardgrid").addEventListener("click", (e) => {
   const tr = e.target.closest("[data-id]"); if (!tr) return;

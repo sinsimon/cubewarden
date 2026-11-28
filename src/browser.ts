@@ -26,6 +26,7 @@ import { referenceCounts, type ReferenceState } from "./references.ts";
 import { filterToText, parseFilter, parseRule, ruleToText } from "./syntax.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
 import { chordBadgeT, enemyLabel } from "./star.ts";
+import { cardTableView } from "./card-table.ts";
 import { createWorkspace, cubeAllows, sortCards, type Project, type SearchSource, type SortKey } from "./workspace.ts";
 import { loadHosted, resolveNames } from "./hosted.ts";
 
@@ -92,7 +93,7 @@ W.CubeEngine = {
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
   REPO_URL, SYNTAX_HELP, SOURCES, resolveNames, spellCosts,
   linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic, referenceCounts,
-  chordBadgeT, enemyLabel,
+  chordBadgeT, enemyLabel, cardTableView,
   allowedSets, allowedPrinting, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings,
 };
 
