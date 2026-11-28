@@ -11,6 +11,7 @@
  */
 import type { Card, Config } from "./model.ts";
 import { colorSet } from "./colors.ts";
+import { manaValue } from "./mana-value.ts";
 import { slug } from "./slug.ts";
 
 const BLOCK_RE = /```cubewarden v1\s+([A-Za-z0-9_-]+)\s*```|^\[cubewarden-v1\]:\s*cw:([A-Za-z0-9_-]+)\s*$/m;
@@ -89,7 +90,7 @@ export function cardFromCubeCobra(d: CubeCobraDetails): Card {
   const manaCost = costFromParsed(d.parsed_cost);
   return {
     id: d.oracle_id, name: d.name, colors: colorSet((d.colors || []).join("")), identity: colorSet((d.color_identity || []).join("")),
-    manaCost, hybrid: isHybridCost(manaCost), type: d.type || "", mv: Number(d.cmc) || 0, power: d.power ?? null, toughness: d.toughness ?? null,
+    manaCost, hybrid: isHybridCost(manaCost), type: d.type || "", mv: manaValue({ manaCost, mv: Number(d.cmc) || 0 }), power: d.power ?? null, toughness: d.toughness ?? null,
     text: d.oracle_text || "", keywords: (d.keywords || []).map((x) => x.toLowerCase()), tags: (d.oracle_tags || []).map(slug),
     set: d.set ?? null, number: d.collector_number ?? null, rarity: d.rarity ?? null, printSets: d.set ? [d.set] : [],
     image: d.scryfall_id ? scryfallImage(d.scryfall_id) : d.image_normal || null, scryfallId: d.scryfall_id ?? null,

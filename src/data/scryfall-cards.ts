@@ -4,6 +4,7 @@
 import type { Card, Printing } from "../model.ts";
 import { colorSet } from "../colors.ts";
 import { isHybridCost } from "../cubecobra.ts";
+import { manaValue } from "../mana-value.ts";
 import type { Http } from "./http.ts";
 
 const API = "https://api.scryfall.com";
@@ -83,7 +84,7 @@ export function cardFromPrintings(prints: ScryfallCard[], shown: ScryfallCard = 
     id: oracleIdOf(shown)!, name: shown.name,
     colors: colorSet((shown.colors ?? front?.colors ?? []).join("")), identity: colorSet((shown.color_identity || []).join("")),
     manaCost, hybrid: isHybridCost(manaCost), type: shown.type_line ?? (shown.card_faces || []).map((f) => f.type_line).join(" // "),
-    mv: shown.cmc ?? 0, power: shown.power ?? front?.power ?? null, toughness: shown.toughness ?? front?.toughness ?? null,
+    mv: manaValue({ manaCost, mv: shown.cmc ?? 0 }), power: shown.power ?? front?.power ?? null, toughness: shown.toughness ?? front?.toughness ?? null,
     text: textOf(shown), keywords: (shown.keywords || []).map((k) => k.toLowerCase()), tags: [],
     set: shown.set, number: shown.collector_number, rarity: shown.rarity,
     printSets: [...new Set(prints.map((p) => p.set))].sort(), image: imageOf(shown), scryfallId: shown.id,

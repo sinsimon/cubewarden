@@ -9,6 +9,7 @@ export { archetypePool, colorPool, evaluate, evaluateMaybeboard, scopeCards, wor
 export { describeFilter } from "./describe.ts";
 export { isLinkedRule, linkedRule, linkedRules, mechanicOfRule, mechanicTarget, removeMechanic, saveMechanic, type MechanicTarget } from "./mechanic-target.ts";
 export { spellCosts, spellMvMatches, type SpellCost } from "./spell-costs.ts";
+export { manaValue, withManaValue } from "./mana-value.ts";
 export { toScryfall, type ScryfallScope } from "./scryfall.ts";
 export {
   cardFromCubeCobra, cubeCobraListUrl, decodeRules, encodeRules, fetchCubeCobra, isHybridCost, readCubeCobra,

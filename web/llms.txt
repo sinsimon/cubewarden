@@ -60,6 +60,9 @@ terminal, use Changes → "Download project file" and "Open project file".
   miracle, surge. `count(spellmv<=2)` counts cheap spells, `count(spellmv>=5)` big ones. An X spell matches any
   `>=`/`>` and `<=`/`<` from its X=0 cost. Creatures without a spell side and lands never match (`-spellmv>=0`
   finds them). Scryfall has no such filter: "Open in Scryfall" leaves it out and says so.
+- Mana value (`mv`, and `spellmv`, `avg(mv, …)`, curves, sorting, the `mv` of every card returned): a twobrid pip
+  `{2/X}` counts as 1.5, rounded down (Magmablood Archaic `{2/R}{2/R}{2/R}` = 4, Wildgrowth Archaic `{2/G}{2/G}` = 3).
+  Every other card has Scryfall's mana value.
 - Win rates (17Lands): `wr` is the WR Δ, in percentage points: the card's adjusted WR (GIH WR minus the strength of
   the decks it was played in) minus the average adjusted WR of its set's commons and uncommons. `wr>=1.5` = 1.5 points
   above an average common or uncommon, `wr<0` = below it; cards from different sets compare. Pages show it signed

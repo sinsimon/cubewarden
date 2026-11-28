@@ -10,6 +10,7 @@ import type { Card } from "./model.ts";
 import { aboutMarkdown } from "./about.ts";
 import { fetchCubeCobra } from "./cubecobra.ts";
 import { exportCsv, mechanicTags } from "./export.ts";
+import { withManaValue } from "./mana-value.ts";
 import { points } from "./fields.ts";
 import { printingLabel } from "./printing.ts";
 import { SYNTAX_HELP } from "./syntax-help.ts";
@@ -82,7 +83,7 @@ export async function run(argv: string[], io: Io): Promise<number> {
     const project: Project = JSON.parse(await readFile(projectPath, "utf8"));
     const raw = JSON.parse(await readFile(cardsPath, "utf8"));
     const list: Card[] = Array.isArray(raw) ? raw : raw.cards;
-    return createWorkspace(project, Object.fromEntries(list.map((c) => [c.id, c])));
+    return createWorkspace(project, Object.fromEntries(list.map((c) => [c.id, withManaValue(c)])));
   }
   const save = (p: Project) => writeFile(projectPath, JSON.stringify(p, null, 1) + "\n");
   const line = (f: Finding) => `  ${f.scope} · ${f.name}: ${f.value ?? "?"}${f.buckets ? " bucket(s) off" : ""} (target ${f.target}) ${f.status}${f.error ? " — " + f.error : ""}\n      ${f.rule}` +

@@ -14,6 +14,7 @@ import { describeFilter } from "./describe.ts";
 import { archetypePool, evaluate, evaluateMaybeboard, scopeCards } from "./evaluate.ts";
 import { changelist, diff, exportCsv, mechanicTags } from "./export.ts";
 import { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
+import { withManaValue } from "./mana-value.ts";
 import { FilterError, isCreature, isLand, matches, metricOf, validateFilter, type MatchContext } from "./filter.ts";
 import { allowedPrinting, allowedSets, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings } from "./printing.ts";
 import { toScryfall } from "./scryfall.ts";
@@ -70,6 +71,8 @@ function boot(storageKey: string) {
   const D = W.CUBE_DATA;
   if (!D) throw new Error("No card data: data.js did not load. Run `cubewarden serve` in your project folder.");
   D.sources = { ...SOURCES, ...(D.sources || {}) };
+  // Card data built before the twobrid rule still has Scryfall's mv: value it the engine's way.
+  D.cards = D.cards.map(withManaValue);
   const cardsById = Object.fromEntries(D.cards.map((c) => [c.id, c]));
   const store = storage(storageKey);
   const saved = store.load();

@@ -12,6 +12,7 @@
  * mana (a kicker that sacrifices, a flashback that taps creatures) add nothing. Creature faces and lands have none.
  */
 import type { Card } from "./model.ts";
+import { symbolValue } from "./mana-value.ts";
 import { cmp } from "./scryfall-subset.ts";
 
 export interface SpellCost {
@@ -36,10 +37,8 @@ function costOf(s: string): Cost {
   let mv = 0, x = 0;
   for (const [, sym] of s.matchAll(/\{([^}]+)\}/g)) {
     const u = sym.toUpperCase();
-    if (/^\d+$/.test(u)) mv += Number(u);
-    else if (u === "X" || u === "Y" || u === "Z") x++;
-    else if (/^\d+\//.test(u)) mv += Number(u.split("/")[0]);
-    else mv += 1;
+    if (u === "X" || u === "Y" || u === "Z") x++;
+    else mv += symbolValue(u);
   }
   return { mv, x };
 }
@@ -69,7 +68,8 @@ function costsOf(card: Pick<Card, "name" | "type" | "manaCost" | "text">): Spell
   const names = (card.name || "").split(" // ");
   const out: SpellCost[] = [];
   const add = (c: Cost, via: string) => {
-    if (!out.some((o) => o.mv === c.mv && (o.x ?? 0) === c.x)) out.push({ mv: c.mv, ...(c.x ? { x: c.x } : {}), via });
+    const mv = Math.floor(c.mv); // twobrid pips count 1.5 (see mana-value.ts)
+    if (!out.some((o) => o.mv === mv && (o.x ?? 0) === c.x)) out.push({ mv, ...(c.x ? { x: c.x } : {}), via });
   };
   faces(card).forEach((f, i) => {
     if (!f.cost || /\b(Creature|Land)\b/.test(f.type)) return;

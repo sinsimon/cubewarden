@@ -3,6 +3,7 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   otag:removal          Scryfall oracle tag (functional tag)
   t:creature  o:"draw a card"  kw:flying  m:{X}  name:bolt  !"Exact Name"
   mv>=4  pow>=3  tou<=2  ncolors>=2
+  mv (mana value): {2/X} counts as 1.5, rounded down ({2/R}{2/R}{2/R} = 4); the same in spellmv, avg, curves, sorting
   spellmv<=2  spellmv>=5  any mana value the card can be cast for as a noncreature spell: its own, the spell side of
                         an adventure/omen/prepared creature, each split half, kicker, tiered, spree (all modes),
                         flashback, harmonize, escape, foretell, overload, mayhem, sneak, warp…; an X spell goes up
