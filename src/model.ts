@@ -112,7 +112,8 @@ export interface ColorConfig {
 
 export interface Config {
   version: 1;
-  cube: { name: string; targetSize?: number | null; description?: string };
+  /** xValue: what each {X} in a mana cost counts in mana value ("X counts as"); absent = 0, the official rule. */
+  cube: { name: string; targetSize?: number | null; description?: string; xValue?: number };
   colors: ColorConfig[];
   archetypes: Archetype[];
   rules: Rule[];

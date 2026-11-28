@@ -4,6 +4,7 @@ import { bucketLabel, gap, inBucket, inConstraint, share, shareStatus, statusOf,
 import { METRICS, RETIRED } from "./fields.ts";
 import { isLand, matches, metricOf, type MatchContext } from "./filter.ts";
 import { WUBRG } from "./colors.ts";
+import { applyXValue, configXValue } from "./mana-value.ts";
 
 /** One bucket of a curve rule: its count (scaled like counts) or share in %, and how it compares with its target. */
 export interface CurveBucketResult {
@@ -193,6 +194,7 @@ export interface EvaluateOptions {
 
 export function evaluate(config: Config, cubeIds: string[], cardsById: Record<string, Card>, opts: EvaluateOptions = {}): Report {
   const cards = cubeIds.map((id) => cardsById[id]).filter(Boolean);
+  applyXValue(cards, configXValue(config)); // the cube's "X counts as" in the cards' mv (see mana-value.ts)
   const target = config.cube?.targetSize || null;
   const factor = opts.scale !== false && target && cards.length ? target / cards.length : 1;
   const cubeRules = config.rules.filter((r) => r.scope.kind === "cube").map((r) => measureRule(r, cards, undefined, factor));

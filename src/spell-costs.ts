@@ -8,15 +8,16 @@
  *     jump-start cost the face's own. Plot is not one: its cost exiles the card, which is later cast for free;
  *   - optional additional costs added to the face's cost: each kicker (and both of an "and/or" pair), one multikick,
  *     each tier, entwine, every spree mode together.
- * A cost with X (`x` = how many X it has) can be cast for its X=0 value or more, in steps of `x`. Costs that are not
+ * A cost with X (`x` = how many X it has) can be cast for its X=0 value or more, in steps of `x`; with the cube's
+ * "X counts as" setting (see mana-value.ts) each {X} counts that much in the starting value. Costs that are not
  * mana (a kicker that sacrifices, a flashback that taps creatures) add nothing. Creature faces and lands have none.
  */
 import type { Card } from "./model.ts";
-import { symbolValue } from "./mana-value.ts";
+import { appliedXValue, symbolValue } from "./mana-value.ts";
 import { cmp } from "./scryfall-subset.ts";
 
 export interface SpellCost {
-  /** Mana value paid, with X = 0. */
+  /** Mana value paid, with each {X} at the cube's X value (0 by default; Y and Z at 0). */
   mv: number;
   /** Number of X in the cost: the spell can also be cast for mv + x, mv + 2x… Absent when the cost has no X. */
   x?: number;
@@ -24,7 +25,8 @@ export interface SpellCost {
   via: string;
 }
 
-interface Cost { mv: number; x: number }
+/** mv without X, x = X/Y/Z symbols, xs = {X} symbols (they count the cube's X value). */
+interface Cost { mv: number; x: number; xs: number }
 
 const COST = String.raw`((?:\{[^}]+\})+)`;
 /** Keywords that cast the spell for the cost written after them ("Flashback {4}{R}", "Escape—{3}{B}, Exile…"). */
@@ -34,15 +36,15 @@ const ALTERNATIVE = ["flashback", "harmonize", "beam me up", "escape", "mayhem",
 const SAME_COST = ["retrace", "jump-start"];
 
 function costOf(s: string): Cost {
-  let mv = 0, x = 0;
+  let mv = 0, x = 0, xs = 0;
   for (const [, sym] of s.matchAll(/\{([^}]+)\}/g)) {
     const u = sym.toUpperCase();
-    if (u === "X" || u === "Y" || u === "Z") x++;
+    if (u === "X" || u === "Y" || u === "Z") { x++; if (u === "X") xs++; }
     else mv += symbolValue(u);
   }
-  return { mv, x };
+  return { mv, x, xs };
 }
-const plus = (...cs: Cost[]): Cost => ({ mv: cs.reduce((a, c) => a + c.mv, 0), x: cs.reduce((a, c) => a + c.x, 0) });
+const plus = (...cs: Cost[]): Cost => ({ mv: cs.reduce((a, c) => a + c.mv, 0), x: cs.reduce((a, c) => a + c.x, 0), xs: cs.reduce((a, c) => a + c.xs, 0) });
 const allMatches = (text: string, re: RegExp) => [...text.matchAll(re)].map((m) => m[1]);
 
 /** The faces of a card: type, mana cost (empty = cannot be cast) and rules text. */
@@ -64,11 +66,11 @@ function faces(card: Pick<Card, "type" | "manaCost" | "text">) {
   }));
 }
 
-function costsOf(card: Pick<Card, "name" | "type" | "manaCost" | "text">): SpellCost[] {
+function costsOf(card: Pick<Card, "name" | "type" | "manaCost" | "text">, xValue: number): SpellCost[] {
   const names = (card.name || "").split(" // ");
   const out: SpellCost[] = [];
   const add = (c: Cost, via: string) => {
-    const mv = Math.floor(c.mv); // twobrid pips count 1.5 (see mana-value.ts)
+    const mv = Math.floor(c.mv + c.xs * xValue); // twobrid pips count 1.5, each {X} the cube's X value (see mana-value.ts)
     if (!out.some((o) => o.mv === mv && (o.x ?? 0) === c.x)) out.push({ mv, ...(c.x ? { x: c.x } : {}), via });
   };
   faces(card).forEach((f, i) => {
@@ -103,16 +105,21 @@ function costsOf(card: Pick<Card, "name" | "type" | "manaCost" | "text">): Spell
   return out;
 }
 
-const memo = new WeakMap<object, SpellCost[]>();
+const memo = new WeakMap<object, { xValue: number; costs: SpellCost[] }>();
 
-/** Every mana value the card can be cast for as a noncreature spell, without repeats (see the top of this file). */
+/**
+ * Every mana value the card can be cast for as a noncreature spell, without repeats (see the top of this file), with
+ * each {X} at the X value the cube wrote into the card (applyXValue in mana-value.ts; 0 when none was).
+ */
 export function spellCosts(card: Pick<Card, "name" | "type" | "manaCost" | "text">): SpellCost[] {
+  const xValue = appliedXValue(card);
   let r = memo.get(card);
-  if (!r) memo.set(card, (r = costsOf(card)));
-  return r;
+  if (!r || r.xValue !== xValue) memo.set(card, (r = { xValue, costs: costsOf(card, xValue) }));
+  return r.costs;
 }
 
-/** True when one of the card's spell costs passes `op n`. An X cost passes any > or >=, and = for mv, mv + x… */
+/** True when one of the card's spell costs passes `op n`. An X cost passes any > or >=, and = for mv, mv + x…
+ *  (mv being its value with each {X} at the cube's X value). */
 export function spellMvMatches(card: Pick<Card, "name" | "type" | "manaCost" | "text">, op: string, n: number): boolean {
   return spellCosts(card).some((c) => {
     if (!c.x) return cmp(c.mv, op, n);

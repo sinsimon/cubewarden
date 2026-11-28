@@ -32,15 +32,18 @@ The page exposes `window.cubewarden`, the same operations as the command line:
 - `cubewarden.rules()`, `cubewarden.setRule({ id, name, scope, text, priority })`, `cubewarden.removeRule(id)`.
 - `cubewarden.mechanics()`, `cubewarden.setMechanic({ id, name, scope: "color:W" | "archetype:<id>", text, priority })`,
   `cubewarden.removeMechanic(id)`: the "musts" of a colour and the mechanics of an archetype (a mechanic counts cards).
+- `cubewarden.settings()`, `cubewarden.setSettings({ xValue })`: cube-wide settings, saved in the project.
+  `xValue` ("X counts as", Cube settings on the page) is what each `{X}` in a mana cost counts in mana value, a whole
+  number; 0, the default, is the official rule. `setSettings({ xValue: 2 })` makes `{X}{G}{G}` a 4.
 - `cubewarden.syntax()`: the filter and rule syntax. `cubewarden.help()`: this list.
 
 Where the browser supports WebMCP (`document.modelContext`), the same operations are registered as tools named
 `cubewarden_check`, `cubewarden_explain`, `cubewarden_search`, `cubewarden_try_changes`, `cubewarden_apply_changes`,
 `cubewarden_rules`, `cubewarden_set_rule`, `cubewarden_mechanics`, `cubewarden_set_mechanic`, `cubewarden_changes`,
 `cubewarden_maybeboard`, `cubewarden_printings`, `cubewarden_set_printing`, `cubewarden_printing_issues`,
-`cubewarden_use_allowed_printings`, `cubewarden_syntax`.
+`cubewarden_use_allowed_printings`, `cubewarden_settings`, `cubewarden_set_settings`, `cubewarden_syntax`.
 
-Ask the person before `applyChanges`, `setPrinting`, `useAllowedPrintings`, `setRule` or `removeRule`: they change
+Ask the person before `applyChanges`, `setPrinting`, `useAllowedPrintings`, `setRule`, `removeRule` or `setSettings`: they change
 the cube they are working on.
 
 ## For agents in a terminal
@@ -58,11 +61,13 @@ terminal, use Changes → "Download project file" and "Open project file".
   kicker (each and both), multikicker (one kick), tiered (each tier), spree (all modes), entwine, and the costs of
   flashback, harmonize, beam me up, escape, mayhem, overload, foretell, cleave, sneak, web-slinging, warp, madness,
   miracle, surge. `count(spellmv<=2)` counts cheap spells, `count(spellmv>=5)` big ones. An X spell matches any
-  `>=`/`>` and `<=`/`<` from its X=0 cost. Creatures without a spell side and lands never match (`-spellmv>=0`
-  finds them). Scryfall has no such filter: "Open in Scryfall" leaves it out and says so.
+  `>=`/`>` and `<=`/`<` from its cost with X at the cube's "X counts as" value (0 by default). Creatures without a
+  spell side and lands never match (`-spellmv>=0` finds them). Scryfall has no such filter: "Open in Scryfall" leaves it out and says so.
 - Mana value (`mv`, and `spellmv`, `avg(mv, …)`, curves, sorting, the `mv` of every card returned): a twobrid pip
   `{2/X}` counts as 1.5, rounded down (Magmablood Archaic `{2/R}{2/R}{2/R}` = 4, Wildgrowth Archaic `{2/G}{2/G}` = 3).
-  Every other card has Scryfall's mana value.
+  Every other card has Scryfall's mana value, except that with the cube setting "X counts as N" (default 0, the
+  official rule) each `{X}` in the mana cost (front face) counts N, added before rounding down: with N = 2,
+  `{X}{G}{G}` = 4, `{X}{X}{R}` = 5. An X only in the rules text changes nothing.
 - Win rates (17Lands): `wr` is the WR Δ, in percentage points: the card's adjusted WR (GIH WR minus the strength of
   the decks it was played in) minus the average adjusted WR of its set's commons and uncommons. `wr>=1.5` = 1.5 points
   above an average common or uncommon, `wr<0` = below it; cards from different sets compare. Pages show it signed

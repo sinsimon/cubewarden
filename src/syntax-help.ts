@@ -4,10 +4,13 @@ export const SYNTAX_HELP = `Filters (CubeCobra / Scryfall style; space = and, "o
   t:creature  o:"draw a card"  kw:flying  m:{X}  name:bolt  !"Exact Name"
   mv>=4  pow>=3  tou<=2  ncolors>=2
   mv (mana value): {2/X} counts as 1.5, rounded down ({2/R}{2/R}{2/R} = 4); the same in spellmv, avg, curves, sorting
+  mv with the cube setting "X counts as N" (default 0, the official rule): each {X} in the mana cost (front face)
+                        counts N, added before rounding down ({X}{G}{G} = 4 with N = 2); X in rules text is ignored
   spellmv<=2  spellmv>=5  any mana value the card can be cast for as a noncreature spell: its own, the spell side of
                         an adventure/omen/prepared creature, each split half, kicker, tiered, spree (all modes),
                         flashback, harmonize, escape, foretell, overload, mayhem, sneak, warp…; an X spell goes up
-                        from its X=0 cost; creatures and lands never match (Scryfall cannot filter it)
+                        from its cost with X = the cube's "X counts as" (0 by default); creatures and lands never
+                        match (Scryfall cannot filter it)
   c=wu (exactly)  c>=u (includes)  c<=wu (within)  c:c (colourless)  c=scope (the colour/archetype being checked)
   is:hybrid  r:common  r:u,r  s:fdn,trk (printed in any of these sets)
   wr>=1.5  wr<0 (17Lands WR Δ: points above or below the average common/uncommon of the card's set)

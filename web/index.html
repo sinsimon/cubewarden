@@ -761,6 +761,7 @@ let find = null;
 function save() { B.save(); }
 function recompute() {
   E.showPrintings(byId, S); // every cube and maybeboard card in its chosen printing (image, set, export)
+  E.applyXValue(byId, E.configXValue(S.config)); // mv of every card with the cube's "X counts as" (tables, search, sort)
   R = E.evaluate(S.config, S.current, byId, { scale: U.scale });
   if (draft) { RDC = draftConfig(); RD = E.evaluate(RDC, S.current, byId, { scale: U.scale }); }
   evalRefs(false);
@@ -940,7 +941,7 @@ const TIP = {
   noData: "Cards with no WR Δ (no 17Lands data for their set). They are left out of the averages",
   creNon: "Creatures / every other card in this list",
   curve: "Mana curve of the nonland cards: dark = creatures, light = noncreature. Hover a bar for its count",
-  mv: "Mana value of the front face; {2/X} counts as 1.5, rounded down",
+  mv: "Mana value of the front face; {2/X} counts as 1.5, rounded down; each {X} counts the cube's \"X counts as\" (Cube settings, default 0)",
   ccElo: "CubeCobra ELO from draft picks",
   ccCubes: "How many CubeCobra cubes include the card",
   ccPicks: "How many times the card was picked in CubeCobra drafts",
@@ -3210,10 +3211,11 @@ function renderRefList() {
   }) : [h("div", { class: "kempty" }, "No reference cubes.")]));
 }
 function openCubeModal() {
-  const w = { name: S.config.cube.name || "", target: S.config.cube.targetSize || "", ccid: S.config.cube.cubeCobraId || (S.source && S.source.id) || "" };
+  const w = { name: S.config.cube.name || "", target: S.config.cube.targetSize || "", xValue: String(E.configXValue(S.config)), ccid: S.config.cube.cubeCobraId || (S.source && S.source.id) || "" };
   openModal([drawerHeadModal("Cube settings"), h("div", { class: "dr-b" },
     h("div", { class: "fld" }, h("label", null, "Name"), inp("text", w.name, (v) => (w.name = v))),
     h("div", { class: "fld" }, h("label", null, "Target size (optional)"), inp("number", w.target, (v) => (w.target = v), "e.g. 360"), h("span", { class: "help" }, "With a target size, colour and archetype counts can be scaled to it. Leave it empty to always see actual counts.")),
+    h("div", { class: "fld" }, h("label", { for: "cubeXValue" }, "X counts as"), (() => { const i = inp("number", w.xValue, (v) => (w.xValue = v), "0", null, "1"); i.id = "cubeXValue"; i.min = "0"; i.style.maxWidth = "90px"; return i; })(), h("span", { class: "help" }, "Mana value used for each {X} in a mana cost (official rule: 0)")),
     h("div", { class: "fld" }, h("label", null, "CubeCobra cube id (optional)"), inp("text", w.ccid, (v) => (w.ccid = v), "address or id of your cube"), h("span", { class: "help" }, "Used for “see on CubeCobra” links in the About text.")),
     h("div", { class: "fld" }, h("span", { class: "lbl" }, "Reference cubes"), h("span", { class: "help" }, "Other public CubeCobra cubes measured with your rules, shown next to your numbers. Only their ids are saved."),
       h("div", { id: "refList" }),
@@ -3224,6 +3226,7 @@ function openCubeModal() {
     h("div", { class: "dr-f" }, h("button", { class: "btn primary", type: "button", onclick: () => {
       S.config.cube.name = w.name.trim() || "My cube";
       const t = Number(w.target); if (t > 0) S.config.cube.targetSize = t; else delete S.config.cube.targetSize;
+      const xv = Math.floor(Number(w.xValue)); if (xv > 0) S.config.cube.xValue = xv; else delete S.config.cube.xValue;
       const cid = parseCubeId(w.ccid); if (cid) S.config.cube.cubeCobraId = cid; else delete S.config.cube.cubeCobraId;
       closeModal(); save(); recompute(); renderAll();
     } }, "Save"), h("button", { class: "btn", type: "button", onclick: closeModal }, "Cancel"))]);

@@ -8,6 +8,7 @@ import { bucketLabel, formatConstraint, inConstraint, type Status } from "./cons
 import { evaluate, measureMechanic, memberOf, scopeCards, type EvaluateOptions, type Report, type Result, type SharedSummary } from "./evaluate.ts";
 import { changelist, diff, type Diff } from "./export.ts";
 import { matches, metricOf, type MatchContext } from "./filter.ts";
+import { applyXValue, configXValue } from "./mana-value.ts";
 import {
   allowedPrinting, allowedSets, choosePrinting, findPrinting, parsePrintingRef, printingChanges, printingIssues, printingLabel, printingsOf,
   showPrintings, type PrintingChange, type PrintingIssue,
@@ -78,6 +79,8 @@ export interface PrintingOptions {
   /** Every printing in the card data, the allowed sets first. allowed is null when no rule limits the sets. */
   options: (Printing & { label: string; allowed: boolean | null; shown: boolean })[];
 }
+/** Cube-wide settings. xValue: what each {X} in a mana cost counts in mana value (0 = the official rule). */
+export interface Settings { xValue: number }
 export interface PrintingSwitch { id: string; name: string; from: string; to: string }
 export interface Delta {
   size: { before: number; after: number };
@@ -100,9 +103,10 @@ export function scopeToText(s: Scope): string {
 
 export function createWorkspace(project: Project, cardsById: Record<string, Card>, opts: EvaluateOptions = {}) {
   const listeners = new Set<(p: Project) => void>();
-  // Every view and export of cardsById shows each entry's chosen printing.
-  showPrintings(cardsById, project);
-  const notify = () => { showPrintings(cardsById, project); listeners.forEach((f) => f(project)); };
+  // Every view and export of cardsById shows each entry's chosen printing, and mv with the cube's X value.
+  const show = () => { showPrintings(cardsById, project); applyXValue(cardsById, configXValue(project.config)); };
+  show();
+  const notify = () => { show(); listeners.forEach((f) => f(project)); };
   const byName = new Map(Object.values(cardsById).map((c) => [c.name.toLowerCase(), c]));
 
   const report = (ids = project.current): Report => evaluate(project.config, ids, cardsById, opts);
@@ -398,6 +402,23 @@ export function createWorkspace(project: Project, cardsById: Record<string, Card
       if (!found) throw new Error(`Unknown mechanic "${id}"`);
       found.list.splice(found.index, 1);
       notify();
+    },
+
+    /** Cube-wide settings: what each {X} counts in mana value. */
+    settings(): Settings {
+      return { xValue: configXValue(project.config) };
+    },
+
+    /** Changes cube-wide settings: xValue, a whole number from 0 (0 = the official rule, kept out of the project). */
+    setSettings(input: Partial<Settings>): Settings {
+      if (input.xValue !== undefined) {
+        const n = input.xValue;
+        if (typeof n !== "number" || !Number.isInteger(n) || n < 0) throw new Error(`"X counts as" must be a whole number from 0 (got ${JSON.stringify(n)})`);
+        if (n) project.config.cube.xValue = n;
+        else delete project.config.cube.xValue;
+      }
+      notify();
+      return api.settings();
     },
 
     onChange(f: (p: Project) => void) {

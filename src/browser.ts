@@ -14,7 +14,7 @@ import { describeFilter } from "./describe.ts";
 import { archetypePool, evaluate, evaluateMaybeboard, scopeCards } from "./evaluate.ts";
 import { changelist, diff, exportCsv, mechanicTags } from "./export.ts";
 import { FIELD, FIELDS, METRICS, pct } from "./fields.ts";
-import { withManaValue } from "./mana-value.ts";
+import { applyXValue, configXValue, withManaValue } from "./mana-value.ts";
 import { FilterError, isCreature, isLand, matches, metricOf, validateFilter, type MatchContext } from "./filter.ts";
 import { allowedPrinting, allowedSets, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings } from "./printing.ts";
 import { toScryfall } from "./scryfall.ts";
@@ -93,7 +93,7 @@ W.CubeEngine = {
   parseFilterText: parseFilter, filterToText, parseRuleText: parseRule, ruleToText, toScryfall, aboutMarkdown,
   REPO_URL, SYNTAX_HELP, SOURCES, resolveNames, spellCosts,
   linkedRule, linkedRules, mechanicOfRule, mechanicTarget, saveMechanic, removeMechanic, referenceCounts,
-  chordBadgeT, enemyLabel, cardTableView,
+  chordBadgeT, enemyLabel, cardTableView, applyXValue, configXValue,
   allowedSets, allowedPrinting, basePrinting, choosePrinting, printingChanges, printingIssues, printingLabel, printingsOf, showPrintings,
 };
 
@@ -160,6 +160,8 @@ function pick(ws: ReturnType<typeof createWorkspace>, before: (label: string) =>
     mechanics: () => ws.mechanics(),
     setMechanic: (m: Parameters<typeof ws.setMechanic>[0]) => undoable(`mechanic ${m.id}`, () => ws.setMechanic(m)),
     removeMechanic: (id: string) => undoable(`remove mechanic ${id}`, () => ws.removeMechanic(id)),
+    settings: () => ws.settings(),
+    setSettings: (s: Parameters<typeof ws.setSettings>[0]) => undoable("cube settings", () => ws.setSettings(s)),
     project: () => structuredClone(ws.project),
   };
 }
@@ -185,6 +187,9 @@ const AGENT_HELP = `window.cubewarden: the cube on this page, for agents. Same o
   changes()                       adds/removes against the imported list, with a changelist
   rules() / setRule({id, name, scope, text, priority}) / removeRule(id)
   mechanics() / setMechanic({id, name, scope: "color:W" | "archetype:<id>", text, priority}) / removeMechanic(id)
+  settings() / setSettings({xValue})   cube-wide settings; xValue = "X counts as": what each {X} in a mana cost
+                                  counts in mana value (mv, spellmv, curves, avg, sorting), a whole number, 0 = the
+                                  official rule (e.g. setSettings({xValue: 2}): {X}{G}{G} is 4)
   syntax()                        the filter and rule syntax
 The page keeps its work in this browser (localStorage). To work from a terminal instead, use the CLI: ${REPO_URL}`;
 
@@ -218,6 +223,8 @@ function registerWebMcp(api: ReturnType<typeof pick> & { syntax: () => string })
     { name: "cubewarden_set_printing", description: "Show and export a cube or maybeboard card in another printing: set code, optionally collector number", inputSchema: { type: "object", properties: { card: str, set: str, number: str }, required: ["card", "set"] }, run: (a: { card: string; set: string; number?: string }) => api.setPrinting(a.card, a.set, a.number) },
     { name: "cubewarden_printing_issues", description: "Cube and maybeboard cards shown in a printing outside the sets the cube's \"every card\" set rule allows, with the allowed printing to use", inputSchema: { type: "object", properties: {} }, run: () => api.printingIssues() },
     { name: "cubewarden_use_allowed_printings", description: "Switch cards to a printing in the allowed sets (the set their win rate comes from, else the newest allowed set): the named cards, or every card shown outside them", inputSchema: { type: "object", properties: { cards: names } }, run: (a: { cards?: string[] }) => api.useAllowedPrintings(a.cards) },
+    { name: "cubewarden_settings", description: "Cube-wide settings: xValue (\"X counts as\") = what each {X} in a mana cost counts in mana value, 0 = the official rule", inputSchema: { type: "object", properties: {} }, run: () => api.settings() },
+    { name: "cubewarden_set_settings", description: "Change cube-wide settings: xValue (\"X counts as\"), a whole number from 0, is what each {X} in a mana cost counts in mana value (mv, spellmv, curves, avg, sorting)", inputSchema: { type: "object", properties: { xValue: { type: "integer", minimum: 0 } } }, run: (a: { xValue?: number }) => api.setSettings(a) },
     { name: "cubewarden_changes", description: "Cards added and removed against the imported list", inputSchema: { type: "object", properties: {} }, run: () => api.changes() },
     { name: "cubewarden_syntax", description: "Filter and rule syntax", inputSchema: { type: "object", properties: {} }, run: () => api.syntax() },
   ];
