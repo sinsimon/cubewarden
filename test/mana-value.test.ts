@@ -130,6 +130,11 @@ describe("mana value: the cube's \"X counts as\" setting", () => {
     expect(manaValue(card("A", { manaCost: "{X}{G} // {1}{G}", mv: 1 }), 2)).toBe(3);
     expect(manaValue(card("A", { manaCost: "{U/R}{U/R} // {X}{U}{U}{R}{R}", mv: 6, type: "Instant // Instant" }), 2)).toBe(6);
   });
+  it("keeps valuing a twobrid front face from its cost on a card with more faces", () => {
+    expect(manaValue(card("A", { manaCost: "{2/R}{2/R} // {1}{R}", mv: 4 }))).toBe(3);
+    expect(manaValue(card("A", { manaCost: "{2/R}{2/R} // {1}{R}", mv: 4 }), 2)).toBe(3);
+    expect(manaValue(card("A", { manaCost: "{X}{2/R} // {1}{R}", mv: 2 }), 2)).toBe(3);
+  });
 
   it("leaves a project without the setting on the official rule", () => {
     const w = ws(project());

@@ -33,15 +33,17 @@ export function xCount(cost: string): number {
 
 /**
  * The card's mana value with twobrid pips at 1.5 and each {X} of its front face at xValue, rounded down once; the
- * card's own `mv` when neither applies. A card with one face is valued from its cost. One with more faces (a split
- * card's mv adds both halves) keeps its own `mv` plus xValue per {X} of the front face.
+ * card's own `mv` when neither applies. A card with twobrid pips, or with one face, is valued from its front face's
+ * cost. Any other card with more faces (a split card's mv adds both halves) keeps its own `mv` plus xValue per {X}
+ * of the front face.
  */
 export function manaValue(card: Pick<Card, "manaCost" | "mv">, xValue = 0): number {
   const faces = (card.manaCost || "").split(" // ");
   const front = faces[0];
   const xs = xValue ? xCount(front) : 0;
-  if (!TWOBRID.test(front) && !xs) return card.mv;
-  if (faces.length > 1) return Math.floor(card.mv + xs * xValue);
+  const twobrid = TWOBRID.test(front);
+  if (!twobrid && !xs) return card.mv;
+  if (!twobrid && faces.length > 1) return Math.floor(card.mv + xs * xValue);
   let v = 0;
   for (const [, sym] of front.matchAll(/\{([^}]+)\}/g)) v += symbolValue(sym, xValue);
   return Math.floor(v);
